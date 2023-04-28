@@ -1,0 +1,357 @@
+Session HTTP
+Introduction
+Configuration
+Prérequis du pilote
+Interagir avec la session
+Récupération des données
+Stocker des données
+Données Flash
+Suppression de données
+Régénérer l'ID de session
+Blocage de session
+Ajout de pilotes de session personnalisés
+Implémentation du pilote
+Enregistrement du pilote
+Introduction
+Étant donné que les applications pilotées par HTTP sont sans état, les sessions fournissent un moyen de stocker 
+
+des informations sur l'utilisateur à travers plusieurs requêtes. Ces informations utilisateur sont généralement 
+
+placées dans un magasin / backend persistant accessible à partir de requêtes ultérieures.
+
+Laravel est livré avec une variété de backends de session accessibles via une API expressive et unifiée. 
+
+La prise en charge des backends populaires tels que Memcached , Redis et les bases de données est incluse.
+
+Configuration
+Le fichier de configuration de session de votre application est stocké dans config/session.php.
+
+Assurez-vous de passer en revue les options qui s'offrent à vous dans ce fichier. Par défaut, 
+
+Laravel est configuré pour utiliser le file pilote de session, qui fonctionnera bien pour de 
+
+nombreuses applications. Si votre application doit être équilibrée en charge sur plusieurs serveurs Web, 
+
+vous devez choisir un magasin centralisé auquel tous les serveurs peuvent accéder, comme Redis ou une base de données.
+
+L'option  driver de configuration de session définit où les données de session seront stockées pour chaque requête. 
+
+Laravel est livré avec plusieurs excellents pilotes prêts à l'emploi :
+
+file- les sessions sont stockées dans storage/framework/sessions.
+cookie- les sessions sont stockées dans des cookies sécurisés et cryptés.
+database- les sessions sont stockées dans une base de données relationnelle.
+memcached/ redis- les sessions sont stockées dans l'un de ces magasins rapides basés sur le cache.
+dynamodb- les sessions sont stockées dans AWS DynamoDB.
+array- les sessions sont stockées dans un tableau PHP et ne seront pas persistantes.
+
+Le pilote de baie est principalement utilisé pendant les tests et empêche la persistance des données 
+
+stockées dans la session.
+
+
+Prérequis du pilote
+Base de données
+Lors de l'utilisation du databasepilote de session, vous devrez créer une table pour contenir les enregistrements 
+
+de session. Un exemple Schemade déclaration pour la table peut être trouvé ci-dessous :
+
+Schema::create('sessions', function ($table) {
+    $table->string('id')->primary();
+    $table->foreignId('')->nuser_idullable()->index();
+    $table->string('ip_address', 45)->nullable();
+    $table->text('user_agent')->nullable();
+    $table->text('payload');
+    $table->integer('last_activity')->index();
+});
+
+Vous pouvez utiliser la session:table commande Artisan pour générer cette migration. Pour en savoir plus sur les migrations de bases de données, vous pouvez consulter la documentation complète sur la migration :
+
+php artisan session:table
+ 
+php artisan migrate
+
+Redis
+Avant d'utiliser les sessions Redis avec Laravel, vous devrez soit installer l'extension PHP PhpRedis via PECL, 
+
+soit installer le predis/predispackage (~1.0) via Composer. Pour plus d'informations sur la configuration de Redis, 
+
+consultez la documentation Redis de Laravel .
+
+
+Dans le fichier session de configuration, l'option  connection peut être utilisée pour spécifier quelle connexion 
+Redis est utilisée par la session.
+
+
+Interagir avec la session
+Récupération des données
+Il existe deux manières principales de travailler avec les données de session dans Laravel : l'assistant session 
+
+global et via une instance Request. Tout d'abord, examinons l'accès à la session via une Request instance, 
+
+qui peut être indiquée sur une fermeture de route ou une méthode de contrôleur. N'oubliez pas que les d
+
+épendances de la méthode du contrôleur sont automatiquement injectées via le conteneur de service Laravel :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show the profile for the given user.
+     *
+     * @param  Request  $request
+     * @param  int  $id
+     * @return Response
+     */
+    public function show(Request $request, $id)
+    {
+        $value = $request->session()->get('key');
+ 
+        //
+    }
+}
+
+Lorsque vous récupérez un élément de la session, vous pouvez également transmettre une valeur par 
+
+défaut comme deuxième argument à la get méthode. Cette valeur par défaut sera renvoyée si la clé spécifiée 
+
+n'existe pas dans la session. Si vous passez une fermeture comme valeur par défaut à la get méthode 
+
+et que la clé demandée n'existe pas, la fermeture sera exécutée et son résultat renvoyé :
+
+$value = $request->session()->get('key', 'default');
+ 
+$value = $request->session()->get('key', function () {
+    return 'default';
+});
+
+L'assistant de session globale
+Vous pouvez également utiliser la fonction PHP globale session pour récupérer et stocker des données dans la session. 
+
+Lorsque l' session assistant est appelé avec un seul argument de chaîne, il renverra la valeur de 
+
+cette clé de session. Lorsque l'assistant est appelé avec un tableau de paires clé/valeur, ces valeurs seront 
+
+stockées dans la session :
+
+Route::get('/home', function () {
+    // Retrieve a piece of data from the session...
+    $value = session('key');
+ 
+    // Specifying a default value...
+    $value = session('key', 'default');
+ 
+    // Store a piece of data in the session...
+    session(['key' => 'value']);
+});
+
+
+Il y a peu de différence pratique entre l'utilisation de la session via une instance de requête HTTP et 
+
+l'utilisation de l' sessionassistant global. Les deux méthodes peuvent être testées via la assertSessionHas méthode 
+
+disponible dans tous vos cas de test.
+
+
+Récupération de toutes les données de session
+Si vous souhaitez récupérer toutes les données de la session, vous pouvez utiliser la allméthode :
+
+$data = $request->session()->all();
+
+Déterminer si un élément existe dans la session
+Pour déterminer si un élément est présent dans la session, vous pouvez utiliser la has méthode. La has 
+
+méthode retourne true si l'item est présent et n'est pas null:
+
+if ($request->session()->has('users')) {
+    //
+}
+
+Pour déterminer si un élément est présent dans la session, même si sa valeur est null, vous pouvez utiliser la exists 
+
+méthode :
+
+if ($request->session()->exists('users')) {
+    //
+}
+
+Pour déterminer si un élément n'est pas présent dans la session, vous pouvez utiliser la missing méthode. 
+
+La missing méthode retourne true si l'élément est null ou si l'élément n'est pas présent :
+
+if ($request->session()->missing('users')) {
+    //
+}
+
+Stocker des données
+Pour stocker des données dans la session, vous utiliserez généralement la méthode de l'instance de requête 
+
+ou l' assistant put global :session
+
+// Via a request instance...
+$request->session()->put('key', 'value');
+ 
+// Via the global "session" helper...
+session(['key' => 'value']);
+
+Pousser vers les valeurs de session du tableau
+Le push procédé peut être utilisé pour pousser une nouvelle valeur sur une valeur de session qui est un tableau. 
+
+Par exemple, si la user.teams clé contient un tableau de noms d'équipe, vous pouvez insérer une nouvelle 
+
+valeur dans le tableau comme suit :
+
+$request->session()->push('user.teams', 'developers');
+
+Récupération et suppression d'un élément
+La pullméthode récupérera et supprimera un élément de la session en une seule instruction :
+
+$value = $request->session()->pull('key', 'default');
+
+Incrémentation et décrémentation des valeurs de session
+Si vos données de session contiennent un entier que vous souhaitez incrémenter ou décrémenter, vous pouvez utiliser les méthodes incrementet :decrement
+
+$request->session()->increment('count');
+ 
+$request->session()->increment('count', $incrementBy = 2);
+ 
+$request->session()->decrement('count');
+ 
+$request->session()->decrement('count', $decrementBy = 2);
+
+Données Flash
+Parfois, vous souhaiterez peut-être stocker des éléments dans la session pour la prochaine demande. Vous pouvez le faire en utilisant la flashméthode. Les données stockées dans la session à l'aide de cette méthode seront disponibles immédiatement et lors de la requête HTTP suivante. Après la requête HTTP suivante, les données flashées seront supprimées. Les données Flash sont principalement utiles pour les messages d'état de courte durée :
+
+$request->session()->flash('status', 'Task was successful!');
+
+Si vous avez besoin de conserver vos données flash pour plusieurs requêtes, vous pouvez utiliser la reflashméthode, qui conservera toutes les données flash pour une requête supplémentaire. Si vous n'avez besoin de conserver que des données flash spécifiques, vous pouvez utiliser la keepméthode :
+
+$request->session()->reflash();
+ 
+$request->session()->keep(['username', 'email']);
+
+Pour conserver vos données flash uniquement pour la requête en cours, vous pouvez utiliser la nowméthode :
+
+$request->session()->now('status', 'Task was successful!');
+
+Suppression de données
+La forgetméthode supprimera une donnée de la session. Si vous souhaitez supprimer toutes les données de la session, vous pouvez utiliser la flushméthode :
+
+// Forget a single key...
+$request->session()->forget('name');
+ 
+// Forget multiple keys...
+$request->session()->forget(['name', 'status']);
+ 
+$request->session()->flush();
+
+Régénérer l'ID de session
+La régénération de l'ID de session est souvent effectuée afin d'empêcher les utilisateurs malveillants d'exploiter une attaque de fixation de session sur votre application.
+
+Laravel régénère automatiquement l'ID de session lors de l'authentification si vous utilisez l'un des kits de démarrage d'application Laravel ou Laravel Fortify ; cependant, si vous devez régénérer manuellement l'ID de session, vous pouvez utiliser la regenerateméthode :
+
+$request->session()->regenerate();
+
+Si vous devez régénérer l'ID de session et supprimer toutes les données de la session en une seule instruction, vous pouvez utiliser la invalidateméthode :
+
+$request->session()->invalidate();
+
+Blocage de session
+
+Pour utiliser le blocage de session, votre application doit utiliser un pilote de cache prenant en charge les verrous atomiques . Actuellement, ces pilotes de cache incluent les pilotes memcached, dynamodb, rediset database. De plus, vous ne pouvez pas utiliser le cookiepilote de session.
+
+
+Par défaut, Laravel permet aux requêtes utilisant la même session de s'exécuter simultanément. Ainsi, par exemple, si vous utilisez une bibliothèque HTTP JavaScript pour envoyer deux requêtes HTTP à votre application, elles s'exécuteront toutes les deux en même temps. Pour de nombreuses applications, ce n'est pas un problème ; cependant, la perte de données de session peut se produire dans un petit sous-ensemble d'applications qui effectuent des demandes simultanées à deux points de terminaison d'application différents qui écrivent tous deux des données dans la session.
+
+Pour atténuer cela, Laravel fournit une fonctionnalité qui vous permet de limiter les demandes simultanées pour une session donnée. Pour commencer, vous pouvez simplement enchaîner la blockméthode sur votre définition de route. Dans cet exemple, une demande entrante au point de /profileterminaison acquérait un verrou de session. Pendant que ce verrou est maintenu, toutes les requêtes entrantes vers le /profileou les points de /orderterminaison qui partagent le même ID de session attendront la fin de l'exécution de la première requête avant de poursuivre leur exécution :
+
+Route::post('/profile', function () {
+    //
+})->block($lockSeconds = 10, $waitSeconds = 10)
+ 
+Route::post('/order', function () {
+    //
+})->block($lockSeconds = 10, $waitSeconds = 10)
+
+La blockméthode accepte deux arguments facultatifs. Le premier argument accepté par la blockméthode est le nombre maximal de secondes pendant lesquelles le verrou de session doit être maintenu avant d'être libéré. Bien sûr, si la requête finit de s'exécuter avant cette heure, le verrou sera libéré plus tôt.
+
+Le deuxième argument accepté par la blockméthode est le nombre de secondes qu'une requête doit attendre lors de la tentative d'obtention d'un verrou de session. Un Illuminate\Contracts\Cache\LockTimeoutExceptionsera émis si la requête ne parvient pas à obtenir un verrou de session dans le nombre de secondes donné.
+
+Si aucun de ces arguments n'est passé, le verrou sera obtenu pendant un maximum de 10 secondes et les requêtes attendront un maximum de 10 secondes lors de la tentative d'obtention d'un verrou :
+
+Route::post('/profile', function () {
+    //
+})->block()
+
+Ajout de pilotes de session personnalisés
+Implémentation du pilote
+Si aucun des pilotes de session existants ne correspond aux besoins de votre application, Laravel permet d'écrire votre propre gestionnaire de session. Votre pilote de session personnalisé doit implémenter le fichier SessionHandlerInterface. Cette interface ne contient que quelques méthodes simples. Une implémentation MongoDB stub ressemble à ceci :
+
+<?php
+ 
+namespace App\Extensions;
+ 
+class MongoSessionHandler implements \SessionHandlerInterface
+{
+    public function open($savePath, $sessionName) {}
+    public function close() {}
+    public function read($sessionId) {}
+    public function write($sessionId, $data) {}
+    public function destroy($sessionId) {}
+    public function gc($lifetime) {}
+}
+
+
+Laravel n'est pas livré avec un répertoire pour contenir vos extensions. Vous êtes libre de les placer où bon vous semble. Dans cet exemple, nous avons créé un Extensionsrépertoire pour héberger le fichier MongoSessionHandler.
+
+
+Étant donné que le but de ces méthodes n'est pas facilement compréhensible, couvrons rapidement ce que font chacune des méthodes :
+
+Le openprocédé serait généralement utilisé dans des systèmes de stockage de sessions basés sur des fichiers. Étant donné que Laravel est livré avec un filepilote de session, vous aurez rarement besoin de mettre quoi que ce soit dans cette méthode. Vous pouvez simplement laisser cette méthode vide.
+La closeméthode, comme la openméthode, peut aussi généralement être ignorée. Pour la plupart des pilotes, ce n'est pas nécessaire.
+La readméthode doit renvoyer la version de chaîne des données de session associées au fichier $sessionId. Il n'est pas nécessaire d'effectuer une sérialisation ou un autre encodage lors de la récupération ou du stockage des données de session dans votre pilote, car Laravel effectuera la sérialisation pour vous.
+La writeméthode doit écrire la $datachaîne donnée associée $sessionIdà un système de stockage persistant, tel que MongoDB ou un autre système de stockage de votre choix. Encore une fois, vous ne devez effectuer aucune sérialisation - Laravel l'aura déjà géré pour vous.
+La destroyméthode doit supprimer les données associées à $sessionIddu stockage persistant.
+La gcméthode doit détruire toutes les données de session antérieures à la valeur donnée $lifetime, qui est un horodatage UNIX. Pour les systèmes à expiration automatique comme Memcached et Redis, cette méthode peut être laissée vide.
+Enregistrement du pilote
+Une fois votre pilote implémenté, vous êtes prêt à l'enregistrer auprès de Laravel. Pour ajouter des pilotes supplémentaires au backend de session de Laravel, vous pouvez utiliser la extendméthode fournie par la Session facade . Vous devez appeler la extendméthode à partir de la bootméthode d'un fournisseur de services . Vous pouvez le faire à partir du fournisseur existant App\Providers\AppServiceProviderou créer un tout nouveau fournisseur :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Extensions\MongoSessionHandler;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\ServiceProvider;
+ 
+class SessionServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Session::extend('mongo', function ($app) {
+            // Return an implementation of SessionHandlerInterface...
+            return new MongoSessionHandler;
+        });
+    }
+}

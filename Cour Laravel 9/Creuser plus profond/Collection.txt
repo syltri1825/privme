@@ -1,0 +1,3112 @@
+
+Introduction
+Création de collections
+Extension des collections
+Méthodes disponibles
+Messages d'ordre supérieur
+Collections paresseuses
+Introduction
+Création de collections paresseuses
+Le contrat énumérable
+Méthodes de collecte paresseuses
+Introduction
+La Illuminate\Support\Collectionclasse fournit un wrapper fluide et pratique pour travailler avec des tableaux de données. Par exemple, consultez le code suivant. Nous allons utiliser l' collectassistant pour créer une nouvelle instance de collection à partir du tableau, exécuter la strtoupperfonction sur chaque élément, puis supprimer tous les éléments vides :
+
+$collection = collect(['taylor', 'abigail', null])->map(function ($name) {
+    return strtoupper($name);
+})->reject(function ($name) {
+    return empty($name);
+});
+
+Comme vous pouvez le voir, la Collectionclasse vous permet de chaîner ses méthodes pour effectuer un mappage fluide et une réduction du tableau sous-jacent. En général, les collections sont immuables, ce qui signifie que chaque Collectionméthode renvoie une Collectioninstance entièrement nouvelle.
+
+Création de collections
+Comme mentionné ci-dessus, l' collectassistant renvoie une nouvelle Illuminate\Support\Collectioninstance pour le tableau donné. Ainsi, créer une collection est aussi simple que :
+
+$collection = collect([1, 2, 3]);
+
+
+Les résultats des requêtes Eloquent sont toujours renvoyés sous forme d' Collectioninstances.
+
+
+Extension des collections
+Les collections sont "macroables", ce qui vous permet d'ajouter des méthodes supplémentaires à la Collectionclasse au moment de l'exécution. La méthode Illuminate\Support\Collectionde la classe macroaccepte une fermeture qui sera exécutée lorsque votre macro sera appelée. La fermeture de la macro peut accéder aux autres méthodes de la collection via $this, comme s'il s'agissait d'une véritable méthode de la classe collection. Par exemple, le code suivant ajoute une toUpperméthode à la Collectionclasse :
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+ 
+Collection::macro('toUpper', function () {
+    return $this->map(function ($value) {
+        return Str::upper($value);
+    });
+});
+ 
+$collection = collect(['first', 'second']);
+ 
+$upper = $collection->toUpper();
+ 
+// ['FIRST', 'SECOND']
+
+En règle générale, vous devez déclarer les macros de collection dans la bootméthode d'un fournisseur de services .
+
+Macro-arguments
+Si nécessaire, vous pouvez définir des macros acceptant des arguments supplémentaires :
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Lang;
+ 
+Collection::macro('toLocale', function ($locale) {
+    return $this->map(function ($value) use ($locale) {
+        return Lang::get($value, [], $locale);
+    });
+});
+ 
+$collection = collect(['first', 'second']);
+ 
+$translated = $collection->toLocale('es');
+
+Méthodes disponibles
+Pour la majorité de la documentation de collection restante, nous discuterons de chaque méthode disponible sur la Collectionclasse. N'oubliez pas que toutes ces méthodes peuvent être chaînées pour manipuler facilement le tableau sous-jacent. De plus, presque toutes les méthodes renvoient une nouvelle Collectioninstance, vous permettant de conserver la copie originale de la collection si nécessaire :
+
+tout
+moyen
+moyenne
+tronçon
+morceauTant que
+effondrement
+recueillir
+combiner
+concat
+contient
+contientUnÉlément
+contientStrict
+compter
+countBy
+crossJoin
+jj
+différence
+diffAssoc
+diffKeys
+ne contient pas
+décharger
+doublons
+doublonsStrict
+chaque
+chacunPropagation
+tous
+à l'exception
+filtre
+première
+firstOrFail
+premierOù
+flatMap
+aplatir
+retourner
+Oubliez
+pourPage
+obtenir
+par groupe
+a
+aAny
+imploser
+couper
+intersectByKeys
+est vide
+n'est pas vide
+rejoindre
+keyBy
+clés
+dernière
+paresseux
+macro
+Fabriquer
+carte
+mapInto
+cartePropagation
+mapToGroups
+mapWithKeys
+maximum
+médian
+fusionner
+mergeRécursif
+min
+mode
+nième
+seulement
+tampon
+cloison
+tuyau
+pipeInto
+tuyauPar
+cueillir
+populaire
+ajouter
+tirer
+pousser
+mettre
+Aléatoire
+intervalle
+réduire
+réduire la propagation
+rejeter
+remplacer
+replaceRécursif
+inverse
+chercher
+décalage
+mélanger
+sauter
+sauterjusqu'à
+sauterPendant
+tranche
+glissement
+Unique
+quelques
+trier
+Trier par
+triParDesc
+sortDesc
+sortKeys
+sortKeysDesc
+triClésUtilisation
+épissure
+diviser
+divisé en
+somme
+prendre
+prendre jusqu'à
+prendre tant que
+robinet
+fois
+versTableau
+àJson
+transformer
+défaire
+syndicat
+unique
+uniqueStrict
+sauf si
+à moinsVide
+à moins que ce ne soit pas vide
+déballer
+évaluer
+valeurs
+lorsque
+quandvide
+quandpasvide
+où
+oùStrict
+oùEntre
+où
+oùDansStrict
+oùInstanceOf
+oùPasEntre
+oùpasdans
+whereNotInStrict
+oùNonNull
+oùNull
+envelopper
+Zip *: français
+
+Liste des méthodes
+all()
+La allméthode renvoie le tableau sous-jacent représenté par la collection :
+
+collect([1, 2, 3])->all();
+ 
+// [1, 2, 3]
+
+average()
+Alias ​​de la avgméthode.
+
+avg()
+La avgméthode renvoie la valeur moyenne d'une clé donnée :
+
+$average = collect([
+    ['foo' => 10],
+    ['foo' => 10],
+    ['foo' => 20],
+    ['foo' => 40]
+])->avg('foo');
+ 
+// 20
+ 
+$average = collect([1, 1, 2, 4])->avg();
+ 
+// 2
+
+chunk()
+La chunkméthode divise la collection en plusieurs collections plus petites d'une taille donnée :
+
+$collection = collect([1, 2, 3, 4, 5, 6, 7]);
+ 
+$chunks = $collection->chunk(4);
+ 
+$chunks->all();
+ 
+// [[1, 2, 3, 4], [5, 6, 7]]
+
+Cette méthode est particulièrement utile dans les vues lorsque vous travaillez avec un système de grille tel que Bootstrap . Par exemple, imaginez que vous avez une collection de modèles Eloquent que vous souhaitez afficher dans une grille :
+
+@foreach ($products->chunk(3) as $chunk)
+    <div class="row">
+        @foreach ($chunk as $product)
+            <div class="col-xs-4">{{ $product->name }}</div>
+        @endforeach
+    </div>
+@endforeach
+
+chunkWhile()
+La chunkWhileméthode divise la collection en plusieurs collections plus petites en fonction de l'évaluation du rappel donné. La $chunkvariable passée à la fermeture peut être utilisée pour inspecter l'élément précédent :
+
+$collection = collect(str_split('AABBCCCD'));
+ 
+$chunks = $collection->chunkWhile(function ($value, $key, $chunk) {
+    return $value === $chunk->last();
+});
+ 
+$chunks->all();
+ 
+// [['A', 'A'], ['B', 'B'], ['C', 'C', 'C'], ['D']]
+
+collapse()
+La collapseméthode réduit une collection de tableaux en une seule collection plate :
+
+$collection = collect([
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9],
+]);
+ 
+$collapsed = $collection->collapse();
+ 
+$collapsed->all();
+ 
+// [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+collect()
+La collectméthode renvoie une nouvelle Collectioninstance avec les éléments actuellement dans la collection :
+
+$collectionA = collect([1, 2, 3]);
+ 
+$collectionB = $collectionA->collect();
+ 
+$collectionB->all();
+ 
+// [1, 2, 3]
+
+La collectméthode est principalement utile pour convertir des collections paresseusesCollection en instances standard :
+
+$lazyCollection = LazyCollection::make(function () {
+    yield 1;
+    yield 2;
+    yield 3;
+});
+ 
+$collection = $lazyCollection->collect();
+ 
+get_class($collection);
+ 
+// 'Illuminate\Support\Collection'
+ 
+$collection->all();
+ 
+// [1, 2, 3]
+
+
+La collectméthode est particulièrement utile lorsque vous avez une instance de Enumerableet avez besoin d'une instance de collection non différée. Puisque cela collect()fait partie du Enumerablecontrat, vous pouvez l'utiliser en toute sécurité pour obtenir une Collectioninstance.
+
+
+combine()
+La combineméthode combine les valeurs de la collection, sous forme de clés, avec les valeurs d'un autre tableau ou d'une autre collection :
+
+$collection = collect(['name', 'age']);
+ 
+$combined = $collection->combine(['George', 29]);
+ 
+$combined->all();
+ 
+// ['name' => 'George', 'age' => 29]
+
+concat()
+La concatméthode ajoute les arrayvaleurs données ou de la collection à la fin d'une autre collection :
+
+$collection = collect(['John Doe']);
+ 
+$concatenated = $collection->concat(['Jane Doe'])->concat(['name' => 'Johnny Doe']);
+ 
+$concatenated->all();
+ 
+// ['John Doe', 'Jane Doe', 'Johnny Doe']
+
+La concatméthode réindexe numériquement les clés des éléments concaténés dans la collection d'origine. Pour conserver les clés dans les collections associatives, consultez la méthode de fusion .
+
+contains()
+La containsméthode détermine si la collection contient un élément donné. Vous pouvez passer une fermeture à la containsméthode pour déterminer si un élément existe dans la collection correspondant à un test de vérité donné :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->contains(function ($value, $key) {
+    return $value > 5;
+});
+ 
+// false
+
+Vous pouvez également passer une chaîne à la containsméthode pour déterminer si la collection contient une valeur d'élément donnée :
+
+$collection = collect(['name' => 'Desk', 'price' => 100]);
+ 
+$collection->contains('Desk');
+ 
+// true
+ 
+$collection->contains('New York');
+ 
+// false
+
+Vous pouvez également passer une paire clé/valeur à la containsméthode, qui déterminera si la paire donnée existe dans la collection :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+]);
+ 
+$collection->contains('product', 'Bookcase');
+ 
+// false
+
+La containsméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Utilisez la containsStrictméthode pour filtrer à l'aide de comparaisons "strictes".
+
+Pour l'inverse de contains, voir la méthode doesntContain .
+
+containsOneItem()
+La containsOneItemméthode détermine si la collection contient un seul élément :
+
+collect([])->containsOneItem();
+ 
+// false
+ 
+collect(['1'])->containsOneItem();
+ 
+// true
+ 
+collect(['1', '2'])->containsOneItem();
+ 
+// false
+
+containsStrict()
+Cette méthode a la même signature que la containsméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+count()
+La countméthode renvoie le nombre total d'éléments de la collection :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$collection->count();
+ 
+// 4
+
+countBy()
+La countByméthode compte les occurrences de valeurs dans la collection. Par défaut, la méthode compte les occurrences de chaque élément, vous permettant de compter certains "types" d'éléments dans la collection :
+
+$collection = collect([1, 2, 2, 2, 3]);
+ 
+$counted = $collection->countBy();
+ 
+$counted->all();
+ 
+// [1 => 1, 2 => 3, 3 => 1]
+
+Vous passez une fermeture à la countByméthode pour compter tous les éléments par une valeur personnalisée :
+
+$collection = collect(['alice@gmail.com', 'bob@yahoo.com', 'carlos@gmail.com']);
+ 
+$counted = $collection->countBy(function ($email) {
+    return substr(strrchr($email, "@"), 1);
+});
+ 
+$counted->all();
+ 
+// ['gmail.com' => 2, 'yahoo.com' => 1]
+
+crossJoin()
+La crossJoinméthode cross joint les valeurs de la collection parmi les tableaux ou collections donnés, renvoyant un produit cartésien avec toutes les permutations possibles :
+
+$collection = collect([1, 2]);
+ 
+$matrix = $collection->crossJoin(['a', 'b']);
+ 
+$matrix->all();
+ 
+/*
+    [
+        [1, 'a'],
+        [1, 'b'],
+        [2, 'a'],
+        [2, 'b'],
+    ]
+*/
+ 
+$collection = collect([1, 2]);
+ 
+$matrix = $collection->crossJoin(['a', 'b'], ['I', 'II']);
+ 
+$matrix->all();
+ 
+/*
+    [
+        [1, 'a', 'I'],
+        [1, 'a', 'II'],
+        [1, 'b', 'I'],
+        [1, 'b', 'II'],
+        [2, 'a', 'I'],
+        [2, 'a', 'II'],
+        [2, 'b', 'I'],
+        [2, 'b', 'II'],
+    ]
+*/
+
+dd()
+La ddméthode vide les éléments de la collection et termine l'exécution du script :
+
+$collection = collect(['John Doe', 'Jane Doe']);
+ 
+$collection->dd();
+ 
+/*
+    Collection {
+        #items: array:2 [
+            0 => "John Doe"
+            1 => "Jane Doe"
+        ]
+    }
+*/
+
+Si vous ne souhaitez pas arrêter l'exécution du script, utilisez dumpplutôt la méthode.
+
+diff()
+La diffméthode compare la collection à une autre collection ou à un PHP simple arrayen fonction de ses valeurs. Cette méthode renverra les valeurs de la collection d'origine qui ne sont pas présentes dans la collection donnée :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$diff = $collection->diff([2, 4, 6, 8]);
+ 
+$diff->all();
+ 
+// [1, 3, 5]
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+diffAssoc()
+La diffAssocméthode compare la collection à une autre collection ou à un PHP simple arrayen fonction de ses clés et de ses valeurs. Cette méthode renverra les paires clé/valeur de la collection d'origine qui ne sont pas présentes dans la collection donnée :
+
+$collection = collect([
+    'color' => 'orange',
+    'type' => 'fruit',
+    'remain' => 6,
+]);
+ 
+$diff = $collection->diffAssoc([
+    'color' => 'yellow',
+    'type' => 'fruit',
+    'remain' => 3,
+    'used' => 6,
+]);
+ 
+$diff->all();
+ 
+// ['color' => 'orange', 'remain' => 6]
+
+diffKeys()
+La diffKeysméthode compare la collection à une autre collection ou à un PHP simple arrayen fonction de ses clés. Cette méthode renverra les paires clé/valeur de la collection d'origine qui ne sont pas présentes dans la collection donnée :
+
+$collection = collect([
+    'one' => 10,
+    'two' => 20,
+    'three' => 30,
+    'four' => 40,
+    'five' => 50,
+]);
+ 
+$diff = $collection->diffKeys([
+    'two' => 2,
+    'four' => 4,
+    'six' => 6,
+    'eight' => 8,
+]);
+ 
+$diff->all();
+ 
+// ['one' => 10, 'three' => 30, 'five' => 50]
+
+doesntContain()
+La doesntContainméthode détermine si la collection ne contient pas un élément donné. Vous pouvez passer une fermeture à la doesntContainméthode pour déterminer si un élément n'existe pas dans la collection correspondant à un test de vérité donné :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->doesntContain(function ($value, $key) {
+    return $value < 5;
+});
+ 
+// false
+
+Vous pouvez également passer une chaîne à la doesntContainméthode pour déterminer si la collection ne contient pas une valeur d'élément donnée :
+
+$collection = collect(['name' => 'Desk', 'price' => 100]);
+ 
+$collection->doesntContain('Table');
+ 
+// true
+ 
+$collection->doesntContain('Desk');
+ 
+// false
+
+Vous pouvez également passer une paire clé/valeur à la doesntContainméthode, qui déterminera si la paire donnée n'existe pas dans la collection :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+]);
+ 
+$collection->doesntContain('product', 'Bookcase');
+ 
+// true
+
+La doesntContainméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur.
+
+dump()
+La dumpméthode vide les éléments de la collection :
+
+$collection = collect(['John Doe', 'Jane Doe']);
+ 
+$collection->dump();
+ 
+/*
+    Collection {
+        #items: array:2 [
+            0 => "John Doe"
+            1 => "Jane Doe"
+        ]
+    }
+*/
+
+Si vous souhaitez arrêter l'exécution du script après avoir vidé la collection, utilisez ddplutôt la méthode .
+
+duplicates()
+La duplicatesméthode récupère et renvoie les valeurs en double de la collection :
+
+$collection = collect(['a', 'b', 'a', 'c', 'b']);
+ 
+$collection->duplicates();
+ 
+// [2 => 'a', 4 => 'b']
+
+Si la collection contient des tableaux ou des objets, vous pouvez passer la clé des attributs dont vous souhaitez vérifier les valeurs en double :
+
+$employees = collect([
+    ['email' => 'abigail@example.com', 'position' => 'Developer'],
+    ['email' => 'james@example.com', 'position' => 'Designer'],
+    ['email' => 'victoria@example.com', 'position' => 'Developer'],
+]);
+ 
+$employees->duplicates('position');
+ 
+// [2 => 'Developer']
+
+duplicatesStrict()
+Cette méthode a la même signature que la duplicatesméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+each()
+La eachméthode itère sur les éléments de la collection et passe chaque élément à une fermeture :
+
+$collection->each(function ($item, $key) {
+    //
+});
+
+Si vous souhaitez arrêter de parcourir les éléments, vous pouvez revenir falsede votre fermeture :
+
+$collection->each(function ($item, $key) {
+    if (/* condition */) {
+        return false;
+    }
+});
+
+eachSpread()
+La eachSpreadméthode itère sur les éléments de la collection, en passant chaque valeur d'élément imbriqué dans le rappel donné :
+
+$collection = collect([['John Doe', 35], ['Jane Doe', 33]]);
+ 
+$collection->eachSpread(function ($name, $age) {
+    //
+});
+
+Vous pouvez arrêter de parcourir les éléments en revenant falsedu rappel :
+
+$collection->eachSpread(function ($name, $age) {
+    return false;
+});
+
+every()
+La everyméthode peut être utilisée pour vérifier que tous les éléments d'une collection passent un test de vérité donné :
+
+collect([1, 2, 3, 4])->every(function ($value, $key) {
+    return $value > 2;
+});
+ 
+// false
+
+Si la collection est vide, la everyméthode renverra true :
+
+$collection = collect([]);
+ 
+$collection->every(function ($value, $key) {
+    return $value > 2;
+});
+ 
+// true
+
+except()
+La exceptméthode renvoie tous les éléments de la collection à l'exception de ceux avec les clés spécifiées :
+
+$collection = collect(['product_id' => 1, 'price' => 100, 'discount' => false]);
+ 
+$filtered = $collection->except(['price', 'discount']);
+ 
+$filtered->all();
+ 
+// ['product_id' => 1]
+
+Pour l'inverse de except, voir la seule méthode.
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+filter()
+La filterméthode filtre la collection à l'aide du rappel donné, en ne conservant que les éléments qui réussissent un test de vérité donné :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$filtered = $collection->filter(function ($value, $key) {
+    return $value > 2;
+});
+ 
+$filtered->all();
+ 
+// [3, 4]
+
+Si aucun rappel n'est fourni, toutes les entrées de la collection équivalentes à falseseront supprimées :
+
+$collection = collect([1, 2, 3, null, false, '', 0, []]);
+ 
+$collection->filter()->all();
+ 
+// [1, 2, 3]
+
+Pour l'inverse de filter, voir la méthode de rejet .
+
+first()
+La firstméthode renvoie le premier élément de la collection qui réussit un test de vérité donné :
+
+collect([1, 2, 3, 4])->first(function ($value, $key) {
+    return $value > 2;
+});
+ 
+// 3
+
+Vous pouvez également appeler la firstméthode sans argument pour obtenir le premier élément de la collection. Si la collection est vide, nullest retourné :
+
+collect([1, 2, 3, 4])->first();
+ 
+// 1
+
+firstOrFail()
+La firstOrFailméthode est identique à la firstméthode ; cependant, si aucun résultat n'est trouvé, une Illuminate\Support\ItemNotFoundExceptionexception sera levée :
+
+collect([1, 2, 3, 4])->firstOrFail(function ($value, $key) {
+    return $value > 5;
+});
+ 
+// Throws ItemNotFoundException...
+
+Vous pouvez également appeler la firstOrFailméthode sans argument pour obtenir le premier élément de la collection. Si la collection est vide, une Illuminate\Support\ItemNotFoundExceptionexception sera levée :
+
+collect([])->firstOrFail();
+ 
+// Throws ItemNotFoundException...
+
+firstWhere()
+La firstWhereméthode renvoie le premier élément de la collection avec la paire clé/valeur donnée :
+
+$collection = collect([
+    ['name' => 'Regena', 'age' => null],
+    ['name' => 'Linda', 'age' => 14],
+    ['name' => 'Diego', 'age' => 23],
+    ['name' => 'Linda', 'age' => 84],
+]);
+ 
+$collection->firstWhere('name', 'Linda');
+ 
+// ['name' => 'Linda', 'age' => 14]
+
+Vous pouvez également appeler la firstWhereméthode avec un opérateur de comparaison :
+
+$collection->firstWhere('age', '>=', 18);
+ 
+// ['name' => 'Diego', 'age' => 23]
+
+Comme la méthode where , vous pouvez passer un argument à la firstWhereméthode. Dans ce scénario, la firstWhereméthode renverra le premier élément où la valeur de la clé d'élément donnée est « true » :
+
+$collection->firstWhere('age');
+ 
+// ['name' => 'Linda', 'age' => 14]
+
+flatMap()
+La flatMapméthode parcourt la collection et transmet chaque valeur à la fermeture donnée. La fermeture est libre de modifier l'article et de le retourner, formant ainsi une nouvelle collection d'articles modifiés. Ensuite, le tableau est aplati d'un niveau :
+
+$collection = collect([
+    ['name' => 'Sally'],
+    ['school' => 'Arkansas'],
+    ['age' => 28]
+]);
+ 
+$flattened = $collection->flatMap(function ($values) {
+    return array_map('strtoupper', $values);
+});
+ 
+$flattened->all();
+ 
+// ['name' => 'SALLY', 'school' => 'ARKANSAS', 'age' => '28'];
+
+flatten()
+La flattenméthode aplatit une collection multidimensionnelle en une seule dimension :
+
+$collection = collect([
+    'name' => 'taylor',
+    'languages' => [
+        'php', 'javascript'
+    ]
+]);
+ 
+$flattened = $collection->flatten();
+ 
+$flattened->all();
+ 
+// ['taylor', 'php', 'javascript'];
+
+Si nécessaire, vous pouvez passer à la flattenméthode un argument "profondeur":
+
+$collection = collect([
+    'Apple' => [
+        [
+            'name' => 'iPhone 6S',
+            'brand' => 'Apple'
+        ],
+    ],
+    'Samsung' => [
+        [
+            'name' => 'Galaxy S7',
+            'brand' => 'Samsung'
+        ],
+    ],
+]);
+ 
+$products = $collection->flatten(1);
+ 
+$products->values()->all();
+ 
+/*
+    [
+        ['name' => 'iPhone 6S', 'brand' => 'Apple'],
+        ['name' => 'Galaxy S7', 'brand' => 'Samsung'],
+    ]
+*/
+
+Dans cet exemple, appeler flattensans fournir la profondeur aurait également aplati les tableaux imbriqués, ce qui aurait donné ['iPhone 6S', 'Apple', 'Galaxy S7', 'Samsung']. Fournir une profondeur vous permet de spécifier le nombre de niveaux que les tableaux imbriqués seront aplatis.
+
+flip()
+La flipméthode échange les clés de la collection avec leurs valeurs correspondantes :
+
+$collection = collect(['name' => 'taylor', 'framework' => 'laravel']);
+ 
+$flipped = $collection->flip();
+ 
+$flipped->all();
+ 
+// ['taylor' => 'name', 'laravel' => 'framework']
+
+forget()
+La forgetméthode supprime un élément de la collection par sa clé :
+
+$collection = collect(['name' => 'taylor', 'framework' => 'laravel']);
+ 
+$collection->forget('name');
+ 
+$collection->all();
+ 
+// ['framework' => 'laravel']
+
+
+Contrairement à la plupart des autres méthodes de collecte, forgetne renvoie pas une nouvelle collection modifiée ; il modifie la collection sur laquelle il est appelé.
+
+
+forPage()
+La forPageméthode renvoie une nouvelle collection contenant les éléments qui seraient présents sur un numéro de page donné. La méthode accepte le numéro de page comme premier argument et le nombre d'éléments à afficher par page comme deuxième argument :
+
+$collection = collect([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+ 
+$chunk = $collection->forPage(2, 3);
+ 
+$chunk->all();
+ 
+// [4, 5, 6]
+
+get()
+La getméthode renvoie l'élément à une clé donnée. Si la clé n'existe pas, nullest retourné :
+
+$collection = collect(['name' => 'taylor', 'framework' => 'laravel']);
+ 
+$value = $collection->get('name');
+ 
+// taylor
+
+Vous pouvez éventuellement passer une valeur par défaut comme deuxième argument :
+
+$collection = collect(['name' => 'taylor', 'framework' => 'laravel']);
+ 
+$value = $collection->get('age', 34);
+ 
+// 34
+
+Vous pouvez même passer un rappel comme valeur par défaut de la méthode. Le résultat du rappel sera renvoyé si la clé spécifiée n'existe pas :
+
+$collection->get('email', function () {
+    return 'taylor@example.com';
+});
+ 
+// taylor@example.com
+
+groupBy()
+La groupByméthode regroupe les éléments de la collection par une clé donnée :
+
+$collection = collect([
+    ['account_id' => 'account-x10', 'product' => 'Chair'],
+    ['account_id' => 'account-x10', 'product' => 'Bookcase'],
+    ['account_id' => 'account-x11', 'product' => 'Desk'],
+]);
+ 
+$grouped = $collection->groupBy('account_id');
+ 
+$grouped->all();
+ 
+/*
+    [
+        'account-x10' => [
+            ['account_id' => 'account-x10', 'product' => 'Chair'],
+            ['account_id' => 'account-x10', 'product' => 'Bookcase'],
+        ],
+        'account-x11' => [
+            ['account_id' => 'account-x11', 'product' => 'Desk'],
+        ],
+    ]
+*/
+
+Au lieu de passer une chaîne key, vous pouvez passer un rappel. Le rappel doit renvoyer la valeur par laquelle vous souhaitez saisir le groupe :
+
+$grouped = $collection->groupBy(function ($item, $key) {
+    return substr($item['account_id'], -3);
+});
+ 
+$grouped->all();
+ 
+/*
+    [
+        'x10' => [
+            ['account_id' => 'account-x10', 'product' => 'Chair'],
+            ['account_id' => 'account-x10', 'product' => 'Bookcase'],
+        ],
+        'x11' => [
+            ['account_id' => 'account-x11', 'product' => 'Desk'],
+        ],
+    ]
+*/
+
+Plusieurs critères de regroupement peuvent être passés sous forme de tableau. Chaque élément de tableau sera appliqué au niveau correspondant dans un tableau multidimensionnel :
+
+$data = new Collection([
+    10 => ['user' => 1, 'skill' => 1, 'roles' => ['Role_1', 'Role_3']],
+    20 => ['user' => 2, 'skill' => 1, 'roles' => ['Role_1', 'Role_2']],
+    30 => ['user' => 3, 'skill' => 2, 'roles' => ['Role_1']],
+    40 => ['user' => 4, 'skill' => 2, 'roles' => ['Role_2']],
+]);
+ 
+$result = $data->groupBy(['skill', function ($item) {
+    return $item['roles'];
+}], preserveKeys: true);
+ 
+/*
+[
+    1 => [
+        'Role_1' => [
+            10 => ['user' => 1, 'skill' => 1, 'roles' => ['Role_1', 'Role_3']],
+            20 => ['user' => 2, 'skill' => 1, 'roles' => ['Role_1', 'Role_2']],
+        ],
+        'Role_2' => [
+            20 => ['user' => 2, 'skill' => 1, 'roles' => ['Role_1', 'Role_2']],
+        ],
+        'Role_3' => [
+            10 => ['user' => 1, 'skill' => 1, 'roles' => ['Role_1', 'Role_3']],
+        ],
+    ],
+    2 => [
+        'Role_1' => [
+            30 => ['user' => 3, 'skill' => 2, 'roles' => ['Role_1']],
+        ],
+        'Role_2' => [
+            40 => ['user' => 4, 'skill' => 2, 'roles' => ['Role_2']],
+        ],
+    ],
+];
+*/
+
+has()
+La hasméthode détermine si une clé donnée existe dans la collection :
+
+$collection = collect(['account_id' => 1, 'product' => 'Desk', 'amount' => 5]);
+ 
+$collection->has('product');
+ 
+// true
+ 
+$collection->has(['product', 'amount']);
+ 
+// true
+ 
+$collection->has(['amount', 'price']);
+ 
+// false
+
+hasAny()
+La hasAnyméthode détermine si l'une des clés données existe dans la collection :
+
+$collection = collect(['account_id' => 1, 'product' => 'Desk', 'amount' => 5]);
+ 
+$collection->hasAny(['product', 'price']);
+ 
+// true
+ 
+$collection->hasAny(['name', 'price']);
+ 
+// false
+
+implode()
+La implodeméthode joint les éléments d'une collection. Ses arguments dépendent du type d'éléments de la collection. Si la collection contient des tableaux ou des objets, vous devez passer la clé des attributs que vous souhaitez joindre, et la chaîne "glue" que vous souhaitez placer entre les valeurs :
+
+$collection = collect([
+    ['account_id' => 1, 'product' => 'Desk'],
+    ['account_id' => 2, 'product' => 'Chair'],
+]);
+ 
+$collection->implode('product', ', ');
+ 
+// Desk, Chair
+
+Si la collection contient des chaînes simples ou des valeurs numériques, vous devez passer le "glue" comme seul argument à la méthode :
+
+collect([1, 2, 3, 4, 5])->implode('-');
+ 
+// '1-2-3-4-5'
+
+intersect()
+La intersectméthode supprime toutes les valeurs de la collection d'origine qui ne sont pas présentes dans la arraycollection donnée ou . La collection résultante conservera les clés de la collection d'origine :
+
+$collection = collect(['Desk', 'Sofa', 'Chair']);
+ 
+$intersect = $collection->intersect(['Desk', 'Chair', 'Bookcase']);
+ 
+$intersect->all();
+ 
+// [0 => 'Desk', 2 => 'Chair']
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+intersectByKeys()
+La intersectByKeysméthode supprime toutes les clés et leurs valeurs correspondantes de la collection d'origine qui ne sont pas présentes dans la arraycollection donnée ou :
+
+$collection = collect([
+    'serial' => 'UX301', 'type' => 'screen', 'year' => 2009,
+]);
+ 
+$intersect = $collection->intersectByKeys([
+    'reference' => 'UX404', 'type' => 'tab', 'year' => 2011,
+]);
+ 
+$intersect->all();
+ 
+// ['type' => 'screen', 'year' => 2009]
+
+isEmpty()
+La isEmptyméthode retourne truesi la collection est vide ; sinon, falseest retourné :
+
+collect([])->isEmpty();
+ 
+// true
+
+isNotEmpty()
+La isNotEmptyméthode retourne truesi la collection n'est pas vide ; sinon, falseest retourné :
+
+collect([])->isNotEmpty();
+ 
+// false
+
+join()
+La joinméthode joint les valeurs de la collection avec une chaîne. En utilisant le deuxième argument de cette méthode, vous pouvez également spécifier comment l'élément final doit être ajouté à la chaîne :
+
+collect(['a', 'b', 'c'])->join(', '); // 'a, b, c'
+collect(['a', 'b', 'c'])->join(', ', ', and '); // 'a, b, and c'
+collect(['a', 'b'])->join(', ', ' and '); // 'a and b'
+collect(['a'])->join(', ', ' and '); // 'a'
+collect([])->join(', ', ' and '); // ''
+
+keyBy()
+La keyByméthode clé la collection par la clé donnée. Si plusieurs éléments ont la même clé, seul le dernier apparaîtra dans la nouvelle collection :
+
+$collection = collect([
+    ['product_id' => 'prod-100', 'name' => 'Desk'],
+    ['product_id' => 'prod-200', 'name' => 'Chair'],
+]);
+ 
+$keyed = $collection->keyBy('product_id');
+ 
+$keyed->all();
+ 
+/*
+    [
+        'prod-100' => ['product_id' => 'prod-100', 'name' => 'Desk'],
+        'prod-200' => ['product_id' => 'prod-200', 'name' => 'Chair'],
+    ]
+*/
+
+Vous pouvez également passer un rappel à la méthode. Le rappel doit renvoyer la valeur pour saisir la collection en :
+
+$keyed = $collection->keyBy(function ($item) {
+    return strtoupper($item['product_id']);
+});
+ 
+$keyed->all();
+ 
+/*
+    [
+        'PROD-100' => ['product_id' => 'prod-100', 'name' => 'Desk'],
+        'PROD-200' => ['product_id' => 'prod-200', 'name' => 'Chair'],
+    ]
+*/
+
+keys()
+La keysméthode renvoie toutes les clés de la collection :
+
+$collection = collect([
+    'prod-100' => ['product_id' => 'prod-100', 'name' => 'Desk'],
+    'prod-200' => ['product_id' => 'prod-200', 'name' => 'Chair'],
+]);
+ 
+$keys = $collection->keys();
+ 
+$keys->all();
+ 
+// ['prod-100', 'prod-200']
+
+last()
+La lastméthode renvoie le dernier élément de la collection qui réussit un test de vérité donné :
+
+collect([1, 2, 3, 4])->last(function ($value, $key) {
+    return $value < 3;
+});
+ 
+// 2
+
+Vous pouvez également appeler la lastméthode sans argument pour obtenir le dernier élément de la collection. Si la collection est vide, nullest retourné :
+
+collect([1, 2, 3, 4])->last();
+ 
+// 4
+
+lazy()
+La lazyméthode renvoie une nouvelle LazyCollectioninstance à partir du tableau d'éléments sous-jacent :
+
+$lazyCollection = collect([1, 2, 3, 4])->lazy();
+ 
+get_class($lazyCollection);
+ 
+// Illuminate\Support\LazyCollection
+ 
+$lazyCollection->all();
+ 
+// [1, 2, 3, 4]
+
+Ceci est particulièrement utile lorsque vous devez effectuer des transformations sur un énorme Collectioncontenant de nombreux éléments :
+
+$count = $hugeCollection
+    ->lazy()
+    ->where('country', 'FR')
+    ->where('balance', '>', '100')
+    ->count();
+
+En convertissant la collection en a LazyCollection, nous évitons d'avoir à allouer une tonne de mémoire supplémentaire. Bien que la collection d'origine conserve toujours ses valeurs en mémoire, les filtres suivants ne le feront pas. Par conséquent, pratiquement aucune mémoire supplémentaire ne sera allouée lors du filtrage des résultats de la collection.
+
+macro()
+La méthode statique macrovous permet d'ajouter des méthodes à la Collectionclasse au moment de l'exécution. Reportez-vous à la documentation sur l'extension des collections pour plus d'informations.
+
+make()
+La méthode statique makecrée une nouvelle instance de collection. Voir la section Créer des collections .
+
+map()
+La mapméthode parcourt la collection et transmet chaque valeur au rappel donné. Le rappel est libre de modifier l'élément et de le renvoyer, formant ainsi une nouvelle collection d'éléments modifiés :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$multiplied = $collection->map(function ($item, $key) {
+    return $item * 2;
+});
+ 
+$multiplied->all();
+ 
+// [2, 4, 6, 8, 10]
+
+
+Comme la plupart des autres méthodes de collection, mapretourne une nouvelle instance de collection ; il ne modifie pas la collection sur laquelle il est appelé. Si vous souhaitez transformer la collection d'origine, utilisez la transformméthode.
+
+
+mapInto()
+La mapInto()méthode itère sur la collection, créant une nouvelle instance de la classe donnée en passant la valeur dans le constructeur :
+
+class Currency
+{
+    /**
+     * Create a new currency instance.
+     *
+     * @param  string  $code
+     * @return void
+     */
+    function __construct(string $code)
+    {
+        $this->code = $code;
+    }
+}
+ 
+$collection = collect(['USD', 'EUR', 'GBP']);
+ 
+$currencies = $collection->mapInto(Currency::class);
+ 
+$currencies->all();
+ 
+// [Currency('USD'), Currency('EUR'), Currency('GBP')]
+
+mapSpread()
+La mapSpreadméthode itère sur les éléments de la collection, en passant chaque valeur d'élément imbriquée dans la fermeture donnée. La fermeture est libre de modifier l'article et de le retourner, formant ainsi une nouvelle collection d'articles modifiés :
+
+$collection = collect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+ 
+$chunks = $collection->chunk(2);
+ 
+$sequence = $chunks->mapSpread(function ($even, $odd) {
+    return $even + $odd;
+});
+ 
+$sequence->all();
+ 
+// [1, 5, 9, 13, 17]
+
+mapToGroups()
+La mapToGroupsméthode regroupe les éléments de la collection par la fermeture donnée. La fermeture doit renvoyer un tableau associatif contenant une seule paire clé/valeur, formant ainsi une nouvelle collection de valeurs groupées :
+
+$collection = collect([
+    [
+        'name' => 'John Doe',
+        'department' => 'Sales',
+    ],
+    [
+        'name' => 'Jane Doe',
+        'department' => 'Sales',
+    ],
+    [
+        'name' => 'Johnny Doe',
+        'department' => 'Marketing',
+    ]
+]);
+ 
+$grouped = $collection->mapToGroups(function ($item, $key) {
+    return [$item['department'] => $item['name']];
+});
+ 
+$grouped->all();
+ 
+/*
+    [
+        'Sales' => ['John Doe', 'Jane Doe'],
+        'Marketing' => ['Johnny Doe'],
+    ]
+*/
+ 
+$grouped->get('Sales')->all();
+ 
+// ['John Doe', 'Jane Doe']
+
+mapWithKeys()
+La mapWithKeysméthode parcourt la collection et transmet chaque valeur au rappel donné. Le rappel doit renvoyer un tableau associatif contenant une seule paire clé/valeur :
+
+$collection = collect([
+    [
+        'name' => 'John',
+        'department' => 'Sales',
+        'email' => 'john@example.com',
+    ],
+    [
+        'name' => 'Jane',
+        'department' => 'Marketing',
+        'email' => 'jane@example.com',
+    ]
+]);
+ 
+$keyed = $collection->mapWithKeys(function ($item, $key) {
+    return [$item['email'] => $item['name']];
+});
+ 
+$keyed->all();
+ 
+/*
+    [
+        'john@example.com' => 'John',
+        'jane@example.com' => 'Jane',
+    ]
+*/
+
+max()
+La maxméthode renvoie la valeur maximale d'une clé donnée :
+
+$max = collect([
+    ['foo' => 10],
+    ['foo' => 20]
+])->max('foo');
+ 
+// 20
+ 
+$max = collect([1, 2, 3, 4, 5])->max();
+ 
+// 5
+
+median()
+La medianméthode renvoie la valeur médiane d'une clé donnée :
+
+$median = collect([
+    ['foo' => 10],
+    ['foo' => 10],
+    ['foo' => 20],
+    ['foo' => 40]
+])->median('foo');
+ 
+// 15
+ 
+$median = collect([1, 1, 2, 4])->median();
+ 
+// 1.5
+
+merge()
+La mergeméthode fusionne le tableau ou la collection donné avec la collection d'origine. Si une clé de chaîne dans les éléments donnés correspond à une clé de chaîne dans la collection d'origine, la valeur des éléments donnés écrasera la valeur de la collection d'origine :
+
+$collection = collect(['product_id' => 1, 'price' => 100]);
+ 
+$merged = $collection->merge(['price' => 200, 'discount' => false]);
+ 
+$merged->all();
+ 
+// ['product_id' => 1, 'price' => 200, 'discount' => false]
+
+Si les clés des éléments donnés sont numériques, les valeurs seront ajoutées à la fin de la collection :
+
+$collection = collect(['Desk', 'Chair']);
+ 
+$merged = $collection->merge(['Bookcase', 'Door']);
+ 
+$merged->all();
+ 
+// ['Desk', 'Chair', 'Bookcase', 'Door']
+
+mergeRecursive()
+La mergeRecursiveméthode fusionne le tableau ou la collection donné de manière récursive avec la collection d'origine. Si une clé de chaîne dans les éléments donnés correspond à une clé de chaîne dans la collection d'origine, les valeurs de ces clés sont fusionnées dans un tableau, et cela se fait de manière récursive :
+
+$collection = collect(['product_id' => 1, 'price' => 100]);
+ 
+$merged = $collection->mergeRecursive([
+    'product_id' => 2,
+    'price' => 200,
+    'discount' => false
+]);
+ 
+$merged->all();
+ 
+// ['product_id' => [1, 2], 'price' => [100, 200], 'discount' => false]
+
+min()
+La minméthode renvoie la valeur minimale d'une clé donnée :
+
+$min = collect([['foo' => 10], ['foo' => 20]])->min('foo');
+ 
+// 10
+ 
+$min = collect([1, 2, 3, 4, 5])->min();
+ 
+// 1
+
+mode()
+La modeméthode renvoie la valeur de mode d'une clé donnée :
+
+$mode = collect([
+    ['foo' => 10],
+    ['foo' => 10],
+    ['foo' => 20],
+    ['foo' => 40]
+])->mode('foo');
+ 
+// [10]
+ 
+$mode = collect([1, 1, 2, 4])->mode();
+ 
+// [1]
+ 
+$mode = collect([1, 1, 2, 2])->mode();
+ 
+// [1, 2]
+
+nth()
+La nthméthode crée une nouvelle collection composée de chaque n-ième élément :
+
+$collection = collect(['a', 'b', 'c', 'd', 'e', 'f']);
+ 
+$collection->nth(4);
+ 
+// ['a', 'e']
+
+Vous pouvez éventuellement passer un décalage de départ comme deuxième argument :
+
+$collection->nth(4, 1);
+ 
+// ['b', 'f']
+
+only()
+La onlyméthode renvoie les éléments de la collection avec les clés spécifiées :
+
+$collection = collect([
+    'product_id' => 1,
+    'name' => 'Desk',
+    'price' => 100,
+    'discount' => false
+]);
+ 
+$filtered = $collection->only(['product_id', 'name']);
+ 
+$filtered->all();
+ 
+// ['product_id' => 1, 'name' => 'Desk']
+
+Pour l'inverse de only, voir la méthode except .
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+pad()
+La padméthode remplira le tableau avec la valeur donnée jusqu'à ce que le tableau atteigne la taille spécifiée. Cette méthode se comporte comme la fonction PHP array_pad .
+
+Pour remplir à gauche, vous devez spécifier une taille négative. Aucun remplissage n'aura lieu si la valeur absolue de la taille donnée est inférieure ou égale à la longueur du tableau :
+
+$collection = collect(['A', 'B', 'C']);
+ 
+$filtered = $collection->pad(5, 0);
+ 
+$filtered->all();
+ 
+// ['A', 'B', 'C', 0, 0]
+ 
+$filtered = $collection->pad(-5, 0);
+ 
+$filtered->all();
+ 
+// [0, 0, 'A', 'B', 'C']
+
+partition()
+La partitionméthode peut être combinée avec la déstructuration de tableaux PHP pour séparer les éléments qui réussissent un test de vérité donné de ceux qui ne le font pas :
+
+$collection = collect([1, 2, 3, 4, 5, 6]);
+ 
+[$underThree, $equalOrAboveThree] = $collection->partition(function ($i) {
+    return $i < 3;
+});
+ 
+$underThree->all();
+ 
+// [1, 2]
+ 
+$equalOrAboveThree->all();
+ 
+// [3, 4, 5, 6]
+
+pipe()
+La pipeméthode passe la collection à la fermeture donnée et renvoie le résultat de la fermeture exécutée :
+
+$collection = collect([1, 2, 3]);
+ 
+$piped = $collection->pipe(function ($collection) {
+    return $collection->sum();
+});
+ 
+// 6
+
+pipeInto()
+La pipeIntométhode crée une nouvelle instance de la classe donnée et passe la collection au constructeur :
+
+class ResourceCollection
+{
+    /**
+     * The Collection instance.
+     */
+    public $collection;
+ 
+    /**
+     * Create a new ResourceCollection instance.
+     *
+     * @param  Collection  $collection
+     * @return void
+     */
+    public function __construct(Collection $collection)
+    {
+        $this->collection = $collection;
+    }
+}
+ 
+$collection = collect([1, 2, 3]);
+ 
+$resource = $collection->pipeInto(ResourceCollection::class);
+ 
+$resource->collection->all();
+ 
+// [1, 2, 3]
+
+pipeThrough()
+La pipeThroughméthode passe la collection au tableau de fermetures donné et renvoie le résultat des fermetures exécutées :
+
+$collection = collect([1, 2, 3]);
+ 
+$result = $collection->pipeThrough([
+    function ($collection) {
+        return $collection->merge([4, 5]);
+    },
+    function ($collection) {
+        return $collection->sum();
+    },
+]);
+ 
+// 15
+
+pluck()
+La pluckméthode récupère toutes les valeurs d'une clé donnée :
+
+$collection = collect([
+    ['product_id' => 'prod-100', 'name' => 'Desk'],
+    ['product_id' => 'prod-200', 'name' => 'Chair'],
+]);
+ 
+$plucked = $collection->pluck('name');
+ 
+$plucked->all();
+ 
+// ['Desk', 'Chair']
+
+Vous pouvez également spécifier comment vous souhaitez que la collection résultante soit saisie :
+
+$plucked = $collection->pluck('name', 'product_id');
+ 
+$plucked->all();
+ 
+// ['prod-100' => 'Desk', 'prod-200' => 'Chair']
+
+La pluckméthode prend également en charge la récupération des valeurs imbriquées à l'aide de la notation "point" :
+
+$collection = collect([
+    [
+        'name' => 'Laracon',
+        'speakers' => [
+            'first_day' => ['Rosa', 'Judith'],
+        ],
+    ],
+    [
+        'name' => 'VueConf',
+        'speakers' => [
+            'first_day' => ['Abigail', 'Joey'],
+        ],
+    ],
+]);
+ 
+$plucked = $collection->pluck('speakers.first_day');
+ 
+$plucked->all();
+ 
+// [['Rosa', 'Judith'], ['Abigail', 'Joey']]
+
+Si des clés en double existent, le dernier élément correspondant sera inséré dans la collection pincée :
+
+$collection = collect([
+    ['brand' => 'Tesla',  'color' => 'red'],
+    ['brand' => 'Pagani', 'color' => 'white'],
+    ['brand' => 'Tesla',  'color' => 'black'],
+    ['brand' => 'Pagani', 'color' => 'orange'],
+]);
+ 
+$plucked = $collection->pluck('color', 'brand');
+ 
+$plucked->all();
+ 
+// ['Tesla' => 'black', 'Pagani' => 'orange']
+
+pop()
+La popméthode supprime et renvoie le dernier élément de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->pop();
+ 
+// 5
+ 
+$collection->all();
+ 
+// [1, 2, 3, 4]
+
+Vous pouvez passer un entier à la popméthode pour supprimer et renvoyer plusieurs éléments à la fin d'une collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->pop(3);
+ 
+// collect([5, 4, 3])
+ 
+$collection->all();
+ 
+// [1, 2]
+
+prepend()
+La prependméthode ajoute un élément au début de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->prepend(0);
+ 
+$collection->all();
+ 
+// [0, 1, 2, 3, 4, 5]
+
+Vous pouvez également passer un deuxième argument pour spécifier la clé de l'élément ajouté :
+
+$collection = collect(['one' => 1, 'two' => 2]);
+ 
+$collection->prepend(0, 'zero');
+ 
+$collection->all();
+ 
+// ['zero' => 0, 'one' => 1, 'two' => 2]
+
+pull()
+La pullméthode supprime et renvoie un élément de la collection par sa clé :
+
+$collection = collect(['product_id' => 'prod-100', 'name' => 'Desk']);
+ 
+$collection->pull('name');
+ 
+// 'Desk'
+ 
+$collection->all();
+ 
+// ['product_id' => 'prod-100']
+
+push()
+La pushméthode ajoute un élément à la fin de la collection :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$collection->push(5);
+ 
+$collection->all();
+ 
+// [1, 2, 3, 4, 5]
+
+put()
+La putméthode définit la clé et la valeur données dans la collection :
+
+$collection = collect(['product_id' => 1, 'name' => 'Desk']);
+ 
+$collection->put('price', 100);
+ 
+$collection->all();
+ 
+// ['product_id' => 1, 'name' => 'Desk', 'price' => 100]
+
+random()
+La randomméthode renvoie un élément aléatoire de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->random();
+ 
+// 4 - (retrieved randomly)
+
+Vous pouvez passer un nombre entier à randompour spécifier le nombre d'éléments que vous souhaitez récupérer au hasard. Une collection d'éléments est toujours renvoyée lors de la transmission explicite du nombre d'éléments que vous souhaitez recevoir :
+
+$random = $collection->random(3);
+ 
+$random->all();
+ 
+// [2, 4, 5] - (retrieved randomly)
+
+Si l'instance de collection contient moins d'éléments que demandé, la randomméthode lancera un InvalidArgumentException.
+
+La randomméthode accepte également une fermeture, qui recevra l'instance de collection actuelle :
+
+$random = $collection->random(fn ($items) => min(10, count($items)));
+ 
+$random->all();
+ 
+// [1, 2, 3, 4, 5] - (retrieved randomly)
+
+range()
+La rangeméthode renvoie une collection contenant des entiers compris dans la plage spécifiée :
+
+$collection = collect()->range(3, 6);
+ 
+$collection->all();
+ 
+// [3, 4, 5, 6]
+
+reduce()
+La reduceméthode réduit la collection à une seule valeur, en transmettant le résultat de chaque itération à l'itération suivante :
+
+$collection = collect([1, 2, 3]);
+ 
+$total = $collection->reduce(function ($carry, $item) {
+    return $carry + $item;
+});
+ 
+// 6
+
+La valeur de $carryla première itération est null; cependant, vous pouvez spécifier sa valeur initiale en passant un second argument à reduce:
+
+$collection->reduce(function ($carry, $item) {
+    return $carry + $item;
+}, 4);
+ 
+// 10
+
+La reduceméthode passe également les clés de tableau dans les collections associatives au rappel donné :
+
+$collection = collect([
+    'usd' => 1400,
+    'gbp' => 1200,
+    'eur' => 1000,
+]);
+ 
+$ratio = [
+    'usd' => 1,
+    'gbp' => 1.37,
+    'eur' => 1.22,
+];
+ 
+$collection->reduce(function ($carry, $value, $key) use ($ratio) {
+    return $carry + ($value * $ratio[$key]);
+});
+ 
+// 4264
+
+reduceSpread()
+La reduceSpreadméthode réduit la collection à un tableau de valeurs, en transmettant les résultats de chaque itération à l'itération suivante. Cette méthode est similaire à la reduceméthode; cependant, il peut accepter plusieurs valeurs initiales :
+
+[$creditsRemaining, $batch] = Image::where('status', 'unprocessed')
+    ->get()
+    ->reduceSpread(function ($creditsRemaining, $batch, $image) {
+        if ($creditsRemaining >= $image->creditsRequired()) {
+            $batch->push($image);
+ 
+            $creditsRemaining -= $image->creditsRequired();
+        }
+ 
+        return [$creditsRemaining, $batch];
+    }, $creditsAvailable, collect());
+
+reject()
+La rejectméthode filtre la collection à l'aide de la fermeture donnée. La fermeture doit revenir truesi l'élément doit être supprimé de la collection résultante :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$filtered = $collection->reject(function ($value, $key) {
+    return $value > 2;
+});
+ 
+$filtered->all();
+ 
+// [1, 2]
+
+Pour l'inverse de la rejectméthode, voir la filterméthode.
+
+replace()
+La replaceméthode se comporte de manière similaire à merge; cependant, en plus d'écraser les éléments correspondants qui ont des clés de chaîne, la replaceméthode écrasera également les éléments de la collection qui ont des clés numériques correspondantes :
+
+$collection = collect(['Taylor', 'Abigail', 'James']);
+ 
+$replaced = $collection->replace([1 => 'Victoria', 3 => 'Finn']);
+ 
+$replaced->all();
+ 
+// ['Taylor', 'Victoria', 'James', 'Finn']
+
+replaceRecursive()
+Cette méthode fonctionne comme replace, mais elle se reproduira dans des tableaux et appliquera le même processus de remplacement aux valeurs internes :
+
+$collection = collect([
+    'Taylor',
+    'Abigail',
+    [
+        'James',
+        'Victoria',
+        'Finn'
+    ]
+]);
+ 
+$replaced = $collection->replaceRecursive([
+    'Charlie',
+    2 => [1 => 'King']
+]);
+ 
+$replaced->all();
+ 
+// ['Charlie', 'Abigail', ['James', 'King', 'Finn']]
+
+reverse()
+La reverseméthode inverse l'ordre des éléments de la collection, en préservant les clés d'origine :
+
+$collection = collect(['a', 'b', 'c', 'd', 'e']);
+ 
+$reversed = $collection->reverse();
+ 
+$reversed->all();
+ 
+/*
+    [
+        4 => 'e',
+        3 => 'd',
+        2 => 'c',
+        1 => 'b',
+        0 => 'a',
+    ]
+*/
+
+search()
+La searchméthode recherche la collection pour la valeur donnée et renvoie sa clé si elle est trouvée. Si l'article n'est pas trouvé, falseest retourné :
+
+$collection = collect([2, 4, 6, 8]);
+ 
+$collection->search(4);
+ 
+// 1
+
+La recherche est effectuée à l'aide d'une comparaison "lâche", ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Pour utiliser la comparaison "stricte", passez trueen deuxième argument à la méthode :
+
+collect([2, 4, 6, 8])->search('4', $strict = true);
+ 
+// false
+
+Alternativement, vous pouvez fournir votre propre fermeture pour rechercher le premier élément qui réussit un test de vérité donné :
+
+collect([2, 4, 6, 8])->search(function ($item, $key) {
+    return $item > 5;
+});
+ 
+// 2
+
+shift()
+La shiftméthode supprime et renvoie le premier élément de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->shift();
+ 
+// 1
+ 
+$collection->all();
+ 
+// [2, 3, 4, 5]
+
+Vous pouvez passer un entier à la shiftméthode pour supprimer et renvoyer plusieurs éléments depuis le début d'une collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->shift(3);
+ 
+// collect([1, 2, 3])
+ 
+$collection->all();
+ 
+// [4, 5]
+
+shuffle()
+La shuffleméthode mélange aléatoirement les éléments de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$shuffled = $collection->shuffle();
+ 
+$shuffled->all();
+ 
+// [3, 2, 5, 1, 4] - (generated randomly)
+
+skip()
+La skipméthode renvoie une nouvelle collection, avec le nombre donné d'éléments supprimés depuis le début de la collection :
+
+$collection = collect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+ 
+$collection = $collection->skip(4);
+ 
+$collection->all();
+ 
+// [5, 6, 7, 8, 9, 10]
+
+skipUntil()
+La skipUntilméthode ignore les éléments de la collection jusqu'au retour du rappel donné true, puis renvoie les éléments restants de la collection en tant que nouvelle instance de collection :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->skipUntil(function ($item) {
+    return $item >= 3;
+});
+ 
+$subset->all();
+ 
+// [3, 4]
+
+Vous pouvez également passer une valeur simple à la skipUntilméthode pour ignorer tous les éléments jusqu'à ce que la valeur donnée soit trouvée :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->skipUntil(3);
+ 
+$subset->all();
+ 
+// [3, 4]
+
+
+Si la valeur donnée n'est pas trouvée ou si le rappel ne renvoie jamais true, la skipUntilméthode renverra une collection vide.
+
+
+skipWhile()
+La skipWhileméthode ignore les éléments de la collection pendant que le rappel donné revient true, puis renvoie les éléments restants de la collection en tant que nouvelle collection :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->skipWhile(function ($item) {
+    return $item <= 3;
+});
+ 
+$subset->all();
+ 
+// [4]
+
+
+Si le rappel ne retourne jamais false, la skipWhileméthode retournera une collection vide.
+
+
+slice()
+La sliceméthode renvoie une tranche de la collection commençant à l'index donné :
+
+$collection = collect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+ 
+$slice = $collection->slice(4);
+ 
+$slice->all();
+ 
+// [5, 6, 7, 8, 9, 10]
+
+Si vous souhaitez limiter la taille de la tranche renvoyée, passez la taille souhaitée comme deuxième argument à la méthode :
+
+$slice = $collection->slice(4, 2);
+ 
+$slice->all();
+ 
+// [5, 6]
+
+La tranche renvoyée conservera les clés par défaut. Si vous ne souhaitez pas conserver les clés d'origine, vous pouvez utiliser la valuesméthode pour les réindexer.
+
+sliding()
+La slidingméthode renvoie une nouvelle collection de morceaux représentant une vue "fenêtre coulissante" des éléments de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$chunks = $collection->sliding(2);
+ 
+$chunks->toArray();
+ 
+// [[1, 2], [2, 3], [3, 4], [4, 5]]
+
+Ceci est particulièrement utile en conjonction avec la eachSpreadméthode :
+
+$transactions->sliding(2)->eachSpread(function ($previous, $current) {
+    $current->total = $previous->total + $current->amount;
+});
+
+Vous pouvez éventuellement passer une deuxième valeur "step", qui détermine la distance entre le premier élément de chaque morceau :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$chunks = $collection->sliding(3, step: 2);
+ 
+$chunks->toArray();
+ 
+// [[1, 2, 3], [3, 4, 5]]
+
+sole()
+La soleméthode renvoie le premier élément de la collection qui réussit un test de vérité donné, mais uniquement si le test de vérité correspond exactement à un élément :
+
+collect([1, 2, 3, 4])->sole(function ($value, $key) {
+    return $value === 2;
+});
+ 
+// 2
+
+Vous pouvez également passer une paire clé/valeur à la soleméthode, qui renverra le premier élément de la collection qui correspond à la paire donnée, mais seulement si exactement un élément correspond :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+]);
+ 
+$collection->sole('product', 'Chair');
+ 
+// ['product' => 'Chair', 'price' => 100]
+
+Alternativement, vous pouvez également appeler la soleméthode sans argument pour obtenir le premier élément de la collection s'il n'y a qu'un seul élément :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+]);
+ 
+$collection->sole();
+ 
+// ['product' => 'Desk', 'price' => 200]
+
+S'il n'y a aucun élément dans la collection qui doit être renvoyé par la soleméthode, une \Illuminate\Collections\ItemNotFoundExceptionexception sera levée. S'il y a plus d'un élément qui doit être retourné, un \Illuminate\Collections\MultipleItemsFoundExceptionsera lancé.
+
+some()
+Alias ​​de la containsméthode.
+
+sort()
+La sortméthode trie la collection. La collection triée conserve les clés du tableau d'origine, donc dans l'exemple suivant, nous utiliserons la valuesméthode pour réinitialiser les clés aux index numérotés consécutivement :
+
+$collection = collect([5, 3, 1, 2, 4]);
+ 
+$sorted = $collection->sort();
+ 
+$sorted->values()->all();
+ 
+// [1, 2, 3, 4, 5]
+
+Si vos besoins de tri sont plus avancés, vous pouvez passer un rappel à sortavec votre propre algorithme. Reportez-vous à la documentation PHP sur uasort, qui est ce que les sortappels de méthode de la collection utilisent en interne.
+
+
+Si vous devez trier une collection de tableaux ou d'objets imbriqués, consultez les méthodes sortByet .sortByDesc
+
+
+sortBy()
+La sortByméthode trie la collection par la clé donnée. La collection triée conserve les clés du tableau d'origine, donc dans l'exemple suivant, nous utiliserons la valuesméthode pour réinitialiser les clés aux index numérotés consécutivement :
+
+$collection = collect([
+    ['name' => 'Desk', 'price' => 200],
+    ['name' => 'Chair', 'price' => 100],
+    ['name' => 'Bookcase', 'price' => 150],
+]);
+ 
+$sorted = $collection->sortBy('price');
+ 
+$sorted->values()->all();
+ 
+/*
+    [
+        ['name' => 'Chair', 'price' => 100],
+        ['name' => 'Bookcase', 'price' => 150],
+        ['name' => 'Desk', 'price' => 200],
+    ]
+*/
+
+La sortByméthode accepte les indicateurs de tri comme deuxième argument :
+
+$collection = collect([
+    ['title' => 'Item 1'],
+    ['title' => 'Item 12'],
+    ['title' => 'Item 3'],
+]);
+ 
+$sorted = $collection->sortBy('title', SORT_NATURAL);
+ 
+$sorted->values()->all();
+ 
+/*
+    [
+        ['title' => 'Item 1'],
+        ['title' => 'Item 3'],
+        ['title' => 'Item 12'],
+    ]
+*/
+
+Alternativement, vous pouvez passer votre propre fermeture pour déterminer comment trier les valeurs de la collection :
+
+$collection = collect([
+    ['name' => 'Desk', 'colors' => ['Black', 'Mahogany']],
+    ['name' => 'Chair', 'colors' => ['Black']],
+    ['name' => 'Bookcase', 'colors' => ['Red', 'Beige', 'Brown']],
+]);
+ 
+$sorted = $collection->sortBy(function ($product, $key) {
+    return count($product['colors']);
+});
+ 
+$sorted->values()->all();
+ 
+/*
+    [
+        ['name' => 'Chair', 'colors' => ['Black']],
+        ['name' => 'Desk', 'colors' => ['Black', 'Mahogany']],
+        ['name' => 'Bookcase', 'colors' => ['Red', 'Beige', 'Brown']],
+    ]
+*/
+
+Si vous souhaitez trier votre collection par plusieurs attributs, vous pouvez passer un tableau d'opérations de tri à la sortByméthode. Chaque opération de tri doit être un tableau composé de l'attribut que vous souhaitez trier et de la direction du tri souhaité :
+
+$collection = collect([
+    ['name' => 'Taylor Otwell', 'age' => 34],
+    ['name' => 'Abigail Otwell', 'age' => 30],
+    ['name' => 'Taylor Otwell', 'age' => 36],
+    ['name' => 'Abigail Otwell', 'age' => 32],
+]);
+ 
+$sorted = $collection->sortBy([
+    ['name', 'asc'],
+    ['age', 'desc'],
+]);
+ 
+$sorted->values()->all();
+ 
+/*
+    [
+        ['name' => 'Abigail Otwell', 'age' => 32],
+        ['name' => 'Abigail Otwell', 'age' => 30],
+        ['name' => 'Taylor Otwell', 'age' => 36],
+        ['name' => 'Taylor Otwell', 'age' => 34],
+    ]
+*/
+
+Lors du tri d'une collection par plusieurs attributs, vous pouvez également fournir des fermetures qui définissent chaque opération de tri :
+
+$collection = collect([
+    ['name' => 'Taylor Otwell', 'age' => 34],
+    ['name' => 'Abigail Otwell', 'age' => 30],
+    ['name' => 'Taylor Otwell', 'age' => 36],
+    ['name' => 'Abigail Otwell', 'age' => 32],
+]);
+ 
+$sorted = $collection->sortBy([
+    fn ($a, $b) => $a['name'] <=> $b['name'],
+    fn ($a, $b) => $b['age'] <=> $a['age'],
+]);
+ 
+$sorted->values()->all();
+ 
+/*
+    [
+        ['name' => 'Abigail Otwell', 'age' => 32],
+        ['name' => 'Abigail Otwell', 'age' => 30],
+        ['name' => 'Taylor Otwell', 'age' => 36],
+        ['name' => 'Taylor Otwell', 'age' => 34],
+    ]
+*/
+
+sortByDesc()
+Cette méthode a la même signature que la sortByméthode, mais trie la collection dans l'ordre inverse.
+
+sortDesc()
+Cette méthode triera la collection dans l'ordre inverse de la sortméthode :
+
+$collection = collect([5, 3, 1, 2, 4]);
+ 
+$sorted = $collection->sortDesc();
+ 
+$sorted->values()->all();
+ 
+// [5, 4, 3, 2, 1]
+
+Contrairement à sort, vous ne pouvez pas passer de fermeture à sortDesc. Au lieu de cela, vous devez utiliser la sortméthode et inverser votre comparaison.
+
+sortKeys()
+La sortKeysméthode trie la collection en fonction des clés du tableau associatif sous-jacent :
+
+$collection = collect([
+    'id' => 22345,
+    'first' => 'John',
+    'last' => 'Doe',
+]);
+ 
+$sorted = $collection->sortKeys();
+ 
+$sorted->all();
+ 
+/*
+    [
+        'first' => 'John',
+        'id' => 22345,
+        'last' => 'Doe',
+    ]
+*/
+
+sortKeysDesc()
+Cette méthode a la même signature que la sortKeysméthode, mais trie la collection dans l'ordre inverse.
+
+sortKeysUsing()
+La sortKeysUsingméthode trie la collection en fonction des clés du tableau associatif sous-jacent à l'aide d'un rappel :
+
+$collection = collect([
+    'ID' => 22345,
+    'first' => 'John',
+    'last' => 'Doe',
+]);
+ 
+$sorted = $collection->sortKeysUsing('strnatcasecmp');
+ 
+$sorted->all();
+ 
+/*
+    [
+        'first' => 'John',
+        'ID' => 22345,
+        'last' => 'Doe',
+    ]
+*/
+
+Le rappel doit être une fonction de comparaison qui renvoie un entier inférieur, égal ou supérieur à zéro. Pour plus d'informations, reportez-vous à la documentation PHP sur uksort, qui est la fonction PHP que la sortKeysUsingméthode utilise en interne.
+
+splice()
+La spliceméthode supprime et renvoie une tranche d'éléments commençant à l'index spécifié :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$chunk = $collection->splice(2);
+ 
+$chunk->all();
+ 
+// [3, 4, 5]
+ 
+$collection->all();
+ 
+// [1, 2]
+
+Vous pouvez passer un deuxième argument pour limiter la taille de la collection résultante :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$chunk = $collection->splice(2, 1);
+ 
+$chunk->all();
+ 
+// [3]
+ 
+$collection->all();
+ 
+// [1, 2, 4, 5]
+
+De plus, vous pouvez passer un troisième argument contenant les nouveaux éléments pour remplacer les éléments supprimés de la collection :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$chunk = $collection->splice(2, 1, [10, 11]);
+ 
+$chunk->all();
+ 
+// [3]
+ 
+$collection->all();
+ 
+// [1, 2, 10, 11, 4, 5]
+
+split()
+La splitméthode décompose une collection en le nombre donné de groupes :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$groups = $collection->split(3);
+ 
+$groups->all();
+ 
+// [[1, 2], [3, 4], [5]]
+
+splitIn()
+La splitInméthode divise une collection en un nombre donné de groupes, remplissant complètement les groupes non terminaux avant d'allouer le reste au groupe final :
+
+$collection = collect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+ 
+$groups = $collection->splitIn(3);
+ 
+$groups->all();
+ 
+// [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10]]
+
+sum()
+La summéthode renvoie la somme de tous les éléments de la collection :
+
+collect([1, 2, 3, 4, 5])->sum();
+ 
+// 15
+
+Si la collection contient des tableaux ou des objets imbriqués, vous devez transmettre une clé qui sera utilisée pour déterminer les valeurs à sommer :
+
+$collection = collect([
+    ['name' => 'JavaScript: The Good Parts', 'pages' => 176],
+    ['name' => 'JavaScript: The Definitive Guide', 'pages' => 1096],
+]);
+ 
+$collection->sum('pages');
+ 
+// 1272
+
+De plus, vous pouvez passer votre propre fermeture pour déterminer quelles valeurs de la collection additionner :
+
+$collection = collect([
+    ['name' => 'Chair', 'colors' => ['Black']],
+    ['name' => 'Desk', 'colors' => ['Black', 'Mahogany']],
+    ['name' => 'Bookcase', 'colors' => ['Red', 'Beige', 'Brown']],
+]);
+ 
+$collection->sum(function ($product) {
+    return count($product['colors']);
+});
+ 
+// 6
+
+take()
+La takeméthode renvoie une nouvelle collection avec le nombre d'éléments spécifié :
+
+$collection = collect([0, 1, 2, 3, 4, 5]);
+ 
+$chunk = $collection->take(3);
+ 
+$chunk->all();
+ 
+// [0, 1, 2]
+
+Vous pouvez également passer un entier négatif pour prendre le nombre spécifié d'éléments à partir de la fin de la collection :
+
+$collection = collect([0, 1, 2, 3, 4, 5]);
+ 
+$chunk = $collection->take(-2);
+ 
+$chunk->all();
+ 
+// [4, 5]
+
+takeUntil()
+La takeUntilméthode renvoie les éléments de la collection jusqu'à ce que le rappel donné renvoietrue :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->takeUntil(function ($item) {
+    return $item >= 3;
+});
+ 
+$subset->all();
+ 
+// [1, 2]
+
+Vous pouvez également passer une valeur simple à la takeUntilméthode pour obtenir les éléments jusqu'à ce que la valeur donnée soit trouvée :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->takeUntil(3);
+ 
+$subset->all();
+ 
+// [1, 2]
+
+
+Si la valeur donnée n'est pas trouvée ou si le rappel ne renvoie jamais true, la takeUntilméthode renverra tous les éléments de la collection.
+
+
+takeWhile()
+La takeWhileméthode renvoie les éléments de la collection jusqu'à ce que le rappel donné renvoiefalse :
+
+$collection = collect([1, 2, 3, 4]);
+ 
+$subset = $collection->takeWhile(function ($item) {
+    return $item < 3;
+});
+ 
+$subset->all();
+ 
+// [1, 2]
+
+
+Si le rappel ne renvoie jamais false, la takeWhileméthode renverra tous les éléments de la collection.
+
+
+tap()
+La tapméthode passe la collection au rappel donné, ce qui vous permet de « puiser » dans la collection à un point spécifique et de faire quelque chose avec les éléments sans affecter la collection elle-même. La collection est ensuite renvoyée par la tapméthode :
+
+collect([2, 4, 3, 1, 5])
+    ->sort()
+    ->tap(function ($collection) {
+        Log::debug('Values after sorting', $collection->values()->all());
+    })
+    ->shift();
+ 
+// 1
+
+times()
+La méthode statique timescrée une nouvelle collection en invoquant la fermeture donnée un nombre de fois spécifié :
+
+$collection = Collection::times(10, function ($number) {
+    return $number * 9;
+});
+ 
+$collection->all();
+ 
+// [9, 18, 27, 36, 45, 54, 63, 72, 81, 90]
+
+toArray()
+La toArrayméthode convertit la collection en PHP simple array. Si les valeurs de la collection sont des modèles Eloquent , les modèles seront également convertis en tableaux :
+
+$collection = collect(['name' => 'Desk', 'price' => 200]);
+ 
+$collection->toArray();
+ 
+/*
+    [
+        ['name' => 'Desk', 'price' => 200],
+    ]
+*/
+
+
+toArrayconvertit également tous les objets imbriqués de la collection qui sont une instance de Arrayableen un tableau. Si vous souhaitez obtenir le tableau brut sous-jacent à la collection, utilisez allplutôt la méthode.
+
+
+toJson()
+La toJsonméthode convertit la collection en une chaîne sérialisée JSON :
+
+$collection = collect(['name' => 'Desk', 'price' => 200]);
+ 
+$collection->toJson();
+ 
+// '{"name":"Desk", "price":200}'
+
+transform()
+La transformméthode itère sur la collection et appelle le rappel donné avec chaque élément de la collection. Les éléments de la collection seront remplacés par les valeurs renvoyées par le rappel :
+
+$collection = collect([1, 2, 3, 4, 5]);
+ 
+$collection->transform(function ($item, $key) {
+    return $item * 2;
+});
+ 
+$collection->all();
+ 
+// [2, 4, 6, 8, 10]
+
+
+Contrairement à la plupart des autres méthodes de collecte, transformmodifie la collection elle-même. Si vous souhaitez plutôt créer une nouvelle collection, utilisez la mapméthode.
+
+
+undot()
+La undotméthode développe une collection unidimensionnelle qui utilise la notation "point" en une collection multidimensionnelle :
+
+$person = collect([
+    'name.first_name' => 'Marie',
+    'name.last_name' => 'Valentine',
+    'address.line_1' => '2992 Eagle Drive',
+    'address.line_2' => '',
+    'address.suburb' => 'Detroit',
+    'address.state' => 'MI',
+    'address.postcode' => '48219'
+]);
+ 
+$person = $person->undot();
+ 
+$person->toArray();
+ 
+/*
+    [
+        "name" => [
+            "first_name" => "Marie",
+            "last_name" => "Valentine",
+        ],
+        "address" => [
+            "line_1" => "2992 Eagle Drive",
+            "line_2" => "",
+            "suburb" => "Detroit",
+            "state" => "MI",
+            "postcode" => "48219",
+        ],
+    ]
+*/
+
+union()
+La unionméthode ajoute le tableau donné à la collection. Si le tableau donné contient des clés qui sont déjà dans la collection d'origine, les valeurs de la collection d'origine seront préférées :
+
+$collection = collect([1 => ['a'], 2 => ['b']]);
+ 
+$union = $collection->union([3 => ['c'], 1 => ['d']]);
+ 
+$union->all();
+ 
+// [1 => ['a'], 2 => ['b'], 3 => ['c']]
+
+unique()
+La uniqueméthode renvoie tous les éléments uniques de la collection. La collection retournée conserve les clés du tableau d'origine, donc dans l'exemple suivant, nous utiliserons la valuesméthode pour réinitialiser les clés aux index numérotés consécutivement :
+
+$collection = collect([1, 1, 2, 2, 3, 4, 2]);
+ 
+$unique = $collection->unique();
+ 
+$unique->values()->all();
+ 
+// [1, 2, 3, 4]
+
+Lorsqu'il s'agit de tableaux ou d'objets imbriqués, vous pouvez spécifier la clé utilisée pour déterminer l'unicité :
+
+$collection = collect([
+    ['name' => 'iPhone 6', 'brand' => 'Apple', 'type' => 'phone'],
+    ['name' => 'iPhone 5', 'brand' => 'Apple', 'type' => 'phone'],
+    ['name' => 'Apple Watch', 'brand' => 'Apple', 'type' => 'watch'],
+    ['name' => 'Galaxy S6', 'brand' => 'Samsung', 'type' => 'phone'],
+    ['name' => 'Galaxy Gear', 'brand' => 'Samsung', 'type' => 'watch'],
+]);
+ 
+$unique = $collection->unique('brand');
+ 
+$unique->values()->all();
+ 
+/*
+    [
+        ['name' => 'iPhone 6', 'brand' => 'Apple', 'type' => 'phone'],
+        ['name' => 'Galaxy S6', 'brand' => 'Samsung', 'type' => 'phone'],
+    ]
+*/
+
+Enfin, vous pouvez également passer votre propre fermeture à la uniqueméthode pour spécifier quelle valeur doit déterminer l'unicité d'un élément :
+
+$unique = $collection->unique(function ($item) {
+    return $item['brand'].$item['type'];
+});
+ 
+$unique->values()->all();
+ 
+/*
+    [
+        ['name' => 'iPhone 6', 'brand' => 'Apple', 'type' => 'phone'],
+        ['name' => 'Apple Watch', 'brand' => 'Apple', 'type' => 'watch'],
+        ['name' => 'Galaxy S6', 'brand' => 'Samsung', 'type' => 'phone'],
+        ['name' => 'Galaxy Gear', 'brand' => 'Samsung', 'type' => 'watch'],
+    ]
+*/
+
+La uniqueméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Utilisez la uniqueStrictméthode pour filtrer à l'aide de comparaisons "strictes".
+
+
+Le comportement de cette méthode est modifié lors de l'utilisation d' Eloquent Collections .
+
+
+uniqueStrict()
+Cette méthode a la même signature que la uniqueméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+unless()
+La unlessméthode exécutera le rappel donné à moins que le premier argument donné à la méthode n'évaluetrue :
+
+$collection = collect([1, 2, 3]);
+ 
+$collection->unless(true, function ($collection) {
+    return $collection->push(4);
+});
+ 
+$collection->unless(false, function ($collection) {
+    return $collection->push(5);
+});
+ 
+$collection->all();
+ 
+// [1, 2, 3, 5]
+
+Un deuxième rappel peut être passé à la unlessméthode. Le deuxième rappel sera exécuté lorsque le premier argument donné à la unlessméthode vauttrue :
+
+$collection = collect([1, 2, 3]);
+ 
+$collection->unless(true, function ($collection) {
+    return $collection->push(4);
+}, function ($collection) {
+    return $collection->push(5);
+});
+ 
+$collection->all();
+ 
+// [1, 2, 3, 5]
+
+Pour l'inverse de unless, voir la whenméthode.
+
+unlessEmpty()
+Alias ​​de la whenNotEmptyméthode.
+
+unlessNotEmpty()
+Alias ​​de la whenEmptyméthode.
+
+unwrap()
+La méthode statique unwraprenvoie les éléments sous-jacents de la collection à partir de la valeur donnée, le cas échéant :
+
+Collection::unwrap(collect('John Doe'));
+ 
+// ['John Doe']
+ 
+Collection::unwrap(['John Doe']);
+ 
+// ['John Doe']
+ 
+Collection::unwrap('John Doe');
+ 
+// 'John Doe'
+
+value()
+La valueméthode récupère une valeur donnée du premier élément de la collection :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Speaker', 'price' => 400],
+]);
+ 
+$value = $collection->value('price');
+ 
+// 200
+
+values()
+La valuesméthode renvoie une nouvelle collection avec les clés réinitialisées à des entiers consécutifs :
+
+$collection = collect([
+    10 => ['product' => 'Desk', 'price' => 200],
+    11 => ['product' => 'Desk', 'price' => 200],
+]);
+ 
+$values = $collection->values();
+ 
+$values->all();
+ 
+/*
+    [
+        0 => ['product' => 'Desk', 'price' => 200],
+        1 => ['product' => 'Desk', 'price' => 200],
+    ]
+*/
+
+when()
+La whenméthode exécutera le rappel donné lorsque le premier argument donné à la méthode sera évalué à true. L'instance de collection et le premier argument donné à la whenméthode seront fournis à la fermeture :
+
+$collection = collect([1, 2, 3]);
+ 
+$collection->when(true, function ($collection, $value) {
+    return $collection->push(4);
+});
+ 
+$collection->when(false, function ($collection, $value) {
+    return $collection->push(5);
+});
+ 
+$collection->all();
+ 
+// [1, 2, 3, 4]
+
+Un deuxième rappel peut être passé à la whenméthode. Le deuxième rappel sera exécuté lorsque le premier argument donné à la whenméthode vautfalse :
+
+$collection = collect([1, 2, 3]);
+ 
+$collection->when(false, function ($collection, $value) {
+    return $collection->push(4);
+}, function ($collection) {
+    return $collection->push(5);
+});
+ 
+$collection->all();
+ 
+// [1, 2, 3, 5]
+
+Pour l'inverse de when, voir la unlessméthode.
+
+whenEmpty()
+La whenEmptyméthode exécutera le rappel donné lorsque la collection est vide :
+
+$collection = collect(['Michael', 'Tom']);
+ 
+$collection->whenEmpty(function ($collection) {
+    return $collection->push('Adam');
+});
+ 
+$collection->all();
+ 
+// ['Michael', 'Tom']
+ 
+ 
+$collection = collect();
+ 
+$collection->whenEmpty(function ($collection) {
+    return $collection->push('Adam');
+});
+ 
+$collection->all();
+ 
+// ['Adam']
+
+Une deuxième fermeture peut être passée à la whenEmptyméthode qui sera exécutée lorsque la collection n'est pas vide :
+
+$collection = collect(['Michael', 'Tom']);
+ 
+$collection->whenEmpty(function ($collection) {
+    return $collection->push('Adam');
+}, function ($collection) {
+    return $collection->push('Taylor');
+});
+ 
+$collection->all();
+ 
+// ['Michael', 'Tom', 'Taylor']
+
+Pour l'inverse de whenEmpty, voir la whenNotEmptyméthode.
+
+whenNotEmpty()
+La whenNotEmptyméthode exécutera le rappel donné lorsque la collection n'est pas vide :
+
+$collection = collect(['michael', 'tom']);
+ 
+$collection->whenNotEmpty(function ($collection) {
+    return $collection->push('adam');
+});
+ 
+$collection->all();
+ 
+// ['michael', 'tom', 'adam']
+ 
+ 
+$collection = collect();
+ 
+$collection->whenNotEmpty(function ($collection) {
+    return $collection->push('adam');
+});
+ 
+$collection->all();
+ 
+// []
+
+Une deuxième fermeture peut être passée à la whenNotEmptyméthode qui sera exécutée lorsque la collection sera vide :
+
+$collection = collect();
+ 
+$collection->whenNotEmpty(function ($collection) {
+    return $collection->push('adam');
+}, function ($collection) {
+    return $collection->push('taylor');
+});
+ 
+$collection->all();
+ 
+// ['taylor']
+
+Pour l'inverse de whenNotEmpty, voir la whenEmptyméthode.
+
+where()
+La whereméthode filtre la collection par une paire clé/valeur donnée :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+    ['product' => 'Bookcase', 'price' => 150],
+    ['product' => 'Door', 'price' => 100],
+]);
+ 
+$filtered = $collection->where('price', 100);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['product' => 'Chair', 'price' => 100],
+        ['product' => 'Door', 'price' => 100],
+    ]
+*/
+
+La whereméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Utilisez la whereStrictméthode pour filtrer à l'aide de comparaisons "strictes".
+
+Facultativement, vous pouvez passer un opérateur de comparaison comme deuxième paramètre.
+
+$collection = collect([
+    ['name' => 'Jim', 'deleted_at' => '2019-01-01 00:00:00'],
+    ['name' => 'Sally', 'deleted_at' => '2019-01-02 00:00:00'],
+    ['name' => 'Sue', 'deleted_at' => null],
+]);
+ 
+$filtered = $collection->where('deleted_at', '!=', null);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['name' => 'Jim', 'deleted_at' => '2019-01-01 00:00:00'],
+        ['name' => 'Sally', 'deleted_at' => '2019-01-02 00:00:00'],
+    ]
+*/
+
+whereStrict()
+Cette méthode a la même signature que la whereméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+whereBetween()
+La whereBetweenméthode filtre la collection en déterminant si une valeur d'élément spécifiée se trouve dans une plage donnée :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 80],
+    ['product' => 'Bookcase', 'price' => 150],
+    ['product' => 'Pencil', 'price' => 30],
+    ['product' => 'Door', 'price' => 100],
+]);
+ 
+$filtered = $collection->whereBetween('price', [100, 200]);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['product' => 'Desk', 'price' => 200],
+        ['product' => 'Bookcase', 'price' => 150],
+        ['product' => 'Door', 'price' => 100],
+    ]
+*/
+
+whereIn()
+La whereInméthode supprime les éléments de la collection qui n'ont pas de valeur d'élément spécifiée contenue dans le tableau donné :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+    ['product' => 'Bookcase', 'price' => 150],
+    ['product' => 'Door', 'price' => 100],
+]);
+ 
+$filtered = $collection->whereIn('price', [150, 200]);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['product' => 'Desk', 'price' => 200],
+        ['product' => 'Bookcase', 'price' => 150],
+    ]
+*/
+
+La whereInméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Utilisez la whereInStrictméthode pour filtrer à l'aide de comparaisons "strictes".
+
+whereInStrict()
+Cette méthode a la même signature que la whereInméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+whereInstanceOf()
+La whereInstanceOfméthode filtre la collection par un type de classe donné :
+
+use App\Models\User;
+use App\Models\Post;
+ 
+$collection = collect([
+    new User,
+    new User,
+    new Post,
+]);
+ 
+$filtered = $collection->whereInstanceOf(User::class);
+ 
+$filtered->all();
+ 
+// [App\Models\User, App\Models\User]
+
+whereNotBetween()
+La whereNotBetweenméthode filtre la collection en déterminant si une valeur d'élément spécifiée est en dehors d'une plage donnée :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 80],
+    ['product' => 'Bookcase', 'price' => 150],
+    ['product' => 'Pencil', 'price' => 30],
+    ['product' => 'Door', 'price' => 100],
+]);
+ 
+$filtered = $collection->whereNotBetween('price', [100, 200]);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['product' => 'Chair', 'price' => 80],
+        ['product' => 'Pencil', 'price' => 30],
+    ]
+*/
+
+whereNotIn()
+La whereNotInméthode supprime les éléments de la collection qui ont une valeur d'élément spécifiée contenue dans le tableau donné :
+
+$collection = collect([
+    ['product' => 'Desk', 'price' => 200],
+    ['product' => 'Chair', 'price' => 100],
+    ['product' => 'Bookcase', 'price' => 150],
+    ['product' => 'Door', 'price' => 100],
+]);
+ 
+$filtered = $collection->whereNotIn('price', [150, 200]);
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['product' => 'Chair', 'price' => 100],
+        ['product' => 'Door', 'price' => 100],
+    ]
+*/
+
+La whereNotInméthode utilise des comparaisons "lâches" lors de la vérification des valeurs des éléments, ce qui signifie qu'une chaîne avec une valeur entière sera considérée comme égale à un entier de la même valeur. Utilisez la whereNotInStrictméthode pour filtrer à l'aide de comparaisons "strictes".
+
+whereNotInStrict()
+Cette méthode a la même signature que la whereNotInméthode ; cependant, toutes les valeurs sont comparées à l'aide de comparaisons "strictes".
+
+whereNotNull()
+La whereNotNullméthode renvoie les éléments de la collection où la clé donnée n'est pasnull :
+
+$collection = collect([
+    ['name' => 'Desk'],
+    ['name' => null],
+    ['name' => 'Bookcase'],
+]);
+ 
+$filtered = $collection->whereNotNull('name');
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['name' => 'Desk'],
+        ['name' => 'Bookcase'],
+    ]
+*/
+
+whereNull()
+La whereNullméthode renvoie les éléments de la collection où la clé donnée estnull :
+
+$collection = collect([
+    ['name' => 'Desk'],
+    ['name' => null],
+    ['name' => 'Bookcase'],
+]);
+ 
+$filtered = $collection->whereNull('name');
+ 
+$filtered->all();
+ 
+/*
+    [
+        ['name' => null],
+    ]
+*/
+
+wrap()
+La méthode statique wrapenveloppe la valeur donnée dans une collection, le cas échéant :
+
+use Illuminate\Support\Collection;
+ 
+$collection = Collection::wrap('John Doe');
+ 
+$collection->all();
+ 
+// ['John Doe']
+ 
+$collection = Collection::wrap(['John Doe']);
+ 
+$collection->all();
+ 
+// ['John Doe']
+ 
+$collection = Collection::wrap(collect('John Doe'));
+ 
+$collection->all();
+ 
+// ['John Doe']
+
+zip()
+La zipméthode fusionne les valeurs du tableau donné avec les valeurs de la collection d'origine à leur index correspondant :
+
+$collection = collect(['Chair', 'Desk']);
+ 
+$zipped = $collection->zip([100, 200]);
+ 
+$zipped->all();
+ 
+// [['Chair', 100], ['Desk', 200]]
+
+Messages d'ordre supérieur
+Les collections prennent également en charge les "messages d'ordre supérieur", qui sont des raccourcis pour effectuer des actions courantes sur les collections. Les méthodes de collecte qui fournissent des messages d'ordre supérieur sont : average, avg, contains, each, every, filter, first, flatMap, groupBy, keyBy, map, max, min, partition, reject, skipUntil, skipWhile, some, sortBy, sortByDesc, sum, takeUntil, takeWhile, et unique.
+
+Chaque message d'ordre supérieur est accessible en tant que propriété dynamique sur une instance de collection. Par exemple, utilisons le eachmessage d'ordre supérieur pour appeler une méthode sur chaque objet d'une collection :
+
+use App\Models\User;
+ 
+$users = User::where('votes', '>', 500)->get();
+ 
+$users->each->markAsVip();
+
+De même, nous pouvons utiliser le summessage d'ordre supérieur pour recueillir le nombre total de "votes" pour un ensemble d'utilisateurs :
+
+$users = User::where('group', 'Development')->get();
+ 
+return $users->sum->votes;
+
+Collections paresseuses
+Introduction
+
+Avant d'en savoir plus sur les collections paresseuses de Laravel, prenez le temps de vous familiariser avec les générateurs PHP .
+
+
+Pour compléter la classe déjà puissante Collection, la LazyCollectionclasse exploite les générateurs de PHP pour vous permettre de travailler avec de très grands ensembles de données tout en minimisant l'utilisation de la mémoire.
+
+Par exemple, imaginez que votre application doive traiter un fichier journal de plusieurs gigaoctets tout en tirant parti des méthodes de collecte de Laravel pour analyser les journaux. Au lieu de lire le fichier entier en mémoire en une seule fois, les collections paresseuses peuvent être utilisées pour ne conserver qu'une petite partie du fichier en mémoire à un moment donné :
+
+use App\Models\LogEntry;
+use Illuminate\Support\LazyCollection;
+ 
+LazyCollection::make(function () {
+    $handle = fopen('log.txt', 'r');
+ 
+    while (($line = fgets($handle)) !== false) {
+        yield $line;
+    }
+})->chunk(4)->map(function ($lines) {
+    return LogEntry::fromLines($lines);
+})->each(function (LogEntry $logEntry) {
+    // Process the log entry...
+});
+
+Ou imaginez que vous ayez besoin de parcourir 10 000 modèles Eloquent. Lors de l'utilisation de collections Laravel traditionnelles, les 10 000 modèles Eloquent doivent être chargés en mémoire en même temps :
+
+use App\Models\User;
+ 
+$users = User::all()->filter(function ($user) {
+    return $user->id > 500;
+});
+
+Cependant, la méthode du générateur de requête cursorrenvoie une LazyCollectioninstance. Cela vous permet de n'exécuter qu'une seule requête sur la base de données, mais également de ne conserver qu'un seul modèle Eloquent chargé en mémoire à la fois. Dans cet exemple, le filterrappel n'est pas exécuté tant que nous n'avons pas itéré sur chaque utilisateur individuellement, ce qui permet une réduction drastique de l'utilisation de la mémoire :
+
+use App\Models\User;
+ 
+$users = User::cursor()->filter(function ($user) {
+    return $user->id > 500;
+});
+ 
+foreach ($users as $user) {
+    echo $user->id;
+}
+
+Création de collections paresseuses
+Pour créer une instance de collection paresseuse, vous devez passer une fonction de générateur PHP à la makeméthode de la collection :
+
+use Illuminate\Support\LazyCollection;
+ 
+LazyCollection::make(function () {
+    $handle = fopen('log.txt', 'r');
+ 
+    while (($line = fgets($handle)) !== false) {
+        yield $line;
+    }
+});
+
+Le contrat énumérable
+Presque toutes les méthodes disponibles sur la Collectionclasse sont également disponibles sur la LazyCollectionclasse. Ces deux classes implémentent le Illuminate\Support\Enumerablecontrat, qui définit les méthodes suivantes :
+
+tous les morceaux moyens moyens chunkWhile réduire collecter combiner concat contient containsStrict count countBy crossJoin dd diff diffAssoc diffKeys vider les doublons duplicatesStrict chacun chacunÉtendre tous sauf le filtre en premier en premierOrFail en premierWhere flatMap flatten flip forPage get groupBy a imploser croiser intersectByKeys isEmpty isNotEmpty join keyBy keys last macro make map mapInto mapSpread mapToGroups mapWithKeys max median merge mergeRecursive min mode nth only pad partition pipe pluck random reduce replacement replace replaceRecursive reverse search shuffle skip slice sole some sort sortBy sortByDesc sortKeys sortKeysDesc split sum take tap times toArray toJson union unique uniqueStrict sauf exceptéVide exceptéNonVide déballer les valeurs quand quandVide quandNonVide où oùStrict oùBetween oùDans oùInStrict oùInstanceOf oùNotBetween oùNotIn oùNotInStrict wrap zip
+
+
+Les méthodes qui modifient la collection (telles que shift, pop, prependetc.) ne sont pas disponibles sur la LazyCollectionclasse.
+
+
+Méthodes de collecte paresseuses
+En plus des méthodes définies dans le Enumerablecontrat, la LazyCollectionclasse contient les méthodes suivantes :
+
+takeUntilTimeout()
+La takeUntilTimeoutméthode renvoie une nouvelle collection différée qui énumérera les valeurs jusqu'à l'heure spécifiée. Passé ce délai, la collection cessera alors d'énumérer :
+
+$lazyCollection = LazyCollection::times(INF)
+    ->takeUntilTimeout(now()->addMinute());
+ 
+$lazyCollection->each(function ($number) {
+    dump($number);
+ 
+    sleep(1);
+});
+ 
+// 1
+// 2
+// ...
+// 58
+// 59
+
+Pour illustrer l'utilisation de cette méthode, imaginez une application qui soumet des factures à partir de la base de données à l'aide d'un curseur. Vous pouvez définir une tâche planifiée qui s'exécute toutes les 15 minutes et ne traite les factures que pendant un maximum de 14 minutes :
+
+use App\Models\Invoice;
+use Illuminate\Support\Carbon;
+ 
+Invoice::pending()->cursor()
+    ->takeUntilTimeout(
+        Carbon::createFromTimestamp(LARAVEL_START)->add(14, 'minutes')
+    )
+    ->each(fn ($invoice) => $invoice->submit());
+
+tapEach()
+Alors que la eachméthode appelle immédiatement le rappel donné pour chaque élément de la collection, la tapEachméthode appelle uniquement le rappel donné lorsque les éléments sont retirés de la liste un par un :
+
+// Nothing has been dumped so far...
+$lazyCollection = LazyCollection::times(INF)->tapEach(function ($value) {
+    dump($value);
+});
+ 
+// Three items are dumped...
+$array = $lazyCollection->take(3)->all();
+ 
+// 1
+// 2
+// 3
+
+remember()
+La rememberméthode renvoie une nouvelle collection paresseuse qui se souviendra de toutes les valeurs qui ont déjà été énumérées et ne les récupérera plus lors des énumérations de collection suivantes :
+
+// No query has been executed yet...
+$users = User::cursor()->remember();
+ 
+// The query is executed...
+// The first 5 users are hydrated from the database...
+$users->take(5)->all();
+ 
+// First 5 users come from the collection's cache...
+// The rest are hydrated from the database...
+$users->take(20)->all();

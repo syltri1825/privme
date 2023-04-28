@@ -1,0 +1,132 @@
+Base de données : Ensemencement
+Introduction
+Écrire des semoirs
+Utilisation des usines modèles
+Appel de seeders supplémentaires
+Désactivation des événements de modèle
+Courir les semoirs
+Introduction
+Laravel inclut la possibilité d'ensemencer votre base de données avec des données à l'aide de classes de départ. Toutes les classes de départ sont stockées dans le database/seedersrépertoire. Par défaut, une DatabaseSeederclasse est définie pour vous. À partir de cette classe, vous pouvez utiliser la callméthode pour exécuter d'autres classes de départ, ce qui vous permet de contrôler l'ordre d'amorçage.
+
+
+La protection des affectations en masse est automatiquement désactivée lors de l'amorçage de la base de données.
+
+
+Écrire des semoirs
+Pour générer un seeder, exécutez la make:seeder commande Artisan . Tous les seeders générés par le framework seront placés dans le database/seedersrépertoire :
+
+php artisan make:seeder UserSeeder
+
+Une classe seeder ne contient qu'une seule méthode par défaut : run. Cette méthode est appelée lorsque la db:seed commande Artisan est exécutée. Dans le cadre de la runméthode, vous pouvez insérer des données dans votre base de données comme vous le souhaitez. Vous pouvez utiliser le générateur de requêtes pour insérer manuellement des données ou vous pouvez utiliser des fabriques de modèles Eloquent .
+
+Par exemple, modifions la DatabaseSeederclasse par défaut et ajoutons une instruction d'insertion de base de données à la runméthode :
+
+<?php
+ 
+namespace Database\Seeders;
+ 
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+ 
+class DatabaseSeeder extends Seeder
+{
+    /**
+     * Run the database seeders.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        DB::table('users')->insert([
+            'name' => Str::random(10),
+            'email' => Str::random(10).'@gmail.com',
+            'password' => Hash::make('password'),
+        ]);
+    }
+}
+
+
+Vous pouvez taper toutes les dépendances dont vous avez besoin dans la runsignature de la méthode. Ils seront automatiquement résolus via le conteneur de service Laravel .
+
+
+Utilisation des usines modèles
+Bien sûr, spécifier manuellement les attributs de chaque graine de modèle est fastidieux. Au lieu de cela, vous pouvez utiliser des fabriques de modèles pour générer facilement de grandes quantités d'enregistrements de base de données. Tout d'abord, consultez la documentation de l'usine modèle pour savoir comment définir vos usines.
+
+Par exemple, créons 50 utilisateurs ayant chacun une publication associée :
+
+use App\Models\User;
+ 
+/**
+ * Run the database seeders.
+ *
+ * @return void
+ */
+public function run()
+{
+    User::factory()
+            ->count(50)
+            ->hasPosts(1)
+            ->create();
+}
+
+Appel de seeders supplémentaires
+Au sein de la DatabaseSeederclasse, vous pouvez utiliser la callméthode pour exécuter des classes de départ supplémentaires. L'utilisation de la callméthode vous permet de diviser l'amorçage de votre base de données en plusieurs fichiers afin qu'aucune classe d'amorçage ne devienne trop volumineuse. La callméthode accepte un tableau de classes seeder qui doivent être exécutées :
+
+/**
+ * Run the database seeders.
+ *
+ * @return void
+ */
+public function run()
+{
+    $this->call([
+        UserSeeder::class,
+        PostSeeder::class,
+        CommentSeeder::class,
+    ]);
+}
+
+Désactivation des événements de modèle
+Lors de l'exécution des graines, vous souhaiterez peut-être empêcher les modèles de distribuer des événements. Vous pouvez y parvenir en utilisant le WithoutModelEventstrait. Lorsqu'il est utilisé, le WithoutModelEventstrait garantit qu'aucun événement de modèle n'est envoyé, même si des classes de départ supplémentaires sont exécutées via la callméthode :
+
+<?php
+ 
+namespace Database\Seeders;
+ 
+use Illuminate\Database\Seeder;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+ 
+class DatabaseSeeder extends Seeder
+{
+    use WithoutModelEvents;
+ 
+    /**
+     * Run the database seeders.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        $this->call([
+            UserSeeder::class,
+        ]);
+    }
+}
+
+Courir les semoirs
+Vous pouvez exécuter la db:seedcommande Artisan pour amorcer votre base de données. Par défaut, la db:seedcommande exécute la Database\Seeders\DatabaseSeederclasse, qui peut à son tour invoquer d'autres classes de départ. Cependant, vous pouvez utiliser l' --classoption pour spécifier une classe de départ spécifique à exécuter individuellement :
+
+php artisan db:seed
+ 
+php artisan db:seed --class=UserSeeder
+
+Vous pouvez également amorcer votre base de données en utilisant la migrate:freshcommande en combinaison avec l' --seedoption, qui supprimera toutes les tables et réexécutera toutes vos migrations. Cette commande est utile pour reconstruire complètement votre base de données :
+
+php artisan migrate:fresh --seed
+
+Forcer les semoirs à fonctionner en production
+Certaines opérations d'amorçage peuvent entraîner la modification ou la perte de données. Afin de vous empêcher d'exécuter des commandes d'amorçage sur votre base de données de production, vous serez invité à confirmer avant que les amorçages ne soient exécutés dans l' productionenvironnement. Pour forcer les seeders à s'exécuter sans invite, utilisez l' --forceindicateur :
+
+php artisan db:seed --force

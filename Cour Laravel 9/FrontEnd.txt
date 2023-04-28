@@ -1,0 +1,406 @@
+
+Introduction
+Utiliser PHP
+PHP et Lame
+Câble en direct
+Kits de démarrage
+Utilisation de Vue/Réagir
+Inertie
+Kits de démarrage
+Regroupement d'actifs
+Introduction
+Laravel est un framework backend qui fournit toutes les fonctionnalités 
+
+dont vous avez besoin pour créer des applications Web modernes, telles 
+
+que le routage , la validation , la mise en cache , les files d'attente , 
+
+le stockage de fichiers , etc. Cependant, nous pensons qu'il est 
+
+important d'offrir aux développeurs une belle expérience full-stack, 
+
+y compris des approches puissantes pour créer l'interface de votre 
+
+application.
+
+Il existe deux façons principales d'aborder le développement frontal 
+
+lors de la création d'une application avec Laravel, et l'approche que 
+
+vous choisissez est déterminée par le fait que vous souhaitez créer 
+
+votre frontend en tirant parti de PHP ou en utilisant des frameworks 
+
+JavaScript tels que Vue et React. Nous discuterons de ces deux options 
+
+ci-dessous afin que vous puissiez prendre une décision éclairée 
+
+concernant la meilleure approche de développement frontal pour 
+
+votre application.
+
+Utiliser PHP
+PHP et Lame
+Dans le passé, la plupart des applications PHP rendaient HTML 
+
+au navigateur en utilisant de simples modèles HTML entrecoupés 
+
+d' echoinstructions PHP qui rendaient les données extraites d'une 
+
+base de données lors de la requête :
+
+<div>
+    <?php foreach ($users as $user): ?>
+        Hello, <?php echo $user->name; ?> <br />
+    <?php endforeach; ?>
+</div>
+
+Dans Laravel, cette approche du rendu HTML peut toujours être 
+
+réalisée en utilisant des vues et Blade . Blade est un langage de 
+
+modélisation extrêmement léger qui fournit une syntaxe courte et 
+
+pratique pour afficher des données, itérer sur des données, etc. :
+
+<div>
+    @foreach ($users as $user)
+        Hello, {{ $user->name }} <br />
+    @endforeach
+</div>
+
+Lors de la création d'applications de cette manière, les soumissions 
+
+de formulaires et autres interactions de page reçoivent généralement 
+
+un document HTML entièrement nouveau du serveur et la page entière 
+
+est restituée par le navigateur. Aujourd'hui encore, de nombreuses 
+
+applications peuvent être parfaitement adaptées pour que leurs 
+
+interfaces soient construites de cette manière à l'aide de simples 
+
+modèles Blade.
+
+
+Attentes croissantes
+Cependant, à mesure que les attentes des utilisateurs concernant 
+
+les applications Web ont mûri, de nombreux développeurs ont constaté 
+
+le besoin de créer des interfaces plus dynamiques avec des 
+
+interactions plus raffinées. À la lumière de cela, certains 
+
+développeurs choisissent de commencer à créer l'interface de leur 
+
+application à l'aide de frameworks JavaScript tels que Vue et React.
+
+D'autres, préférant s'en tenir au langage backend avec lequel ils 
+
+sont à l'aise, ont développé des solutions qui permettent la 
+
+construction d'interfaces utilisateur d'applications Web modernes 
+
+tout en utilisant principalement le langage backend de leur choix. 
+
+Par exemple, dans l' écosystème Rails , cela a stimulé la création 
+
+de bibliothèques telles que Turbo Hotwire et Stimulus .
+
+Au sein de l'écosystème Laravel, la nécessité de créer des interfaces 
+
+modernes et dynamiques en utilisant principalement PHP a conduit 
+
+à la création de Laravel Livewire et Alpine.js .
+
+Câble en direct
+Laravel Livewire est un framework permettant de créer des frontends 
+
+alimentés par Laravel qui se sentent dynamiques, modernes et vivants, 
+
+tout comme les frontends construits avec des frameworks JavaScript 
+
+modernes comme Vue et React.
+
+Lorsque vous utilisez Livewire, vous créez des "composants" 
+
+Livewire qui restituent une partie discrète de votre interface 
+
+utilisateur et exposent des méthodes et des données qui peuvent 
+
+être invoquées et avec lesquelles interagir à partir de l'interface 
+
+de votre application. Par exemple, un simple composant "Compteur" 
+
+pourrait ressembler à ceci :
+
+<?php
+ 
+namespace App\Http\Livewire;
+ 
+use Livewire\Component;
+ 
+class Counter extends Component
+{
+    public $count = 0;
+ 
+    public function increment()
+    {
+        $this->count++;
+    }
+ 
+    public function render()
+    {
+        return view('livewire.counter');
+    }
+}
+
+Et, le modèle correspondant pour le compteur s'écrirait ainsi :
+
+<div>
+    <button wire:click="increment">+</button>
+    <h1>{{ $count }}</h1>
+</div>
+
+Comme vous pouvez le voir, Livewire vous permet d'écrire de nouveaux 
+
+attributs HTML tels que ceux wire:clickqui connectent le frontend 
+
+et le backend de votre application Laravel. De plus, vous pouvez 
+
+afficher l'état actuel de votre composant à l'aide d'expressions 
+
+Blade simples.
+
+Pour beaucoup, Livewire a révolutionné le développement frontal 
+
+avec Laravel, leur permettant de rester dans le confort de Laravel 
+
+tout en créant des applications Web modernes et dynamiques. En règle 
+
+générale, les développeurs utilisant Livewire utiliseront également 
+
+Alpine.js pour « saupoudrer » JavaScript sur leur interface uniquement 
+
+là où cela est nécessaire, par exemple pour afficher une fenêtre de 
+
+dialogue.
+
+Si vous débutez avec Laravel, nous vous recommandons de vous 
+
+familiariser avec l'utilisation de base des vues et de Blade . 
+
+Ensuite, consultez la documentation officielle de Laravel 
+
+Livewire pour savoir comment faire passer votre application au niveau 
+
+supérieur avec les composants interactifs Livewire.
+
+Kits de démarrage
+Si vous souhaitez créer votre interface à l'aide de PHP et Livewire, vous 
+
+pouvez tirer parti de nos kits de démarrage Breeze ou Jetstream 
+
+pour démarrer le développement de votre application. Ces deux kits de 
+
+démarrage échafaudent le flux d'authentification backend et frontend de 
+
+votre application à l'aide de Blade et Tailwind afin que vous puissiez 
+
+simplement commencer à créer votre prochaine grande idée.
+
+Utilisation de Vue/Réagir
+Bien qu'il soit possible de créer des interfaces modernes à l'aide de 
+
+Laravel et Livewire, de nombreux développeurs préfèrent encore tirer 
+
+parti de la puissance d'un framework JavaScript comme Vue ou React. 
+
+Cela permet aux développeurs de tirer parti du riche écosystème de 
+
+packages et d'outils JavaScript disponibles via NPM.
+
+Cependant, sans outils supplémentaires, associer Laravel à Vue ou 
+
+React nous obligerait à résoudre divers problèmes complexes tels que 
+
+le routage côté client, l'hydratation des données et l'authentification. 
+
+Le routage côté client est souvent simplifié en utilisant des frameworks 
+
+avisés Vue / React tels que Nuxt et Next ; cependant, l'hydratation et 
+
+l'authentification des données restent des problèmes compliqués et 
+
+fastidieux à résoudre lors du couplage d'un framework backend comme 
+
+Laravel avec ces frameworks frontend.
+
+De plus, les développeurs doivent gérer deux référentiels de code 
+
+distincts, ce qui nécessite souvent de coordonner la maintenance, 
+
+les versions et les déploiements dans les deux référentiels. 
+
+Bien que ces problèmes ne soient pas insurmontables, nous ne pensons 
+
+pas que ce soit une manière productive ou agréable de développer 
+
+des applications.
+
+Inertie
+Heureusement, Laravel offre le meilleur des deux mondes. Inertia 
+
+comble le fossé entre votre application Laravel et votre interface 
+
+moderne Vue ou React, vous permettant de créer des interfaces 
+
+modernes à part entière à l'aide de Vue ou React tout en tirant parti 
+
+des routes et des contrôleurs Laravel pour le routage, l'hydratation 
+
+des données et l'authentification - le tout dans un seul code dépôt. 
+
+Avec cette approche, vous pouvez profiter de toute la puissance de 
+
+Laravel et de Vue / React sans paralyser les capacités de l'un ou 
+
+l'autre outil.
+
+Après avoir installé Inertia dans votre application Laravel, vous écrirez 
+
+des itinéraires et des contrôleurs comme d'habitude. Cependant, au 
+
+lieu de renvoyer un template Blade depuis votre manette, vous renverrez 
+
+une page Inertia :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Inertia\Inertia;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show the profile for a given user.
+     *
+     * @param  int  $id
+     * @return \Inertia\Response
+     */
+    public function show($id)
+    {
+        return Inertia::render('Users/Profile', [
+            'user' => User::findOrFail($id)
+        ]);
+    }
+}
+
+Une page Inertia correspond à un composant Vue ou React, généralement 
+
+stocké dans le resources/js/Pagesrépertoire de votre application. 
+
+Les données données à la page via la Inertia::renderméthode seront 
+
+utilisées pour hydrater les "props" du composant de la page :
+
+<script setup>
+import Layout from '@/Layouts/Authenticated.vue';
+import { Head } from '@inertiajs/inertia-vue3';
+ 
+const props = defineProps(['user']);
+</script>
+ 
+<template>
+    <Head title="User Profile" />
+ 
+    <Layout>
+        <template #header>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Profile
+            </h2>
+        </template>
+ 
+        <div class="py-12">
+            Hello, {{ user.name }}
+        </div>
+    </Layout>
+</template>
+
+Comme vous pouvez le voir, Inertia vous permet de tirer parti de toute 
+
+la puissance de Vue ou de React lors de la construction de votre 
+
+frontend, tout en fournissant un pont léger entre votre backend 
+
+alimenté par Laravel et votre frontend alimenté par JavaScript.
+
+Rendu côté serveur
+Si vous craignez de plonger dans Inertia parce que votre application 
+
+nécessite un rendu côté serveur, ne vous inquiétez pas. 
+
+Inertia offre une prise en charge du rendu côté serveur . 
+
+Et, lors du déploiement de votre application via Laravel Forge , 
+
+c'est un jeu d'enfant de s'assurer que le processus de rendu côté 
+
+serveur d'Inertia est toujours en cours d'exécution.
+
+Kits de démarrage
+Si vous souhaitez construire votre frontend en utilisant Inertia 
+
+et Vue/React, vous pouvez tirer parti de nos kits de démarrage 
+
+Breeze ou Jetstream pour démarrer le développement de votre application. 
+
+Ces deux kits de démarrage échafaudent le flux d'authentification backend 
+
+et frontend de votre application à l'aide d'Inertia, Vue/React, Tailwind 
+
+et Vite afin que vous puissiez commencer à construire votre prochaine 
+
+grande idée.
+
+Regroupement d'actifs
+Que vous choisissiez de développer votre interface à l'aide de Blade et 
+
+Livewire ou de Vue / React et Inertia, vous devrez probablement regrouper 
+
+le CSS de votre application dans des ressources prêtes pour la production. 
+
+Bien entendu, si vous choisissez de créer l'interface de votre application 
+
+avec Vue ou React, vous devrez également regrouper vos composants dans 
+
+des ressources JavaScript prêtes pour le navigateur.
+
+Par défaut, Laravel utilise Vite pour regrouper vos actifs. Vite fournit 
+
+des temps de construction ultra-rapides et un remplacement de module à 
+
+chaud (HMR) quasi instantané pendant le développement local. Dans toutes 
+
+les nouvelles applications Laravel, y compris celles utilisant nos kits 
+
+de démarrage , vous trouverez un vite.config.jsfichier qui charge notre 
+
+plugin léger Laravel Vite qui fait de Vite un plaisir à utiliser avec 
+
+les applications Laravel.
+
+Le moyen le plus rapide de démarrer avec Laravel et Vite consiste à 
+
+commencer le développement de votre application à l'aide de Laravel 
+
+Breeze , notre kit de démarrage le plus simple qui démarre votre 
+
+application en fournissant un échafaudage d'authentification frontend 
+
+et backend.

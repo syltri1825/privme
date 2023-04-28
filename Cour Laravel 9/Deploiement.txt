@@ -1,0 +1,119 @@
+Déploiement
+Introduction
+Exigences du serveur
+Configuration du serveur
+Nginx
+Optimisation
+Optimisation du chargeur automatique
+Optimisation du chargement de la configuration
+Optimisation du chargement d'itinéraire
+Optimisation du chargement des vues
+Mode débogage
+Déploiement avec Forge / Vapor
+Introduction
+Lorsque vous êtes prêt à déployer votre application Laravel en production, vous pouvez faire certaines choses importantes pour vous assurer que votre application fonctionne aussi efficacement que possible. Dans ce document, nous couvrirons quelques excellents points de départ pour vous assurer que votre application Laravel est déployée correctement.
+
+Exigences du serveur
+Le framework Laravel a quelques exigences système. Vous devez vous assurer que votre serveur Web dispose de la version et des extensions PHP minimales suivantes :
+
+PHP >= 8.0
+Extension PHP BCMath
+Extension PHP Ctype
+cURL Extension PHP
+Extension PHP DOM
+Extension PHP Fileinfo
+Extension PHP JSON
+Extension PHP Mbstring
+Extension PHP OpenSSL
+PCRE Extension PHP
+Extension PHP AOP
+Extension PHP Tokenizer
+Extension PHP XML
+Configuration du serveur
+Nginx
+Si vous déployez votre application sur un serveur qui exécute Nginx, vous pouvez utiliser le fichier de configuration suivant comme point de départ pour configurer votre serveur Web. Très probablement, ce fichier devra être personnalisé en fonction de la configuration de votre serveur. Si vous souhaitez obtenir de l'aide pour gérer votre serveur, envisagez d'utiliser un service de gestion et de déploiement de serveur Laravel de première partie tel que Laravel Forge .
+
+Veuillez vous assurer, comme dans la configuration ci-dessous, que votre serveur Web dirige toutes les requêtes vers le public/index.phpfichier de votre application. Vous ne devez jamais tenter de déplacer le index.phpfichier à la racine de votre projet, car servir l'application à partir de la racine du projet exposera de nombreux fichiers de configuration sensibles à l'Internet public :
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com;
+    root /srv/example.com/public;
+ 
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+ 
+    index index.php;
+ 
+    charset utf-8;
+ 
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+ 
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+ 
+    error_page 404 /index.php;
+ 
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.0-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+ 
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+
+Optimisation
+Optimisation du chargeur automatique
+Lors du déploiement en production, assurez-vous que vous optimisez la carte du chargeur automatique de classe de Composer afin que Composer puisse trouver rapidement le bon fichier à charger pour une classe donnée :
+
+composer install --optimize-autoloader --no-dev
+
+
+En plus d'optimiser le chargeur automatique, vous devez toujours vous assurer d'inclure un composer.lockfichier dans le référentiel de contrôle des sources de votre projet. Les dépendances de votre projet peuvent être installées beaucoup plus rapidement lorsqu'un composer.lockfichier est présent.
+
+
+Optimisation du chargement de la configuration
+Lors du déploiement de votre application en production, vous devez vous assurer que vous exécutez la config:cachecommande Artisan pendant votre processus de déploiement :
+
+php artisan config:cache
+
+Cette commande combinera tous les fichiers de configuration de Laravel en un seul fichier mis en cache, ce qui réduit considérablement le nombre de déplacements que le framework doit effectuer vers le système de fichiers lors du chargement de vos valeurs de configuration.
+
+
+Si vous exécutez la config:cachecommande pendant votre processus de déploiement, vous devez vous assurer que vous n'appelez la envfonction qu'à partir de vos fichiers de configuration. Une fois la configuration mise en cache, le .envfichier ne sera pas chargé et tous les appels à la envfonction pour .envles variables retourneront null.
+
+
+Optimisation du chargement d'itinéraire
+Si vous construisez une grande application avec de nombreuses routes, vous devez vous assurer que vous exécutez la route:cachecommande Artisan pendant votre processus de déploiement :
+
+php artisan route:cache
+
+Cette commande réduit tous vos enregistrements d'itinéraires en un seul appel de méthode dans un fichier mis en cache, améliorant ainsi les performances de l'enregistrement d'itinéraires lors de l'enregistrement de centaines d'itinéraires.
+
+Optimisation du chargement des vues
+Lors du déploiement de votre application en production, vous devez vous assurer que vous exécutez la view:cachecommande Artisan pendant votre processus de déploiement :
+
+php artisan view:cache
+
+Cette commande précompile toutes vos vues Blade afin qu'elles ne soient pas compilées à la demande, améliorant ainsi les performances de chaque requête renvoyant une vue.
+
+Mode débogage
+L'option de débogage dans votre fichier de configuration config/app.php détermine la quantité d'informations sur une erreur qui est réellement affichée à l'utilisateur. Par défaut, cette option est définie pour respecter la valeur de la APP_DEBUGvariable d'environnement, qui est stockée dans le .envfichier de votre application.
+
+Dans votre environnement de production, cette valeur doit toujours être false. Si la APP_DEBUGvariable est définie sur trueen production, vous risquez d'exposer des valeurs de configuration sensibles aux utilisateurs finaux de votre application.
+
+Déploiement avec Forge / Vapor
+Forge de Laravel
+Si vous n'êtes pas tout à fait prêt à gérer votre propre configuration de serveur ou si vous n'êtes pas à l'aise pour configurer tous les différents services nécessaires pour exécuter une application Laravel robuste, Laravel Forge est une merveilleuse alternative.
+
+Laravel Forge peut créer des serveurs sur divers fournisseurs d'infrastructure tels que DigitalOcean, Linode, AWS, etc. De plus, Forge installe et gère tous les outils nécessaires pour créer des applications Laravel robustes, telles que Nginx, MySQL, Redis, Memcached, Beanstalk, etc.
+
+Vapeur Laravel
+Si vous souhaitez une plate-forme de déploiement entièrement sans serveur et à mise à l'échelle automatique adaptée à Laravel, consultez Laravel Vapor . Laravel Vapor est une plate-forme de déploiement sans serveur pour Laravel, optimisée par AWS. Lancez votre infrastructure Laravel sur Vapor et tombez amoureux de la simplicité évolutive du sans serveur. Laravel Vapor est affiné par les créateurs de Laravel pour fonctionner de manière transparente avec le framework afin que vous puissiez continuer à écrire vos applications Laravel exactement comme vous en avez l'habitude.
+

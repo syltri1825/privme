@@ -1,0 +1,90 @@
+Limitation de débit
+Introduction
+Cache Configuration
+Utilisation de base
+Incrémentation manuelle des tentatives
+Tentatives d'effacement
+Introduction
+Laravel inclut une abstraction de limitation de débit simple à utiliser qui, en conjonction avec le cache de votre application , fournit un moyen simple de limiter toute action pendant une fenêtre de temps spécifiée.
+
+
+Si vous êtes intéressé par la limitation du débit des requêtes HTTP entrantes, veuillez consulter la documentation du middleware du limiteur de débit .
+
+
+Cache Configuration
+En règle générale, le limiteur de débit utilise votre cache d'application par défaut tel que défini par la defaultclé dans le cachefichier de configuration de votre application. Cependant, vous pouvez spécifier le pilote de cache que le limiteur de débit doit utiliser en définissant une limiterclé dans le cachefichier de configuration de votre application :
+
+'default' => 'memcached',
+ 
+'limiter' => 'redis',
+
+Utilisation de base
+La Illuminate\Support\Facades\RateLimiterfaçade peut être utilisée pour interagir avec le limiteur de débit. La méthode la plus simple offerte par le limiteur de débit est la attemptméthode qui limite le débit d'un rappel donné pendant un nombre de secondes donné.
+
+La attemptméthode revient falselorsque le rappel n'a plus de tentatives disponibles ; sinon, la attemptméthode renverra le résultat du rappel ou true. Le premier argument accepté par la attemptméthode est une "clé" de limiteur de débit, qui peut être n'importe quelle chaîne de votre choix représentant l'action à débit limité :
+
+use Illuminate\Support\Facades\RateLimiter;
+ 
+$executed = RateLimiter::attempt(
+    'send-message:'.$user->id,
+    $perMinute = 5,
+    function() {
+        // Send message...
+    }
+);
+ 
+if (! $executed) {
+  return 'Too many messages sent!';
+}
+
+Incrémentation manuelle des tentatives
+Si vous souhaitez interagir manuellement avec le limiteur de débit, diverses autres méthodes sont disponibles. Par exemple, vous pouvez invoquer la tooManyAttemptsméthode pour déterminer si une clé de limiteur de débit donnée a dépassé son nombre maximal de tentatives autorisées par minute :
+
+use Illuminate\Support\Facades\RateLimiter;
+ 
+if (RateLimiter::tooManyAttempts('send-message:'.$user->id, $perMinute = 5)) {
+    return 'Too many attempts!';
+}
+
+Alternativement, vous pouvez utiliser la remainingméthode pour récupérer le nombre de tentatives restantes pour une clé donnée. S'il reste des tentatives à une clé donnée, vous pouvez invoquer la hitméthode pour incrémenter le nombre total de tentatives :
+
+use Illuminate\Support\Facades\RateLimiter;
+ 
+if (RateLimiter::remaining('send-message:'.$user->id, $perMinute = 5)) {
+    RateLimiter::hit('send-message:'.$user->id);
+ 
+    // Send message...
+}
+
+Détermination de la disponibilité du limiteur
+Lorsqu'une clé n'a plus de tentatives, la availableInméthode renvoie le nombre de secondes restantes jusqu'à ce que d'autres tentatives soient disponibles :
+
+use Illuminate\Support\Facades\RateLimiter;
+ 
+if (RateLimiter::tooManyAttempts('send-message:'.$user->id, $perMinute = 5)) {
+    $seconds = RateLimiter::availableIn('send-message:'.$user->id);
+ 
+    return 'You may try again in '.$seconds.' seconds.';
+}
+
+Tentatives d'effacement
+Vous pouvez réinitialiser le nombre de tentatives pour une touche de limiteur de débit donnée à l'aide de la clearméthode . Par exemple, vous pouvez réinitialiser le nombre de tentatives lorsqu'un message donné est lu par le destinataire :
+
+use App\Models\Message;
+use Illuminate\Support\Facades\RateLimiter;
+ 
+/**
+ * Mark the message as read.
+ *
+ * @param  \App\Models\Message  $message
+ * @return \App\Models\Message
+ */
+public function read(Message $message)
+{
+    $message->markAsRead();
+ 
+    RateLimiter::clear('send-message:'.$message->user_id);
+ 
+    return $message;
+}
+

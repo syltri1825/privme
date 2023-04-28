@@ -1,0 +1,197 @@
+Configuration
+Introduction
+Configuration de l'environnement
+Types de variables d'environnement
+Récupération de la configuration de l'environnement
+Détermination de l'environnement actuel
+Accès aux valeurs de configuration
+Mise en cache de la configuration
+Mode débogage
+Mode de Maintenance
+Introduction
+Tous les fichiers de configuration du framework Laravel sont stockés dans le configrépertoire. 
+
+Chaque option est documentée, alors n'hésitez pas à parcourir les fichiers et à vous 
+
+familiariser avec les options qui s'offrent à vous.
+
+Ces fichiers de configuration vous permettent de configurer des éléments tels que les 
+
+informations de connexion à votre base de données, les informations de votre serveur 
+
+de messagerie, ainsi que diverses autres valeurs de configuration de base telles que le fuseau 
+
+horaire de votre application et la clé de chiffrement.
+
+Aperçu des applications
+Pressé? Vous pouvez obtenir un aperçu rapide de la configuration, des pilotes et de l'environnement de 
+
+votre application via la aboutcommande Artisan :
+
+php artisan about
+
+Si vous n'êtes intéressé que par une section particulière de la sortie de présentation de l'application, 
+
+vous pouvez filtrer cette section à l'aide de l' --onlyoption :
+
+php artisan about --only=environment
+
+Configuration de l'environnement
+Il est souvent utile d'avoir des valeurs de configuration différentes en fonction de l'environnement 
+
+dans lequel l'application s'exécute. Par exemple, vous souhaiterez peut-être utiliser localement un pilote 
+
+de cache différent de celui que vous utilisez sur votre serveur de production.
+
+Pour en faire un jeu d'enfant, Laravel utilise la bibliothèque PHP DotEnv . 
+
+Dans une nouvelle installation de Laravel, le répertoire racine de votre application contiendra un .env
+
+.examplefichier qui définit de nombreuses variables d'environnement courantes. 
+
+Pendant le processus d'installation de Laravel, ce fichier sera automatiquement copié dans .env.
+
+Le fichier par défaut de Laravel .envcontient certaines valeurs de configuration courantes qui peuvent 
+
+différer selon que votre application s'exécute localement ou sur un serveur Web de production. Ces valeurs sont 
+
+ensuite récupérées à partir de divers fichiers de configuration Laravel dans le configrépertoire à l'aide de la fonction Laravel env.
+
+Si vous développez avec une équipe, vous souhaiterez peut-être continuer à inclure un .env.examplefichier avec votre application. En plaçant des valeurs d'espace réservé dans l'exemple de fichier de configuration, les autres développeurs de votre équipe peuvent voir clairement quelles variables d'environnement sont nécessaires pour exécuter votre application.
+
+
+Toute variable de votre .envfichier peut être remplacée par des variables d'environnement externes telles que des variables d'environnement au niveau du serveur ou du système.
+
+
+Sécurité des fichiers d'environnement
+Votre .envfichier ne doit pas être engagé dans le contrôle de code source de votre application, car chaque développeur/serveur utilisant votre application peut nécessiter une configuration d'environnement différente. De plus, cela constituerait un risque pour la sécurité dans le cas où un intrus accèderait à votre référentiel de contrôle source, car toutes les informations d'identification sensibles seraient exposées.
+
+Fichiers d'environnement supplémentaires
+Avant de charger les variables d'environnement de votre application, Laravel détermine si la APP_ENVvariable d'environnement a été fournie en externe ou si l' --envargument CLI a été spécifié. Si tel est le cas, Laravel tentera de charger un .env.[APP_ENV]fichier s'il existe. S'il n'existe pas, le .envfichier par défaut sera chargé.
+
+Types de variables d'environnement
+Toutes les variables de vos .envfichiers sont généralement analysées comme des chaînes, donc certaines valeurs réservées ont été créées pour vous permettre de renvoyer une plus large gamme de types à partir de la env()fonction :
+
+.envÉvaluer	env()Évaluer
+vrai	(boo) vrai
+(vrai)	(boo) vrai
+faux	(bool) faux
+(faux)	(bool) faux
+vide	(chaîne de caractères) ''
+(vide)	(chaîne de caractères) ''
+nul	(null Null
+(nul)	(null Null
+Si vous devez définir une variable d'environnement avec une valeur contenant des espaces, vous pouvez le faire en plaçant la valeur entre guillemets :
+
+APP_NAME="My Application"
+
+Récupération de la configuration de l'environnement
+Toutes les variables répertoriées dans ce fichier seront chargées dans le $_ENVsuper-global PHP lorsque votre application recevra une requête. Cependant, vous pouvez utiliser l' envassistant pour récupérer les valeurs de ces variables dans vos fichiers de configuration. En fait, si vous examinez les fichiers de configuration de Laravel, vous remarquerez que de nombreuses options utilisent déjà cet assistant :
+
+'debug' => env('APP_DEBUG', false),
+
+La deuxième valeur passée à la envfonction est la "valeur par défaut". Cette valeur sera retournée si aucune variable d'environnement n'existe pour la clé donnée.
+
+Détermination de l'environnement actuel
+L'environnement d'application actuel est déterminé via la APP_ENVvariable de votre .envfichier. Vous pouvez accéder à cette valeur via la environmentméthode sur la App façade :
+
+use Illuminate\Support\Facades\App;
+ 
+$environment = App::environment();
+
+Vous pouvez également passer des arguments à la environmentméthode pour déterminer si l'environnement correspond à une valeur donnée. La méthode retournera truesi l'environnement correspond à l'une des valeurs données :
+
+if (App::environment('local')) {
+    // The environment is local
+}
+ 
+if (App::environment(['local', 'staging'])) {
+    // The environment is either local OR staging...
+}
+
+
+APP_ENVLa détection de l'environnement d'application actuel peut être remplacée en définissant une variable d'environnement au niveau du serveur .
+
+
+Accès aux valeurs de configuration
+Vous pouvez facilement accéder à vos valeurs de configuration à l'aide de la configfonction d'assistance globale depuis n'importe où dans votre application. Les valeurs de configuration sont accessibles à l'aide de la syntaxe "point", qui inclut le nom du fichier et l'option auxquels vous souhaitez accéder. Une valeur par défaut peut également être spécifiée et sera renvoyée si l'option de configuration n'existe pas :
+
+$value = config('app.timezone');
+ 
+// Retrieve a default value if the configuration value does not exist...
+$value = config('app.timezone', 'Asia/Seoul');
+
+Pour définir les valeurs de configuration lors de l'exécution, transmettez un tableau à l' configassistant :
+
+config(['app.timezone' => 'America/Chicago']);
+
+Mise en cache de la configuration
+Pour accélérer la vitesse de votre application, vous devez mettre en cache tous vos fichiers de configuration dans un seul fichier à l'aide de la config:cachecommande Artisan. Cela combinera toutes les options de configuration de votre application dans un seul fichier qui peut être rapidement chargé par le framework.
+
+Vous devez généralement exécuter la php artisan config:cachecommande dans le cadre de votre processus de déploiement de production. La commande ne doit pas être exécutée pendant le développement local car les options de configuration devront fréquemment être modifiées au cours du développement de votre application.
+
+
+Si vous exécutez la config:cachecommande pendant votre processus de déploiement, vous devez vous assurer que vous n'appelez la envfonction qu'à partir de vos fichiers de configuration. Une fois la configuration mise en cache, le .envfichier ne sera pas chargé ; par conséquent, la envfonction renverra uniquement des variables d'environnement externes au niveau du système.
+
+
+Mode débogage
+L' debugoption de votre config/app.phpfichier de configuration détermine la quantité d'informations sur une erreur qui est réellement affichée à l'utilisateur. Par défaut, cette option est définie pour respecter la valeur de la APP_DEBUGvariable d'environnement, qui est stockée dans votre .envfichier.
+
+Pour le développement local, vous devez définir la APP_DEBUGvariable d'environnement sur true. Dans votre environnement de production, cette valeur doit toujours être false. Si la variable est définie sur trueen production, vous risquez d'exposer des valeurs de configuration sensibles aux utilisateurs finaux de votre application.
+
+Mode de Maintenance
+Lorsque votre application est en mode maintenance, une vue personnalisée s'affiche pour toutes les requêtes dans votre application. Cela facilite la "désactivation" de votre application pendant sa mise à jour ou lorsque vous effectuez une maintenance. Une vérification du mode de maintenance est incluse dans la pile middleware par défaut de votre application. Si l'application est en mode maintenance, une Symfony\Component\HttpKernel\Exception\HttpExceptioninstance sera levée avec un code d'état de 503.
+
+Pour activer le mode maintenance, exécutez la downcommande Artisan :
+
+php artisan down
+
+Si vous souhaitez que l' Refreshen-tête HTTP soit envoyé avec toutes les réponses du mode de maintenance, vous pouvez fournir l' refreshoption lors de l'appel de la downcommande. L' Refreshen-tête demandera au navigateur d'actualiser automatiquement la page après le nombre de secondes spécifié :
+
+php artisan down --refresh=15
+
+Vous pouvez également fournir une retryoption à la downcommande, qui sera définie comme Retry-Aftervaleur de l'en-tête HTTP, bien que les navigateurs ignorent généralement cet en-tête :
+
+php artisan down --retry=60
+
+Contournement du mode de maintenance
+Même en mode maintenance, vous pouvez utiliser l' secretoption pour spécifier un jeton de contournement du mode maintenance :
+
+php artisan down --secret="1630542a-246b-4b66-afa1-dd72a4c43515"
+
+Après avoir placé l'application en mode maintenance, vous pouvez accéder à l'URL de l'application correspondant à ce jeton et Laravel émettra un cookie de contournement du mode maintenance sur votre navigateur :
+
+https://example.com/1630542a-246b-4b66-afa1-dd72a4c43515
+
+En accédant à cette route masquée, vous serez alors redirigé vers la /route de l'application. Une fois le cookie émis sur votre navigateur, vous pourrez naviguer normalement sur l'application comme si elle n'était pas en mode maintenance.
+
+
+Votre secret de mode de maintenance doit généralement être composé de caractères alphanumériques et, éventuellement, de tirets. Vous devez éviter d'utiliser des caractères ayant une signification particulière dans les URL telles que ?.
+
+
+Pré-rendu de la vue du mode de maintenance
+Si vous utilisez la php artisan downcommande pendant le déploiement, vos utilisateurs peuvent encore occasionnellement rencontrer des erreurs s'ils accèdent à l'application pendant la mise à jour de vos dépendances Composer ou d'autres composants de l'infrastructure. Cela se produit car une partie importante du framework Laravel doit démarrer pour déterminer que votre application est en mode maintenance et rendre la vue du mode maintenance à l'aide du moteur de modélisation.
+
+Pour cette raison, Laravel vous permet de pré-rendre une vue en mode maintenance qui sera renvoyée au tout début du cycle de requête. Cette vue est rendue avant le chargement de l'une des dépendances de votre application. Vous pouvez pré-rendre un modèle de votre choix en utilisant l' option downde la commanderender :
+
+php artisan down --render="errors::503"
+
+Redirection des requêtes en mode maintenance
+En mode maintenance, Laravel affichera la vue du mode maintenance pour toutes les URL d'application auxquelles l'utilisateur tente d'accéder. Si vous le souhaitez, vous pouvez demander à Laravel de rediriger toutes les requêtes vers une URL spécifique. Ceci peut être accompli en utilisant l' redirectoption. Par exemple, vous souhaiterez peut-être rediriger toutes les requêtes vers l' /URI :
+
+php artisan down --redirect=/
+
+Désactivation du mode maintenance
+Pour désactiver le mode maintenance, utilisez la upcommande :
+
+php artisan up
+
+
+Vous pouvez personnaliser le modèle de mode de maintenance par défaut en définissant votre propre modèle sur resources/views/errors/503.blade.php.
+
+
+Mode de maintenance et files d'attente
+Pendant que votre application est en mode maintenance, aucune tâche en file d'attente ne sera traitée. Les travaux continueront d'être traités normalement une fois que l'application aura quitté le mode de maintenance.
+
+Alternatives au mode maintenance
+Étant donné que le mode de maintenance nécessite que votre application ait plusieurs secondes d'arrêt, envisagez des alternatives comme Laravel Vapor et Envoyer pour réaliser un déploiement sans interruption avec Laravel.

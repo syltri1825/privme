@@ -1,0 +1,371 @@
+Enregistrement
+Introduction
+Configuration
+Pilotes de canal disponibles
+Prérequis du canal
+Avertissements d'obsolescence de la journalisation
+Construire des piles de bûches
+Écriture de messages de journal
+Information contextuelle
+Écriture sur des canaux spécifiques
+Personnalisation du canal monolog
+Personnalisation de Monolog pour les canaux
+Création de canaux de gestionnaire de monolog
+Créer des canaux personnalisés via des usines
+Introduction
+Pour vous aider à en savoir plus sur ce qui se passe dans votre application, Laravel fournit des services de 
+
+journalisation robustes qui vous permettent de consigner des messages dans des fichiers, le journal des erreurs 
+
+système et même dans Slack pour informer toute votre équipe.
+
+La journalisation Laravel est basée sur des "canaux". Chaque canal représente une manière spécifique d'écrire les informations du journal. Par exemple, le singlecanal écrit des fichiers journaux dans un seul fichier journal, tandis que le slackcanal envoie des messages de journal à Slack. Les messages de journal peuvent être écrits sur plusieurs canaux en fonction de leur gravité.
+
+Sous le capot, Laravel utilise la bibliothèque Monolog , qui prend en charge une variété de gestionnaires de journaux puissants. Laravel facilite la configuration de ces gestionnaires, vous permettant de les mélanger et de les assortir pour personnaliser la gestion des journaux de votre application.
+
+Configuration
+Toutes les options de configuration pour le comportement de journalisation de votre application sont hébergées dans le config/logging.phpfichier de configuration. Ce fichier vous permet de configurer les canaux de journalisation de votre application, alors assurez-vous de passer en revue chacun des canaux disponibles et leurs options. Nous passerons en revue quelques options courantes ci-dessous.
+
+Par défaut, Laravel utilisera le stackcanal lors de la journalisation des messages. Le stackcanal est utilisé pour agréger plusieurs canaux de journalisation en un seul canal. Pour plus d'informations sur la création de piles, consultez la documentation ci-dessous .
+
+Configuration du nom du canal
+Par défaut, Monolog est instancié avec un "nom de canal" qui correspond à l'environnement actuel, tel que productionou local. Pour modifier cette valeur, ajoutez une nameoption à la configuration de votre chaîne :
+
+'stack' => [
+    'driver' => 'stack',
+    'name' => 'channel-name',
+    'channels' => ['single', 'slack'],
+],
+
+Pilotes de canal disponibles
+Chaque canal de journalisation est alimenté par un "pilote". Le pilote détermine comment et où le message de journal est réellement enregistré. Les pilotes de canal de journalisation suivants sont disponibles dans chaque application Laravel. Une entrée pour la plupart de ces pilotes est déjà présente dans le config/logging.phpfichier de configuration de votre application, assurez-vous donc de consulter ce fichier pour vous familiariser avec son contenu :
+
+Nom	La description
+custom	Un pilote qui appelle une usine spécifiée pour créer un canal
+daily	Un RotatingFileHandlerpilote basé sur Monolog qui tourne quotidiennement
+errorlog	Un ErrorLogHandlerpilote basé sur Monolog
+monolog	Un pilote d'usine Monolog qui peut utiliser n'importe quel gestionnaire Monolog pris en charge
+null	Un pilote qui supprime tous les messages du journal
+papertrail	Un SyslogUdpHandlerpilote basé sur Monolog
+single	Un seul canal d'enregistrement basé sur un fichier ou un chemin ( StreamHandler)
+slack	Un SlackWebhookHandlerpilote basé sur Monolog
+stack	Un wrapper pour faciliter la création de chaînes "multicanales"
+syslog	Un SyslogHandlerpilote basé sur Monolog
+
+Consultez la documentation sur la personnalisation avancée des canaux pour en savoir plus sur les pilotes monologet .custom
+
+
+Prérequis du canal
+Configuration des canaux simples et quotidiens
+Les canaux singleet dailyont trois options de configuration facultatives : bubble, permissionet locking.
+
+Nom	La description	Défaut
+bubble	Indique si les messages doivent remonter vers d'autres canaux après avoir été traités	true
+locking	Essayez de verrouiller le fichier journal avant d'y écrire	false
+permission	Les autorisations du fichier journal	0644
+De plus, la politique de rétention du dailycanal peut être configurée via l' daysoption :
+
+Nom	La description	Défaut
+days	Le nombre de jours pendant lesquels les fichiers journaux quotidiens doivent être conservés	7
+Configuration du canal Papertrail
+Le papertrailcanal nécessite les options de configuration hostet . portVous pouvez obtenir ces valeurs à partir de Papertrail .
+
+Configuration du canal Slack
+Le slackcanal nécessite une urloption de configuration. Cette URL doit correspondre à une URL pour un webhook entrant que vous avez configuré pour votre équipe Slack.
+
+Par défaut, Slack ne recevra que les journaux au criticalniveau et au-dessus ; cependant, vous pouvez régler cela dans votre config/logging.phpfichier de configuration en modifiant l' leveloption de configuration dans le tableau de configuration de votre canal de journalisation Slack.
+
+Avertissements d'obsolescence de la journalisation
+PHP, Laravel et d'autres bibliothèques informent souvent leurs utilisateurs que certaines de leurs fonctionnalités sont obsolètes et seront supprimées dans une future version. Si vous souhaitez consigner ces avertissements d'obsolescence, vous pouvez spécifier votre deprecationscanal de journalisation préféré dans le config/logging.phpfichier de configuration de votre application :
+
+'deprecations' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+ 
+'channels' => [
+    ...
+]
+
+Ou, vous pouvez définir un canal de journal nommé deprecations. Si un canal de journalisation portant ce nom existe, il sera toujours utilisé pour consigner les obsolescences :
+
+'channels' => [
+    'deprecations' => [
+        'driver' => 'single',
+        'path' => storage_path('logs/php-deprecation-warnings.log'),
+    ],
+],
+
+Construire des piles de bûches
+Comme mentionné précédemment, le stackpilote vous permet de combiner plusieurs canaux en un seul canal de journal pour plus de commodité. Pour illustrer comment utiliser les piles de journaux, examinons un exemple de configuration que vous pourriez voir dans une application de production :
+
+'channels' => [
+    'stack' => [
+        'driver' => 'stack',
+        'channels' => ['syslog', 'slack'],
+    ],
+ 
+    'syslog' => [
+        'driver' => 'syslog',
+        'level' => 'debug',
+    ],
+ 
+    'slack' => [
+        'driver' => 'slack',
+        'url' => env('LOG_SLACK_WEBHOOK_URL'),
+        'username' => 'Laravel Log',
+        'emoji' => ':boom:',
+        'level' => 'critical',
+    ],
+],
+
+Décortiquons cette configuration. Tout d'abord, notez que notre stackcanal agrège deux autres canaux via son channelsoption : sysloget slack. Ainsi, lors de la journalisation des messages, ces deux canaux auront la possibilité de journaliser le message. Cependant, comme nous le verrons ci-dessous, le fait que ces canaux enregistrent réellement le message peut être déterminé par la gravité/le "niveau" du message.
+
+Niveaux de journalisation
+Prenez note de l' leveloption de configuration présente sur les configurations de canaux sysloget dans l'exemple ci-dessus. slackCette option détermine le "niveau" minimum qu'un message doit avoir pour être enregistré par le canal. Monolog, qui alimente les services de journalisation de Laravel, offre tous les niveaux de journalisation définis dans la spécification RFC 5424 : urgence , alerte , critique , erreur , avertissement , avis , info et débogage .
+
+Alors, imaginons que nous enregistrions un message en utilisant la debugméthode :
+
+Log::debug('An informational message.');
+
+Compte tenu de notre configuration, le syslogcanal écrira le message dans le journal système ; cependant, comme le message d'erreur n'est pas criticalou supérieur, il ne sera pas envoyé à Slack. Cependant, si nous enregistrons un emergencymessage, il sera envoyé à la fois au journal système et à Slack puisque le emergencyniveau est supérieur à notre seuil de niveau minimum pour les deux canaux :
+
+Log::emergency('The system is down!');
+
+Écriture de messages de journal
+Vous pouvez écrire des informations dans les journaux en utilisant la Log façade . Comme mentionné précédemment, le logger fournit les huit niveaux de journalisation définis dans la spécification RFC 5424 : emergency , alert , critical , error , warning , notice , info et debug :
+
+use Illuminate\Support\Facades\Log;
+ 
+Log::emergency($message);
+Log::alert($message);
+Log::critical($message);
+Log::error($message);
+Log::warning($message);
+Log::notice($message);
+Log::info($message);
+Log::debug($message);
+
+Vous pouvez appeler n'importe laquelle de ces méthodes pour consigner un message pour le niveau correspondant. Par défaut, le message sera écrit dans le canal de journalisation par défaut tel que configuré par votre loggingfichier de configuration :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show the profile for the given user.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        Log::info('Showing the user profile for user: '.$id);
+ 
+        return view('user.profile', [
+            'user' => User::findOrFail($id)
+        ]);
+    }
+}
+
+Information contextuelle
+Un tableau de données contextuelles peut être transmis aux méthodes de journalisation. Ces données contextuelles seront formatées et affichées avec le message de log :
+
+use Illuminate\Support\Facades\Log;
+ 
+Log::info('User failed to login.', ['id' => $user->id]);
+
+Parfois, vous souhaiterez peut-être spécifier des informations contextuelles qui doivent être incluses avec toutes les entrées de journal suivantes dans un canal particulier. Par exemple, vous souhaiterez peut-être enregistrer un ID de demande associé à chaque demande entrante dans votre application. Pour ce faire, vous pouvez appeler la méthode Logde la façadewithContext :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+ 
+class AssignRequestId
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+        $requestId = (string) Str::uuid();
+ 
+        Log::withContext([
+            'request-id' => $requestId
+        ]);
+ 
+        return $next($request)->header('Request-Id', $requestId);
+    }
+}
+
+Si vous souhaitez partager des informations contextuelles sur tous les canaux de journalisation, vous pouvez appeler la Log::shareContext()méthode. Cette méthode fournira les informations contextuelles à tous les canaux créés et à tous les canaux créés ultérieurement. En règle générale, la shareContextméthode doit être appelée à partir de la bootméthode d'un fournisseur de services d'application :
+
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+ 
+class AppServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Log::shareContext([
+            'invocation-id' => (string) Str::uuid(),
+        ]);
+    }
+}
+
+Écriture sur des canaux spécifiques
+Parfois, vous souhaiterez peut-être enregistrer un message sur un canal autre que le canal par défaut de votre application. Vous pouvez utiliser la channelméthode sur la Logfaçade pour récupérer et vous connecter à n'importe quel canal défini dans votre fichier de configuration :
+
+use Illuminate\Support\Facades\Log;
+ 
+Log::channel('slack')->info('Something happened!');
+
+Si vous souhaitez créer une pile de journalisation à la demande composée de plusieurs canaux, vous pouvez utiliser la stackméthode :
+
+Log::stack(['single', 'slack'])->info('Something happened!');
+
+Chaînes à la demande
+Il est également possible de créer un canal à la demande en fournissant la configuration au moment de l'exécution sans que cette configuration soit présente dans le loggingfichier de configuration de votre application. Pour ce faire, vous pouvez passer un tableau de configuration à la méthode de la Logfaçadebuild :
+
+use Illuminate\Support\Facades\Log;
+ 
+Log::build([
+  'driver' => 'single',
+  'path' => storage_path('logs/custom.log'),
+])->info('Something happened!');
+
+Vous pouvez également souhaiter inclure un canal à la demande dans une pile de journalisation à la demande. Ceci peut être réalisé en incluant votre instance de canal à la demande dans le tableau transmis à la stackméthode :
+
+use Illuminate\Support\Facades\Log;
+ 
+$channel = Log::build([
+  'driver' => 'single',
+  'path' => storage_path('logs/custom.log'),
+]);
+ 
+Log::stack(['slack', $channel])->info('Something happened!');
+
+Personnalisation du canal monolog
+Personnalisation de Monolog pour les canaux
+Parfois, vous pouvez avoir besoin d'un contrôle complet sur la configuration de Monolog pour un canal existant. Par exemple, vous souhaiterez peut-être configurer une implémentation Monolog personnalisée pour le canal FormatterInterfaceintégré de Laravel .single
+
+Pour commencer, définissez un taptableau sur la configuration du canal. Le taptableau doit contenir une liste de classes qui doivent avoir la possibilité de personnaliser (ou "exploiter" dans) l'instance Monolog après sa création. Il n'y a pas d'emplacement conventionnel où ces classes doivent être placées, vous êtes donc libre de créer un répertoire dans votre application pour contenir ces classes :
+
+'single' => [
+    'driver' => 'single',
+    'tap' => [App\Logging\CustomizeFormatter::class],
+    'path' => storage_path('logs/laravel.log'),
+    'level' => 'debug',
+],
+
+Une fois que vous avez configuré l' tapoption sur votre canal, vous êtes prêt à définir la classe qui personnalisera votre instance Monolog. Cette classe n'a besoin que d'une seule méthode : __invoke, qui reçoit une Illuminate\Log\Loggerinstance. L' Illuminate\Log\Loggerinstance transmet tous les appels de méthode à l'instance Monolog sous-jacente :
+
+<?php
+ 
+namespace App\Logging;
+ 
+use Monolog\Formatter\LineFormatter;
+ 
+class CustomizeFormatter
+{
+    /**
+     * Customize the given logger instance.
+     *
+     * @param  \Illuminate\Log\Logger  $logger
+     * @return void
+     */
+    public function __invoke($logger)
+    {
+        foreach ($logger->getHandlers() as $handler) {
+            $handler->setFormatter(new LineFormatter(
+                '[%datetime%] %channel%.%level_name%: %message% %context% %extra%'
+            ));
+        }
+    }
+}
+
+
+Toutes vos classes "tap" sont résolues par le service container , de sorte que toutes les dépendances de constructeur dont elles ont besoin seront automatiquement injectées.
+
+
+Création de canaux de gestionnaire de monolog
+Monolog a une variété de gestionnaires disponibles et Laravel n'inclut pas de canal intégré pour chacun. Dans certains cas, vous souhaiterez peut-être créer un canal personnalisé qui est simplement une instance d'un gestionnaire Monolog spécifique qui n'a pas de pilote de journal Laravel correspondant. Ces canaux peuvent être facilement créés à l'aide du monologpilote.
+
+Lors de l'utilisation du monologpilote, l' handleroption de configuration est utilisée pour spécifier quel gestionnaire sera instancié. Facultativement, tous les paramètres de constructeur dont le gestionnaire a besoin peuvent être spécifiés à l'aide de l' withoption de configuration :
+
+'logentries' => [
+    'driver'  => 'monolog',
+    'handler' => Monolog\Handler\SyslogUdpHandler::class,
+    'with' => [
+        'host' => 'my.logentries.internal.datahubhost.company.com',
+        'port' => '10000',
+    ],
+],
+
+Formateurs monologues
+Lors de l'utilisation du monologpilote, le Monolog LineFormattersera utilisé comme formateur par défaut. Cependant, vous pouvez personnaliser le type de formateur transmis au gestionnaire à l'aide des options de configuration formatteret :formatter_with
+
+'browser' => [
+    'driver' => 'monolog',
+    'handler' => Monolog\Handler\BrowserConsoleHandler::class,
+    'formatter' => Monolog\Formatter\HtmlFormatter::class,
+    'formatter_with' => [
+        'dateFormat' => 'Y-m-d',
+    ],
+],
+
+Si vous utilisez un gestionnaire Monolog capable de fournir son propre formateur, vous pouvez définir la valeur de l' formatteroption de configuration surdefault :
+
+'newrelic' => [
+    'driver' => 'monolog',
+    'handler' => Monolog\Handler\NewRelicHandler::class,
+    'formatter' => 'default',
+],
+
+Créer des canaux personnalisés via des usines
+Si vous souhaitez définir un canal entièrement personnalisé dans lequel vous avez un contrôle total sur l'instanciation et la configuration de Monolog, vous pouvez spécifier un customtype de pilote dans votre config/logging.phpfichier de configuration. Votre configuration doit inclure une viaoption contenant le nom de la classe de fabrique qui sera invoquée pour créer l'instance Monolog :
+
+'channels' => [
+    'example-custom-channel' => [
+        'driver' => 'custom',
+        'via' => App\Logging\CreateCustomLogger::class,
+    ],
+],
+
+Une fois que vous avez configuré le customcanal du pilote, vous êtes prêt à définir la classe qui créera votre instance Monolog. Cette classe n'a besoin que d'une seule __invokeméthode qui doit renvoyer l'instance de l'enregistreur Monolog. La méthode recevra le tableau de configuration des canaux comme seul argument :
+
+<?php
+ 
+namespace App\Logging;
+ 
+use Monolog\Logger;
+ 
+class CreateCustomLogger
+{
+    /**
+     * Create a custom Monolog instance.
+     *
+     * @param  array  $config
+     * @return \Monolog\Logger
+     */
+    public function __invoke(array $config)
+    {
+        return new Logger(/* ... */);
+    }
+}

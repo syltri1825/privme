@@ -1,0 +1,713 @@
+
+Introduction
+Interagir avec la demande
+Accéder à la demande
+Chemin de requête, hôte et méthode
+En-têtes de demande
+Demander l'adresse IP
+Négociation de contenu
+Demandes PSR-7
+Saisir
+Récupération de l'entrée
+Déterminer si l'entrée est présente
+Fusion d'entrées supplémentaires
+Ancienne entrée
+Biscuits
+Ajustement et normalisation d'entrée
+Des dossiers
+Récupération des fichiers téléchargés
+Stockage des fichiers téléchargés
+Configuration des proxys de confiance
+Configuration des hôtes approuvés
+Introduction
+La classe Laravel Illuminate\Http\Requestfournit un moyen orienté objet d'interagir avec la requête HTTP actuelle gérée par votre application, ainsi que de récupérer l'entrée, les cookies et les fichiers qui ont été soumis avec la requête.
+
+Interagir avec la demande
+Accéder à la demande
+Pour obtenir une instance de la requête HTTP actuelle via l'injection de dépendances, vous devez indiquer la Illuminate\Http\Requestclasse sur votre méthode de fermeture de route ou de contrôleur. L'instance de requête entrante sera automatiquement injectée par le conteneur de service Laravel :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Http\Request;
+ 
+class UserController extends Controller
+{
+    /**
+     * Store a new user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $name = $request->input('name');
+ 
+        //
+    }
+}
+
+Comme mentionné, vous pouvez également indiquer la Illuminate\Http\Requestclasse sur une fermeture d'itinéraire. Le conteneur de service injectera automatiquement la requête entrante dans la fermeture lors de son exécution :
+
+use Illuminate\Http\Request;
+ 
+Route::get('/', function (Request $request) {
+    //
+});
+
+Paramètres d'injection de dépendance et de routage
+Si votre méthode de contrôleur attend également une entrée d'un paramètre de route, vous devez répertorier vos paramètres de route après vos autres dépendances. Par exemple, si votre route est définie comme ceci :
+
+use App\Http\Controllers\UserController;
+ 
+Route::put('/user/{id}', [UserController::class, 'update']);
+
+Vous pouvez toujours taper le Illuminate\Http\Requestet accéder à votre idparamètre route en définissant votre méthode de contrôleur comme suit :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Http\Request;
+ 
+class UserController extends Controller
+{
+    /**
+     * Update the specified user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        //
+    }
+}
+
+Chemin de requête, hôte et méthode
+L' Illuminate\Http\Requestinstance fournit diverses méthodes pour examiner la requête HTTP entrante et 
+
+étend la Symfony\Component\HttpFoundation\Requestclasse. Nous aborderons ci-dessous quelques-unes des méthodes 
+
+les plus importantes.
+
+Récupération du chemin de la requête
+La pathméthode renvoie les informations de chemin de la requête. Ainsi, si la requête entrante est ciblée sur http://example.com/foo/bar, la pathméthode retournera foo/bar:
+
+$uri = $request->path();
+
+Inspecter le chemin/la route de la demande
+La isméthode vous permet de vérifier que le chemin de la demande entrante correspond à un modèle donné. Vous pouvez utiliser le *caractère comme caractère générique lors de l'utilisation de cette méthode :
+
+if ($request->is('admin/*')) {
+    //
+}
+
+En utilisant la routeIsméthode, vous pouvez déterminer si la requête entrante correspond à une route nommée :
+
+if ($request->routeIs('admin.*')) {
+    //
+}
+
+Récupération de l'URL de la requête
+Pour récupérer l'URL complète de la requête entrante, vous pouvez utiliser les méthodes urlou . fullUrlLa urlméthode renverra l'URL sans la chaîne de requête, tandis que la fullUrlméthode inclut la chaîne de requête :
+
+$url = $request->url();
+ 
+$urlWithQueryString = $request->fullUrl();
+
+Si vous souhaitez ajouter des données de chaîne de requête à l'URL actuelle, vous pouvez appeler la fullUrlWithQueryméthode. Cette méthode fusionne le tableau donné de variables de chaîne de requête avec la chaîne de requête actuelle :
+
+$request->fullUrlWithQuery(['type' => 'phone']);
+
+Récupération de l'hôte de requête
+Vous pouvez récupérer "l'hôte" de la requête entrante via les méthodes host, httpHostet :schemeAndHttpHost
+
+$request->host();
+$request->httpHost();
+$request->schemeAndHttpHost();
+
+Récupération de la méthode Request
+La methodméthode renverra le verbe HTTP pour la requête. Vous pouvez utiliser la isMethodméthode pour vérifier que le verbe HTTP correspond à une chaîne donnée :
+
+$method = $request->method();
+ 
+if ($request->isMethod('post')) {
+    //
+}
+
+En-têtes de demande
+Vous pouvez récupérer un en-tête de requête à partir de l' Illuminate\Http\Requestinstance à l'aide de la headerméthode. Si l'en-tête n'est pas présent sur la requête, nullsera renvoyé. Cependant, la headerméthode accepte un deuxième argument facultatif qui sera retourné si l'en-tête n'est pas présent sur la requête :
+
+$value = $request->header('X-Header-Name');
+ 
+$value = $request->header('X-Header-Name', 'default');
+
+La hasHeaderméthode peut être utilisée pour déterminer si la requête contient un en-tête donné :
+
+if ($request->hasHeader('X-Header-Name')) {
+    //
+}
+
+Pour plus de commodité, le bearerTokenprocédé peut être utilisé pour récupérer un jeton de support à partir de l' Authorizationen-tête. Si aucun en-tête de ce type n'est présent, une chaîne vide sera renvoyée :
+
+$token = $request->bearerToken();
+
+Demander l'adresse IP
+La ipméthode peut être utilisée pour récupérer l'adresse IP 
+
+du client qui a fait la requête à votre application :
+
+$ipAddress = $request->ip();
+
+Négociation de contenu
+Laravel fournit plusieurs méthodes pour inspecter les types de contenu demandés par la requête entrante via l' Accepten-tête. Tout d'abord, la getAcceptableContentTypesméthode renverra un tableau contenant tous les types de contenu acceptés par la requête :
+
+$contentTypes = $request->getAcceptableContentTypes();
+
+La acceptsméthode accepte un tableau de types de contenu et 
+
+renvoie truesi l'un des types de contenu est accepté par la requête. 
+
+Dans le cas contraire, falseseront retournés :
+
+if ($request->accepts(['text/html', 'application/json'])) {
+    // ...
+}
+
+Vous pouvez utiliser la prefersméthode pour déterminer quel type 
+
+de contenu parmi un tableau donné de types de contenu est le plus 
+
+préféré par la demande. Si aucun des types de contenu fournis n'est accepté par la requête, nullsera renvoyé :
+
+$preferred = $request->prefers(['text/html', 'application/json']);
+
+Étant donné que de nombreuses applications ne servent que du 
+
+HTML ou du JSON, vous pouvez utiliser la expectsJsonméthode 
+
+pour déterminer rapidement si la requête entrante attend une réponse JSON :
+
+if ($request->expectsJson()) {
+    // ...
+}
+
+Demandes PSR-7
+La norme PSR-7 spécifie les interfaces pour les messages HTTP, y compris les requêtes et les réponses. Si vous souhaitez obtenir une instance d'une requête PSR-7 au lieu d'une requête Laravel, vous devrez d'abord installer quelques bibliothèques. Laravel utilise le composant Symfony HTTP Message Bridge pour convertir les requêtes et réponses typiques de Laravel en implémentations compatibles PSR-7 :
+
+composer require symfony/psr-http-message-bridge
+composer require nyholm/psr7
+
+Une fois que vous avez installé ces bibliothèques, vous pouvez obtenir une requête PSR-7 en tapant l'interface de requête sur votre méthode de fermeture de route ou de contrôleur :
+
+use Psr\Http\Message\ServerRequestInterface;
+ 
+Route::get('/', function (ServerRequestInterface $request) {
+    //
+});
+
+
+Si vous renvoyez une instance de réponse PSR-7 à partir d'une route ou d'un contrôleur, elle sera automatiquement reconvertie en une instance de réponse Laravel et affichée par le framework.
+
+
+Saisir
+Récupération de l'entrée
+Récupération de toutes les données d'entrée
+Vous pouvez récupérer toutes les données d'entrée de la demande entrante en arrayutilisant la allméthode . Cette méthode peut être utilisée que la requête entrante provienne d'un formulaire HTML ou soit une requête XHR :
+
+$input = $request->all();
+
+En utilisant la collectméthode, vous pouvez récupérer toutes les 
+
+données d'entrée de la requête entrante sous la forme d'une collection :
+
+$input = $request->collect();
+
+La collectméthode vous permet également de récupérer 
+
+un sous-ensemble de l'entrée de requête entrante sous forme de collection :
+
+$request->collect('users')->each(function ($user) {
+    // ...
+});
+
+Récupération d'une valeur d'entrée
+À l'aide de quelques méthodes simples, vous pouvez accéder à toutes les entrées utilisateur de votre Illuminate\Http\Requestinstance sans vous soucier du verbe HTTP utilisé pour la requête. Quel que soit le verbe HTTP, la inputméthode peut être utilisée pour récupérer l'entrée utilisateur :
+
+$name = $request->input('name');
+
+Vous pouvez passer une valeur par défaut comme second argument de la inputméthode. Cette valeur sera renvoyée si la valeur d'entrée demandée n'est pas présente dans la requête :
+
+$name = $request->input('name', 'Sally');
+
+Lorsque vous travaillez avec des formulaires contenant des entrées de tableau, utilisez la notation "point" pour accéder aux tableaux :
+
+$name = $request->input('products.0.name');
+ 
+$names = $request->input('products.*.name');
+
+Vous pouvez appeler la inputméthode sans aucun argument afin de récupérer toutes les valeurs d'entrée sous forme de tableau associatif :
+
+$input = $request->input();
+
+Récupération de l'entrée de la chaîne de requête
+Alors que la inputméthode récupère les valeurs de l'intégralité de 
+
+la charge utile de la requête (y compris la chaîne de requête), 
+
+la queryméthode récupère uniquement les valeurs de la chaîne de requête :
+
+$name = $request->query('name');
+
+Si les données de valeur de chaîne de requête demandées ne sont pas présentes, le deuxième argument de cette méthode sera renvoyé :
+
+$name = $request->query('name', 'Helen');
+
+Vous pouvez appeler la queryméthode sans aucun argument afin de récupérer toutes les valeurs de la chaîne de requête sous forme de tableau associatif :
+
+$query = $request->query();
+
+Récupération des valeurs d'entrée JSON
+Lors de l'envoi de requêtes JSON à votre application, vous pouvez accéder aux données JSON via la inputméthode tant que l' en- Content-Typetête de la requête est correctement défini sur application/json. Vous pouvez même utiliser la syntaxe "point" pour récupérer des valeurs imbriquées dans des tableaux JSON :
+
+$name = $request->input('user.name');
+
+Récupération de valeurs d'entrée stringables
+Au lieu de récupérer les données d'entrée de la requête en tant que primitive string, vous pouvez utiliser la stringméthode pour récupérer les données de la requête en tant qu'instance de Illuminate\Support\Stringable:
+
+$name = $request->string('name')->trim();
+
+Récupération des valeurs d'entrée booléennes
+Lorsqu'il s'agit d'éléments HTML tels que des cases à cocher, votre application peut recevoir des valeurs "véridiques" qui sont en fait des chaînes. Par exemple, "vrai" ou "on". Pour plus de commodité, vous pouvez utiliser la booleanméthode pour récupérer ces valeurs sous forme de booléens. La booleanméthode renvoie truepour 1, "1", vrai, "vrai", "on" et "oui". Toutes les autres valeurs renverrontfalse :
+
+$archived = $request->boolean('archived');
+
+Récupération des valeurs d'entrée de date
+Pour plus de commodité, les valeurs d'entrée contenant des dates/heures peuvent être récupérées en tant qu'instances Carbon à l'aide de la dateméthode. Si la requête ne contient pas de valeur d'entrée avec le nom donné, nullsera renvoyé :
+
+$birthday = $request->date('birthday');
+
+Les deuxième et troisième arguments acceptés par la dateméthode peuvent être utilisés pour spécifier respectivement le format et le fuseau horaire de la date :
+
+$elapsed = $request->date('elapsed', '!H:i', 'Europe/Madrid');
+
+Si la valeur d'entrée est présente mais a un format invalide, un InvalidArgumentExceptionsera lancé ; par conséquent, il est recommandé de valider l'entrée avant d'appeler la dateméthode.
+
+Récupération des valeurs d'entrée Enum
+Les valeurs d'entrée qui correspondent aux énumérations PHP peuvent également être extraites de la requête. Si la demande ne contient pas de valeur d'entrée avec le nom donné ou si l'énumération n'a pas de valeur de sauvegarde qui correspond à la valeur d'entrée, nullsera renvoyé. La enumméthode accepte le nom de la valeur d'entrée et la classe enum comme premier et deuxième arguments :
+
+use App\Enums\Status;
+ 
+$status = $request->enum('status', Status::class);
+
+Récupération de l'entrée via les propriétés dynamiques
+Vous pouvez également accéder aux entrées utilisateur à l'aide des propriétés dynamiques de l' Illuminate\Http\Requestinstance. Par exemple, si l'un des formulaires de votre application contient un namechamp, vous pouvez accéder à la valeur du champ comme suit :
+
+$name = $request->name;
+
+Lors de l'utilisation de propriétés dynamiques, Laravel recherchera d'abord la valeur du paramètre dans la charge utile de la requête. S'il n'est pas présent, Laravel recherchera le champ dans les paramètres de la route correspondante.
+
+Récupération d'une partie des données d'entrée
+Si vous avez besoin de récupérer un sous-ensemble des données d'entrée, vous pouvez utiliser les méthodes onlyet . exceptCes deux méthodes acceptent une seule arrayou une liste dynamique d'arguments :
+
+$input = $request->only(['username', 'password']);
+ 
+$input = $request->only('username', 'password');
+ 
+$input = $request->except(['credit_card']);
+ 
+$input = $request->except('credit_card');
+
+
+La onlyméthode renvoie toutes les paires clé/valeur que vous demandez ; cependant, il ne renverra pas les paires clé/valeur qui ne sont pas présentes sur la requête.
+
+
+Déterminer si l'entrée est présente
+Vous pouvez utiliser la hasméthode pour déterminer si 
+
+une valeur est présente sur la demande. La hasméthode 
+
+retourne truesi la valeur est présente sur la requête :
+
+if ($request->has('name')) {
+    //
+}
+
+Lorsqu'on lui donne un tableau, la hasméthode déterminera 
+
+si toutes les valeurs spécifiées sont présentes :
+
+if ($request->has(['name', 'email'])) {
+    //
+}
+
+La whenHasméthode exécutera la fermeture donnée si une 
+
+valeur est présente sur la requête :
+
+$request->whenHas('name', function ($input) {
+    //
+});
+
+Une deuxième fermeture peut être passée à la 
+
+whenHasméthode qui sera exécutée si la valeur spécifiée n'est pas présente sur la requête :
+
+$request->whenHas('name', function ($input) {
+    // The "name" value is present...
+}, function () {
+    // The "name" value is not present...
+});
+
+La hasAnyméthode renvoie truesi l'une des valeurs spécifiées est présente :
+
+if ($request->hasAny(['name', 'email'])) {
+    //
+}
+
+Si vous souhaitez déterminer si une valeur est présente sur la requête et n'est pas vide, vous pouvez utiliser la filledméthode :
+
+if ($request->filled('name')) {
+    //
+}
+
+La whenFilledméthode exécutera la fermeture donnée si une valeur est présente sur la requête et n'est pas vide :
+
+$request->whenFilled('name', function ($input) {
+    //
+});
+
+Une deuxième fermeture peut être passée à la whenFilledméthode qui sera exécutée si la valeur spécifiée n'est pas "remplie":
+
+$request->whenFilled('name', function ($input) {
+    // The "name" value is filled...
+}, function () {
+    // The "name" value is not filled...
+});
+
+Pour déterminer si une clé donnée est absente de la requête, vous pouvez utiliser la missingméthode :
+
+if ($request->missing('name')) {
+    //
+}
+
+Fusion d'entrées supplémentaires
+Parfois, vous devrez peut-être fusionner manuellement des entrées supplémentaires dans les données d'entrée existantes de la demande. Pour ce faire, vous pouvez utiliser la mergeméthode :
+
+$request->merge(['votes' => 0]);
+
+La mergeIfMissingméthode peut être utilisée pour fusionner l'entrée dans la requête si les clés correspondantes n'existent pas déjà dans les données d'entrée de la requête :
+
+$request->mergeIfMissing(['votes' => 0]);
+
+Ancienne entrée
+Laravel vous permet de conserver les entrées d'une requête lors de la prochaine requête. Cette fonctionnalité est particulièrement utile pour remplir à nouveau les formulaires après avoir détecté des erreurs de validation. Cependant, si vous utilisez les fonctionnalités de validation incluses de Laravel , il est possible que vous n'ayez pas besoin d'utiliser manuellement ces méthodes de flashage d'entrée de session directement, car certaines des fonctionnalités de validation intégrées de Laravel les appelleront automatiquement.
+
+Entrée clignotante à la session
+La flashméthode sur la Illuminate\Http\Requestclasse fera clignoter l'entrée actuelle de la session afin qu'elle soit disponible lors de la prochaine requête de l'utilisateur à l'application :
+
+$request->flash();
+
+Vous pouvez également utiliser les méthodes flashOnlyet flashExceptpour flasher un sous-ensemble des données de la demande dans la session. Ces méthodes sont utiles pour conserver des informations sensibles telles que les mots de passe hors de la session :
+
+$request->flashOnly(['username', 'email']);
+ 
+$request->flashExcept('password');
+
+Entrée clignotante puis redirection
+Étant donné que vous souhaiterez souvent flasher l'entrée dans la session, puis rediriger vers la page précédente, vous pouvez facilement enchaîner l'entrée clignotante sur une redirection en utilisant la withInputméthode :
+
+return redirect('form')->withInput();
+ 
+return redirect()->route('user.create')->withInput();
+ 
+return redirect('form')->withInput(
+    $request->except('password')
+);
+
+Récupération de l'ancienne entrée
+Pour récupérer l'entrée flashée de la requête précédente, appelez la oldméthode sur une instance de Illuminate\Http\Request. La oldméthode extraira les données d'entrée précédemment flashées de la session :
+
+$username = $request->old('username');
+
+Laravel fournit également une oldaide globale. Si vous affichez d'anciennes entrées dans un modèle Blade , il est plus pratique d'utiliser l' oldassistant pour remplir à nouveau le formulaire. Si aucune ancienne entrée n'existe pour le champ donné, nullsera renvoyé :
+
+<input type="text" name="username" value="{{ old('username') }}">
+
+Biscuits
+Récupération des cookies à partir des demandes
+Tous les cookies créés par le framework Laravel sont cryptés et 
+
+signés avec un code d'authentification, ce qui signifie qu'ils 
+
+seront considérés comme invalides s'ils ont été modifiés par 
+
+le client. Pour récupérer une valeur de cookie à partir de la 
+
+requête, utilisez la cookieméthode sur une 
+
+Illuminate\Http\Requestinstance :
+
+$value = $request->cookie('name');
+
+Ajustement et normalisation d'entrée
+Par défaut, Laravel inclut le middleware 
+
+App\Http\Middleware\TrimStringset 
+
+App\Http\Middleware\ConvertEmptyStringsToNulldans 
+
+la pile middleware globale de votre application. 
+
+Ces middlewares sont répertoriés dans la pile 
+
+middleware globale par App\Http\Kernelclasse. 
+
+Ces intergiciels rogneront automatiquement tous 
+
+les champs de chaîne entrants sur la demande, ainsi 
+
+que convertiront tous les champs de chaîne vides en null. 
+
+Cela vous permet de ne pas avoir à vous soucier de ces 
+
+problèmes de normalisation dans vos routes et vos contrôleurs.
+
+Désactivation de la normalisation d'entrée
+Si vous souhaitez désactiver ce comportement pour toutes les requêtes, vous pouvez supprimer les deux middlewares de la pile middleware de votre application en les supprimant de la $middlewarepropriété de votre App\Http\Kernelclasse.
+
+Si vous souhaitez désactiver le découpage des chaînes et la conversion des chaînes vides pour un sous-ensemble de requêtes adressées à votre application, vous pouvez utiliser la skipWhenméthode proposée par les deux middleware. Cette méthode accepte une fermeture qui doit renvoyer trueou falsepour indiquer si la normalisation des entrées doit être ignorée. En règle générale, la skipWhenméthode doit être appelée dans la bootméthode du fichier AppServiceProvider.
+
+use App\Http\Middleware\ConvertEmptyStringsToNull;
+use App\Http\Middleware\TrimStrings;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    TrimStrings::skipWhen(function ($request) {
+        return $request->is('admin/*');
+    });
+ 
+    ConvertEmptyStringsToNull::skipWhen(function ($request) {
+        // ...
+    });
+}
+
+Des dossiers
+Récupération des fichiers téléchargés
+Vous pouvez récupérer des fichiers téléchargés à partir 
+
+d'une Illuminate\Http\Requestinstance à l'aide de la 
+
+fileméthode ou à l'aide de propriétés dynamiques. La fileméthode 
+
+renvoie une instance de la Illuminate\Http\UploadedFileclasse, qui 
+
+étend la SplFileInfoclasse PHP et fournit une variété de méthodes 
+
+pour interagir avec le fichier :
+
+$file = $request->file('photo');
+ 
+$file = $request->photo;
+
+Vous pouvez déterminer si un fichier est présent sur 
+
+la requête en utilisant la hasFileméthode :
+
+if ($request->hasFile('photo')) {
+    //
+}
+
+Validation des téléchargements réussis
+En plus de vérifier si le fichier est présent, vous pouvez 
+
+vérifier qu'il n'y a eu aucun problème lors du téléchargement 
+
+du fichier via la isValidméthode :
+
+if ($request->file('photo')->isValid()) {
+    //
+}
+
+Chemins de fichiers et extensions
+La UploadedFileclasse contient également des méthodes pour 
+
+accéder au chemin complet du fichier et à son extension. 
+
+La extensionméthode tentera de deviner l'extension du 
+
+fichier en fonction de son contenu. Cette extension peut être
+
+différente de l'extension fournie par le client :
+
+$path = $request->photo->path();
+ 
+$extension = $request->photo->extension();
+
+Autres méthodes de fichier
+Il existe une variété d'autres méthodes disponibles sur les 
+
+UploadedFileinstances. Consultez la documentation de l'API de 
+
+la classe pour plus d'informations sur ces méthodes.
+
+Stockage des fichiers téléchargés
+Pour stocker un fichier téléchargé, vous utiliserez généralement 
+
+l'un de vos systèmes de fichiers configurés . La UploadedFileclasse 
+
+a une storeméthode qui déplacera un fichier téléchargé vers l'un 
+
+de vos disques, qui peut être un emplacement sur votre système 
+
+de fichiers local ou un emplacement de stockage en nuage comme Amazon S3.
+
+La storeméthode accepte le chemin où le fichier doit être stocké 
+
+par rapport au répertoire racine configuré du système de fichiers. 
+
+Ce chemin ne doit pas contenir de nom de fichier, car un identifiant 
+
+unique sera automatiquement généré pour servir de nom de fichier.
+
+La storeméthode accepte également un deuxième argument facultatif 
+
+pour le nom du disque qui doit être utilisé pour stocker le fichier. 
+
+La méthode renverra le chemin du fichier par rapport à la racine 
+
+du disque :
+
+$path = $request->photo->store('images');
+ 
+$path = $request->photo->store('images', 's3');
+
+Si vous ne souhaitez pas qu'un nom de fichier soit généré automatiquement, 
+
+vous pouvez utiliser la storeAsméthode, qui accepte le chemin, 
+
+le nom de fichier et le nom du disque comme arguments :
+
+$path = $request->photo->storeAs('images', 'filename.jpg');
+ 
+$path = $request->photo->storeAs('images', 'filename.jpg', 's3');
+
+
+Pour plus d'informations sur le stockage de fichiers dans Laravel, 
+
+consultez la documentation complète sur le stockage de fichiers .
+
+
+Configuration des proxys de confiance
+Lorsque vous exécutez vos applications derrière un équilibreur de 
+
+charge qui termine les certificats TLS/SSL, vous remarquerez peut-être 
+
+que votre application ne génère parfois pas de liens HTTPS lors de 
+
+l'utilisation de l' urlassistant. Cela est généralement dû au fait 
+
+que votre application transfère le trafic de votre équilibreur 
+
+de charge sur le port 80 et ne sait pas qu'elle doit générer 
+
+des liens sécurisés.
+
+Pour résoudre ce problème, vous pouvez utiliser le 
+
+App\Http\Middleware\TrustProxiesmiddleware inclus 
+
+dans votre application Laravel, qui vous permet de 
+
+personnaliser rapidement les équilibreurs de charge 
+
+ou les proxys auxquels votre application doit faire 
+
+confiance. Vos proxys de confiance doivent être répertoriés 
+
+sous forme de tableau sur la $proxiespropriété de ce middleware. 
+
+Outre la configuration des proxys approuvés, vous pouvez 
+
+configurer le proxy $headersqui doit être approuvé :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Illuminate\Http\Middleware\TrustProxies as Middleware;
+use Illuminate\Http\Request;
+ 
+class TrustProxies extends Middleware
+{
+    /**
+     * The trusted proxies for this application.
+     *
+     * @var string|array
+     */
+    protected $proxies = [
+        '192.168.1.1',
+        '192.168.1.2',
+    ];
+ 
+    /**
+     * The headers that should be used to detect proxies.
+     *
+     * @var int
+     */
+    protected $headers = Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO;
+}
+
+
+Si vous utilisez AWS Elastic Load Balancing, votre $headersvaleur doit être Request::HEADER_X_FORWARDED_AWS_ELB. Pour plus d'informations sur les constantes pouvant être utilisées dans la $headerspropriété, consultez la documentation de Symfony sur l' approbation des proxys .
+
+
+Faire confiance à tous les proxys
+Si vous utilisez Amazon AWS ou un autre fournisseur d'équilibreur de charge "cloud", vous ne connaissez peut-être pas les adresses IP de vos équilibreurs réels. Dans ce cas, vous pouvez utiliser *pour faire confiance à tous les proxy :
+
+/**
+ * The trusted proxies for this application.
+ *
+ * @var string|array
+ */
+protected $proxies = '*';
+
+Configuration des hôtes approuvés
+Par défaut, Laravel répondra à toutes les requêtes qu'il reçoit, quel que soit le contenu de l'en-tête de la requête HTTP Host. De plus, la Hostvaleur de l'en-tête sera utilisée lors de la génération d'URL absolues vers votre application lors d'une requête Web.
+
+En règle générale, vous devez configurer votre serveur Web, tel que Nginx ou Apache, pour n'envoyer à votre application que les requêtes qui correspondent à un nom d'hôte donné. Cependant, si vous n'avez pas la possibilité de personnaliser directement votre serveur Web et que vous devez demander à Laravel de ne répondre qu'à certains noms d'hôte, vous pouvez le faire en activant le App\Http\Middleware\TrustHostsmiddleware pour votre application.
+
+Le TrustHostsmiddleware est déjà inclus dans la $middlewarepile de votre application ; cependant, vous devez le décommenter pour qu'il devienne actif. Dans la méthode de ce middleware hosts, vous pouvez spécifier les noms d'hôte auxquels votre application doit répondre. Les requêtes entrantes avec d'autres Hosten-têtes de valeur seront rejetées :
+
+/**
+ * Get the host patterns that should be trusted.
+ *
+ * @return array
+ */
+public function hosts()
+{
+    return [
+        'laravel.test',
+        $this->allSubdomainsOfApplicationUrl(),
+    ];
+}
+
+La allSubdomainsOfApplicationUrlméthode d'assistance renverra 
+
+une expression régulière correspondant à tous les sous-domaines 
+
+de la app.urlvaleur de configuration de votre application. Cette 
+
+méthode d'assistance fournit un moyen pratique d'autoriser tous 
+
+les sous-domaines de votre application lors de la création d'une 
+
+application qui utilise des sous-domaines génériques.

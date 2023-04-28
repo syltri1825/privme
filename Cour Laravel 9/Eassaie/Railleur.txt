@@ -1,0 +1,621 @@
+Railleur
+Introduction
+Moquer des objets
+Façades moqueuses
+Espions de façade
+Faux d'autobus
+Chaînes d'emplois
+Lots de travaux
+Faux événement
+Fakes d'événements ciblés
+Faux HTTP
+Faux courrier
+Fausse notification
+Faux file d'attente
+Chaînes d'emplois
+Stockage Faux
+Interagir avec le temps
+Introduction
+Lorsque vous testez des applications Laravel, vous souhaiterez peut-être "simuler" certains aspects de votre application afin qu'ils ne soient pas réellement exécutés lors d'un test donné. Par exemple, lors du test d'un contrôleur qui distribue un événement, vous pouvez vous moquer des écouteurs d'événement afin qu'ils ne soient pas réellement exécutés pendant le test. Cela vous permet de tester uniquement la réponse HTTP du contrôleur sans vous soucier de l'exécution des écouteurs d'événement puisque les écouteurs d'événement peuvent être testés dans leur propre scénario de test.
+
+Laravel fournit des méthodes utiles pour se moquer des événements, des tâches et d'autres façades prêtes à l'emploi. Ces assistants fournissent principalement une couche pratique sur Mockery afin que vous n'ayez pas à effectuer manuellement des appels de méthode Mockery compliqués.
+
+Moquer des objets
+Lorsque vous vous moquez d'un objet qui va être injecté dans votre application via le conteneur de service de Laravel , vous devrez lier votre instance simulée dans le conteneur en tant que instanceliaison. Cela demandera au conteneur d'utiliser votre instance fictive de l'objet au lieu de construire l'objet lui-même :
+
+use App\Service;
+use Mockery;
+use Mockery\MockInterface;
+ 
+public function test_something_can_be_mocked()
+{
+    $this->instance(
+        Service::class,
+        Mockery::mock(Service::class, function (MockInterface $mock) {
+            $mock->shouldReceive('process')->once();
+        })
+    );
+}
+
+Afin de rendre cela plus pratique, vous pouvez utiliser la mockméthode fournie par la classe de cas de test de base de Laravel. Par exemple, l'exemple suivant est équivalent à l'exemple ci-dessus :
+
+use App\Service;
+use Mockery\MockInterface;
+ 
+$mock = $this->mock(Service::class, function (MockInterface $mock) {
+    $mock->shouldReceive('process')->once();
+});
+
+Vous pouvez utiliser la partialMockméthode lorsque vous n'avez besoin que de vous moquer de quelques méthodes d'un objet. Les méthodes qui ne sont pas simulées seront exécutées normalement lorsqu'elles seront appelées :
+
+use App\Service;
+use Mockery\MockInterface;
+ 
+$mock = $this->partialMock(Service::class, function (MockInterface $mock) {
+    $mock->shouldReceive('process')->once();
+});
+
+De même, si vous souhaitez espionner un objet, la classe de cas de test de base de Laravel propose une spyméthode en tant que wrapper pratique autour de la Mockery::spyméthode. Les espions sont similaires aux moqueries ; cependant, les espions enregistrent toute interaction entre l'espion et le code testé, vous permettant de faire des assertions après l'exécution du code :
+
+use App\Service;
+ 
+$spy = $this->spy(Service::class);
+ 
+// ...
+ 
+$spy->shouldHaveReceived('process');
+
+Façades moqueuses
+Contrairement aux appels de méthodes statiques traditionnels, les façades (y compris les façades en temps réel ) peuvent être simulées. Cela offre un grand avantage par rapport aux méthodes statiques traditionnelles et vous offre la même testabilité que si vous utilisiez l'injection de dépendances traditionnelle. Lors des tests, vous voudrez peut-être souvent vous moquer d'un appel à une façade Laravel qui se produit dans l'un de vos contrôleurs. Par exemple, considérez l'action de contrôleur suivante :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Support\Facades\Cache;
+ 
+class UserController extends Controller
+{
+    /**
+     * Retrieve a list of all users of the application.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $value = Cache::get('key');
+ 
+        //
+    }
+}
+
+Nous pouvons simuler l'appel à la Cachefaçade en utilisant la shouldReceiveméthode, qui renverra une instance d'un simulacre Mockery . Étant donné que les façades sont en fait résolues et gérées par le conteneur de service Laravel , elles ont beaucoup plus de testabilité qu'une classe statique typique. Par exemple, simulons notre appel à la méthode de la Cachefaçadeget :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Cache;
+use Tests\TestCase;
+ 
+class UserControllerTest extends TestCase
+{
+    public function testGetIndex()
+    {
+        Cache::shouldReceive('get')
+                    ->once()
+                    ->with('key')
+                    ->andReturn('value');
+ 
+        $response = $this->get('/users');
+ 
+        // ...
+    }
+}
+
+
+Il ne faut pas se moquer de la Requestfaçade. Au lieu de cela, transmettez l'entrée souhaitée dans les méthodes de test HTTP telles que getet postlors de l'exécution de votre test. De même, au lieu de vous moquer de la Configfaçade, appelez la Config::setméthode dans vos tests.
+
+
+Espions de façade
+Si vous souhaitez espionner une façade, vous pouvez appeler la spyméthode sur la façade correspondante. Les espions sont similaires aux moqueries ; cependant, les espions enregistrent toute interaction entre l'espion et le code testé, vous permettant de faire des assertions après l'exécution du code :
+
+use Illuminate\Support\Facades\Cache;
+ 
+public function test_values_are_be_stored_in_cache()
+{
+    Cache::spy();
+ 
+    $response = $this->get('/');
+ 
+    $response->assertStatus(200);
+ 
+    Cache::shouldHaveReceived('put')->once()->with('name', 'Taylor', 10);
+}
+
+Faux d'autobus
+Lorsque vous testez du code qui distribue des travaux, vous voulez généralement affirmer qu'un travail donné a été distribué mais pas réellement mis en file d'attente ou exécuté le travail. En effet, l'exécution du travail peut normalement être testée dans une classe de test distincte.
+
+Vous pouvez utiliser la méthode de la Busfaçade fakepour empêcher les travaux d'être répartis dans la file d'attente. Ensuite, après avoir exécuté le code testé, vous pouvez inspecter les tâches que l'application a tenté de distribuer à l'aide des méthodes assertDispatchedet :assertNotDispatched
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Jobs\ShipOrder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Bus;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    public function test_orders_can_be_shipped()
+    {
+        Bus::fake();
+ 
+        // Perform order shipping...
+ 
+        // Assert that a job was dispatched...
+        Bus::assertDispatched(ShipOrder::class);
+ 
+        // Assert a job was not dispatched...
+        Bus::assertNotDispatched(AnotherJob::class);
+ 
+        // Assert that a job was dispatched synchronously...
+        Bus::assertDispatchedSync(AnotherJob::class);
+ 
+        // Assert that a job was not dipatched synchronously...
+        Bus::assertNotDispatchedSync(AnotherJob::class);
+ 
+        // Assert that a job was dispatched after the response was sent...
+        Bus::assertDispatchedAfterResponse(AnotherJob::class);
+ 
+        // Assert a job was not dispatched after response was sent...
+        Bus::assertNotDispatchedAfterResponse(AnotherJob::class);
+ 
+        // Assert no jobs were dispatched...
+        Bus::assertNothingDispatched();
+    }
+}
+
+Vous pouvez passer une fermeture aux méthodes disponibles afin d'affirmer qu'un travail a été envoyé qui passe un "test de vérité" donné. Si au moins un travail a été envoyé qui réussit le test de vérité donné, l'assertion sera réussie. Par exemple, vous souhaiterez peut-être affirmer qu'un travail a été envoyé pour une commande spécifique :
+
+Bus::assertDispatched(function (ShipOrder $job) use ($order) {
+    return $job->order->id === $order->id;
+});
+
+Chaînes d'emplois
+La méthode Busde la façade assertChainedpeut être utilisée pour affirmer qu'une chaîne de travaux a été distribuée. La assertChainedméthode accepte un tableau de travaux chaînés comme premier argument :
+
+use App\Jobs\RecordShipment;
+use App\Jobs\ShipOrder;
+use App\Jobs\UpdateInventory;
+use Illuminate\Support\Facades\Bus;
+ 
+Bus::assertChained([
+    ShipOrder::class,
+    RecordShipment::class,
+    UpdateInventory::class
+]);
+
+Comme vous pouvez le voir dans l'exemple ci-dessus, le tableau des travaux chaînés peut être un tableau des noms de classe du travail. Cependant, vous pouvez également fournir un tableau d'instances de travail réelles. Ce faisant, Laravel s'assurera que les instances de travail sont de la même classe et ont les mêmes valeurs de propriété que les travaux chaînés distribués par votre application :
+
+Bus::assertChained([
+    new ShipOrder,
+    new RecordShipment,
+    new UpdateInventory,
+]);
+
+Lots de travaux
+La méthode Busde la façade assertBatchedpeut être utilisée pour affirmer qu'un lot de travaux a été envoyé. La fermeture donnée à la assertBatchedméthode reçoit une instance de Illuminate\Bus\PendingBatch, qui peut être utilisée pour inspecter les travaux dans le lot :
+
+use Illuminate\Bus\PendingBatch;
+use Illuminate\Support\Facades\Bus;
+ 
+Bus::assertBatched(function (PendingBatch $batch) {
+    return $batch->name == 'import-csv' &&
+           $batch->jobs->count() === 10;
+});
+
+Faux événement
+Lorsque vous testez du code qui distribue des événements, vous souhaiterez peut-être demander à Laravel de ne pas exécuter réellement les écouteurs de l'événement. En utilisant la méthode Eventde la façade fake, vous pouvez empêcher les écouteurs de s'exécuter, exécuter le code testé, puis affirmer quels événements ont été distribués par votre application à l'aide des méthodes assertDispatched, assertNotDispatchedet :assertNothingDispatched
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Events\OrderFailedToShip;
+use App\Events\OrderShipped;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Event;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    /**
+     * Test order shipping.
+     */
+    public function test_orders_can_be_shipped()
+    {
+        Event::fake();
+ 
+        // Perform order shipping...
+ 
+        // Assert that an event was dispatched...
+        Event::assertDispatched(OrderShipped::class);
+ 
+        // Assert an event was dispatched twice...
+        Event::assertDispatched(OrderShipped::class, 2);
+ 
+        // Assert an event was not dispatched...
+        Event::assertNotDispatched(OrderFailedToShip::class);
+ 
+        // Assert that no events were dispatched...
+        Event::assertNothingDispatched();
+    }
+}
+
+Vous pouvez passer une fermeture aux méthodes assertDispatchedou assertNotDispatchedafin d'affirmer qu'un événement a été envoyé qui passe un "test de vérité" donné. Si au moins un événement a été envoyé et qu'il réussit le test de vérité donné, l'assertion réussira :
+
+Event::assertDispatched(function (OrderShipped $event) use ($order) {
+    return $event->order->id === $order->id;
+});
+
+Si vous souhaitez simplement affirmer qu'un écouteur d'événement écoute un événement donné, vous pouvez utiliser la assertListeningméthode :
+
+Event::assertListening(
+    OrderShipped::class,
+    SendShipmentNotification::class
+);
+
+
+Après avoir appelé Event::fake(), aucun écouteur d'événement ne sera exécuté. Ainsi, si vos tests utilisent des fabriques de modèles qui reposent sur des événements, comme la création d'un UUID pendant l' creatingévénement d'un modèle, vous devez appeler Event::fake() après avoir utilisé vos fabriques.
+
+
+Simuler un sous-ensemble d'événements
+Si vous souhaitez uniquement simuler des écouteurs d'événements pour un ensemble spécifique d'événements, vous pouvez les transmettre à la méthode fakeorfakeFor :
+
+/**
+ * Test order process.
+ */
+public function test_orders_can_be_processed()
+{
+    Event::fake([
+        OrderCreated::class,
+    ]);
+ 
+    $order = Order::factory()->create();
+ 
+    Event::assertDispatched(OrderCreated::class);
+ 
+    // Other events are dispatched as normal...
+    $order->update([...]);
+}
+
+Vous pouvez simuler tous les événements à l'exception d'un ensemble d'événements spécifiés en utilisant la fakeExceptméthode :
+
+Event::fakeExcept([
+    OrderCreated::class,
+]);
+
+Fakes d'événements ciblés
+Si vous ne souhaitez falsifier les écouteurs d'événements que pour une partie de votre test, vous pouvez utiliser la fakeForméthode :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Events\OrderCreated;
+use App\Models\Order;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    /**
+     * Test order process.
+     */
+    public function test_orders_can_be_processed()
+    {
+        $order = Event::fakeFor(function () {
+            $order = Order::factory()->create();
+ 
+            Event::assertDispatched(OrderCreated::class);
+ 
+            return $order;
+        });
+ 
+        // Events are dispatched as normal and observers will run ...
+        $order->update([...]);
+    }
+}
+
+Faux HTTP
+La méthode Httpde la façade fakevous permet de demander au client HTTP de renvoyer des réponses stub/dummy lorsque des requêtes sont faites. Pour plus d'informations sur la simulation de requêtes HTTP sortantes, veuillez consulter la documentation de test du client HTTP .
+
+Faux courrier
+Vous pouvez utiliser la méthode de la Mailfaçade fakepour empêcher l'envoi de courrier. En règle générale, l'envoi de courrier n'a aucun rapport avec le code que vous testez réellement. Très probablement, il suffit d'affirmer simplement que Laravel a été chargé d'envoyer un mailable donné.
+
+Après avoir appelé la méthode Mailde la façade fake, vous pouvez alors affirmer que les mailables ont reçu l'instruction d'être envoyés aux utilisateurs et même inspecter les données reçues par les mailables :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Mail\OrderShipped;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    public function test_orders_can_be_shipped()
+    {
+        Mail::fake();
+ 
+        // Perform order shipping...
+ 
+        // Assert that no mailables were sent...
+        Mail::assertNothingSent();
+ 
+        // Assert that a mailable was sent...
+        Mail::assertSent(OrderShipped::class);
+ 
+        // Assert a mailable was sent twice...
+        Mail::assertSent(OrderShipped::class, 2);
+ 
+        // Assert a mailable was not sent...
+        Mail::assertNotSent(AnotherMailable::class);
+    }
+}
+
+Si vous mettez en file d'attente des e-mails pour livraison en arrière-plan, vous devez utiliser la assertQueuedméthode au lieu deassertSent :
+
+Mail::assertQueued(OrderShipped::class);
+ 
+Mail::assertNotQueued(OrderShipped::class);
+ 
+Mail::assertNothingQueued();
+
+Vous pouvez passer une fermeture aux méthodes assertSent, assertNotSent, assertQueuedou assertNotQueuedafin d'affirmer qu'un mailable a été envoyé et qu'il passe un "test de vérité" donné. Si au moins un mailable a été envoyé et qu'il réussit le test de vérité donné, l'assertion sera réussie :
+
+Mail::assertSent(function (OrderShipped $mail) use ($order) {
+    return $mail->order->id === $order->id;
+});
+
+Lors de l'appel des Mailméthodes d'assertion de la façade, l'instance mailable acceptée par la fermeture fournie expose des méthodes utiles pour examiner le mailable :
+
+Mail::assertSent(OrderShipped::class, function ($mail) use ($user) {
+    return $mail->hasTo($user->email) &&
+           $mail->hasCc('...') &&
+           $mail->hasBcc('...') &&
+           $mail->hasReplyTo('...') &&
+           $mail->hasFrom('...') &&
+           $mail->hasSubject('...');
+});
+
+Vous avez peut-être remarqué qu'il existe deux méthodes pour affirmer que le courrier n'a pas été envoyé : assertNotSentet assertNotQueued. Parfois, vous souhaiterez peut-être affirmer qu'aucun courrier n'a été envoyé ou mis en file d' attente. Pour ce faire, vous pouvez utiliser les méthodes assertNothingOutgoinget :assertNotOutgoing
+
+Mail::assertNothingOutgoing();
+ 
+Mail::assertNotOutgoing(function (OrderShipped $mail) use ($order) {
+    return $mail->order->id === $order->id;
+});
+
+Tester le contenu publiable
+Nous vous suggérons de tester le contenu de vos mailables séparément de vos tests qui affirment qu'un mailable donné a été "envoyé" à un utilisateur spécifique. Pour savoir comment tester le contenu de vos mailables, consultez notre documentation sur les tests de mailables .
+
+Fausse notification
+Vous pouvez utiliser la méthode de la Notificationfaçade fakepour empêcher l'envoi de notifications. En règle générale, l'envoi de notifications n'est pas lié au code que vous testez réellement. Très probablement, il suffit d'affirmer simplement que Laravel a été chargé d'envoyer une notification donnée.
+
+Après avoir appelé la méthode Notificationde la façade fake, vous pouvez alors affirmer que les notifications devaient être envoyées aux utilisateurs et même inspecter les données reçues par les notifications :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Notifications\OrderShipped;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Notification;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    public function test_orders_can_be_shipped()
+    {
+        Notification::fake();
+ 
+        // Perform order shipping...
+ 
+        // Assert that no notifications were sent...
+        Notification::assertNothingSent();
+ 
+        // Assert a notification was sent to the given users...
+        Notification::assertSentTo(
+            [$user], OrderShipped::class
+        );
+ 
+        // Assert a notification was not sent...
+        Notification::assertNotSentTo(
+            [$user], AnotherNotification::class
+        );
+ 
+        // Assert that a given number of notifications were sent...
+        Notification::assertCount(3);
+    }
+}
+
+Vous pouvez passer une fermeture aux méthodes assertSentToou assertNotSentToafin d'affirmer qu'une notification a été envoyée qui passe un "test de vérité" donné. Si au moins une notification a été envoyée qui réussit le test de vérité donné, l'assertion sera réussie :
+
+Notification::assertSentTo(
+    $user,
+    function (OrderShipped $notification, $channels) use ($order) {
+        return $notification->order->id === $order->id;
+    }
+);
+
+Notifications à la demande
+Si le code que vous testez envoie des notifications à la demande , vous pouvez tester que la notification à la demande a été envoyée via la assertSentOnDemandméthode :
+
+Notification::assertSentOnDemand(OrderShipped::class);
+
+En passant une fermeture comme deuxième argument à la assertSentOnDemandméthode, vous pouvez déterminer si une notification à la demande a été envoyée à l'adresse "route" correcte :
+
+Notification::assertSentOnDemand(
+    OrderShipped::class,
+    function ($notification, $channels, $notifiable) use ($user) {
+        return $notifiable->routes['mail'] === $user->email;
+    }
+);
+
+Faux file d'attente
+Vous pouvez utiliser la méthode de la Queuefaçade fakepour empêcher les travaux en file d'attente d'être poussés vers la file d'attente. Très probablement, il suffit d'affirmer simplement que Laravel a été chargé de pousser un travail donné vers la file d'attente puisque les travaux en file d'attente eux-mêmes peuvent être testés dans une autre classe de test.
+
+Après avoir appelé la méthode Queuede la façade fake, vous pouvez alors affirmer que l'application a tenté de pousser les travaux vers la file d'attente :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Jobs\AnotherJob;
+use App\Jobs\FinalJob;
+use App\Jobs\ShipOrder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Support\Facades\Queue;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    public function test_orders_can_be_shipped()
+    {
+        Queue::fake();
+ 
+        // Perform order shipping...
+ 
+        // Assert that no jobs were pushed...
+        Queue::assertNothingPushed();
+ 
+        // Assert a job was pushed to a given queue...
+        Queue::assertPushedOn('queue-name', ShipOrder::class);
+ 
+        // Assert a job was pushed twice...
+        Queue::assertPushed(ShipOrder::class, 2);
+ 
+        // Assert a job was not pushed...
+        Queue::assertNotPushed(AnotherJob::class);
+    }
+}
+
+Vous pouvez passer une fermeture aux méthodes assertPushedou assertNotPushedafin d'affirmer qu'un travail a été poussé qui passe un "test de vérité" donné. Si au moins un travail a été poussé et qu'il réussit le test de vérité donné, l'assertion sera réussie :
+
+Queue::assertPushed(function (ShipOrder $job) use ($order) {
+    return $job->order->id === $order->id;
+});
+
+Chaînes d'emplois
+Les procédés Queuede façade assertPushedWithChainet assertPushedWithoutChainpeuvent être utilisés pour inspecter la chaîne de travail d'un travail poussé. La assertPushedWithChainméthode accepte la tâche principale comme premier argument et un tableau de tâches chaînées comme deuxième argument :
+
+use App\Jobs\RecordShipment;
+use App\Jobs\ShipOrder;
+use App\Jobs\UpdateInventory;
+use Illuminate\Support\Facades\Queue;
+ 
+Queue::assertPushedWithChain(ShipOrder::class, [
+    RecordShipment::class,
+    UpdateInventory::class
+]);
+
+Comme vous pouvez le voir dans l'exemple ci-dessus, le tableau des travaux chaînés peut être un tableau des noms de classe du travail. Cependant, vous pouvez également fournir un tableau d'instances de travail réelles. Ce faisant, Laravel s'assurera que les instances de travail sont de la même classe et ont les mêmes valeurs de propriété que les travaux chaînés distribués par votre application :
+
+Queue::assertPushedWithChain(ShipOrder::class, [
+    new RecordShipment,
+    new UpdateInventory,
+]);
+
+Vous pouvez utiliser la assertPushedWithoutChainméthode pour affirmer qu'un travail a été poussé sans chaîne de travaux :
+
+Queue::assertPushedWithoutChain(ShipOrder::class);
+
+Stockage Faux
+La méthode Storagede la façade fakevous permet de générer facilement un faux disque qui, combiné aux utilitaires de génération de fichiers de la Illuminate\Http\UploadedFileclasse, simplifie grandement le test des téléchargements de fichiers. Par exemple:
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    public function test_albums_can_be_uploaded()
+    {
+        Storage::fake('photos');
+ 
+        $response = $this->json('POST', '/photos', [
+            UploadedFile::fake()->image('photo1.jpg'),
+            UploadedFile::fake()->image('photo2.jpg')
+        ]);
+ 
+        // Assert one or more files were stored...
+        Storage::disk('photos')->assertExists('photo1.jpg');
+        Storage::disk('photos')->assertExists(['photo1.jpg', 'photo2.jpg']);
+ 
+        // Assert one or more files were not stored...
+        Storage::disk('photos')->assertMissing('missing.jpg');
+        Storage::disk('photos')->assertMissing(['missing.jpg', 'non-existing.jpg']);
+ 
+        // Assert that a given directory is empty...
+        Storage::disk('photos')->assertDirectoryEmpty('/wallpapers');
+    }
+}
+
+Par défaut, la fakeméthode supprimera tous les fichiers de son répertoire temporaire. Si vous souhaitez conserver ces fichiers, vous pouvez utiliser la méthode "persistentFake" à la place. Pour plus d'informations sur le test des téléchargements de fichiers, vous pouvez consulter les informations de la documentation de test HTTP sur les téléchargements de fichiers .
+
+
+La imageméthode nécessite l' extension GD .
+
+
+Interagir avec le temps
+Lors des tests, vous devrez peut-être parfois modifier l'heure renvoyée par des assistants tels que nowou Illuminate\Support\Carbon::now(). Heureusement, la classe de test de fonctionnalités de base de Laravel inclut des aides qui vous permettent de manipuler l'heure actuelle :
+
+use Illuminate\Support\Carbon;
+ 
+public function testTimeCanBeManipulated()
+{
+    // Travel into the future...
+    $this->travel(5)->milliseconds();
+    $this->travel(5)->seconds();
+    $this->travel(5)->minutes();
+    $this->travel(5)->hours();
+    $this->travel(5)->days();
+    $this->travel(5)->weeks();
+    $this->travel(5)->years();
+ 
+    // Freeze time and resume normal time after executing closure...
+    $this->freezeTime(function (Carbon $time) {
+        // ...
+    });
+ 
+    // Travel into the past...
+    $this->travel(-5)->hours();
+ 
+    // Travel to an explicit time...
+    $this->travelTo(now()->subHours(6));
+ 
+    // Return back to the present time...
+    $this->travelBack();
+}
+

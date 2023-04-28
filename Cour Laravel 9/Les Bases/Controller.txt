@@ -1,0 +1,395 @@
+Contrôleurs
+Introduction
+Contrôleurs d'écriture
+Contrôleurs de base
+Contrôleurs à simple action
+Intergiciel du contrôleur
+Contrôleurs de ressources
+Routes de ressources partielles
+Ressources imbriquées
+Nommer les routes de ressources
+Nommer les paramètres de route de ressource
+Évaluer les itinéraires des ressources
+Localisation des URI de ressources
+Compléter les contrôleurs de ressources
+Injection de dépendance et contrôleurs
+Introduction
+Au lieu de définir toute votre logique de gestion des requêtes comme des fermetures dans vos fichiers de routage, vous pouvez organiser ce comportement à l'aide de classes "contrôleur". Les contrôleurs peuvent regrouper la logique de gestion des demandes associées dans une seule classe. Par exemple, une UserControllerclasse peut gérer toutes les demandes entrantes liées aux utilisateurs, y compris l'affichage, la création, la mise à jour et la suppression d'utilisateurs. Par défaut, les contrôleurs sont stockés dans le app/Http/Controllersrépertoire.
+
+Contrôleurs d'écriture
+Contrôleurs de base
+Examinons un exemple de contrôleur de base. Notez que le contrôleur étend la classe de contrôleur de base incluse avec LaravelApp\Http\Controllers\Controller :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\User;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show the profile for a given user.
+     *
+     * @param  int  $id
+     * @return \Illuminate\View\View
+     */
+    public function show($id)
+    {
+        return view('user.profile', [
+            'user' => User::findOrFail($id)
+        ]);
+    }
+}
+
+Vous pouvez définir une route vers cette méthode de contrôleur comme suit :
+
+use App\Http\Controllers\UserController;
+ 
+Route::get('/user/{id}', [UserController::class, 'show']);
+
+Lorsqu'une requête entrante correspond à l'URI de route spécifié, la showméthode de la App\Http\Controllers\UserControllerclasse est appelée et les paramètres de route sont transmis à la méthode.
+
+
+Les contrôleurs ne sont pas obligés d'étendre une classe de base. Cependant, vous n'aurez pas accès à des fonctionnalités pratiques telles que les méthodes middlewareet .authorize
+
+
+Contrôleurs à simple action
+Si une action de contrôleur est particulièrement complexe, vous trouverez peut-être pratique de dédier une classe de contrôleur entière à cette action unique. Pour ce faire, vous pouvez définir une seule __invokeméthode dans le contrôleur :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\User;
+ 
+class ProvisionServer extends Controller
+{
+    /**
+     * Provision a new web server.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function __invoke()
+    {
+        // ...
+    }
+}
+
+Lors de l'enregistrement d'itinéraires pour des contrôleurs à action unique, vous n'avez pas besoin de spécifier une méthode de contrôleur. Au lieu de cela, vous pouvez simplement transmettre le nom du contrôleur au routeur :
+
+use App\Http\Controllers\ProvisionServer;
+ 
+Route::post('/server', ProvisionServer::class);
+
+Vous pouvez générer un contrôleur invocable en utilisant l' --invokableoption de la make:controllercommande Artisan :
+
+php artisan make:controller ProvisionServer --invokable
+
+
+Les stubs de contrôleur peuvent être personnalisés à l'aide de la publication de stubs .
+
+
+Intergiciel du contrôleur
+Un middleware peut être affecté aux routes du contrôleur dans vos fichiers de routes :
+
+Route::get('profile', [UserController::class, 'show'])->middleware('auth');
+
+Ou, vous trouverez peut-être pratique de spécifier un middleware dans le constructeur de votre contrôleur. En utilisant la middlewareméthode dans le constructeur de votre contrôleur, vous pouvez affecter un middleware aux actions du contrôleur :
+
+class UserController extends Controller
+{
+    /**
+     * Instantiate a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware('log')->only('index');
+        $this->middleware('subscribed')->except('store');
+    }
+}
+
+Les contrôleurs vous permettent également d'enregistrer un middleware à l'aide d'une fermeture. Cela fournit un moyen pratique de définir un middleware en ligne pour un seul contrôleur sans définir une classe complète de middleware :
+
+$this->middleware(function ($request, $next) {
+    return $next($request);
+});
+
+Contrôleurs de ressources
+Si vous considérez chaque modèle Eloquent de votre application comme une "ressource", il est courant d'effectuer les mêmes ensembles d'actions sur chaque ressource de votre application. Par exemple, imaginez que votre application contient un Photomodèle et un Moviemodèle. Il est probable que les utilisateurs puissent créer, lire, mettre à jour ou supprimer ces ressources.
+
+En raison de ce cas d'utilisation courant, le routage des ressources Laravel attribue les routes typiques de création, lecture, mise à jour et suppression ("CRUD") à un contrôleur avec une seule ligne de code. Pour commencer, nous pouvons utiliser l' option de make:controllerla commande Artisan --resourcepour créer rapidement un contrôleur pour gérer ces actions :
+
+php artisan make:controller PhotoController --resource
+
+Cette commande générera un contrôleur à app/Http/Controllers/PhotoController.php. Le contrôleur contiendra une méthode pour chacune des opérations de ressources disponibles. Ensuite, vous pouvez enregistrer une route de ressources qui pointe vers le contrôleur :
+
+use App\Http\Controllers\PhotoController;
+ 
+Route::resource('photos', PhotoController::class);
+
+Cette déclaration de route unique crée plusieurs routes pour gérer diverses actions sur la ressource. Le contrôleur généré aura déjà des méthodes stub pour chacune de ces actions. N'oubliez pas que vous pouvez toujours obtenir un aperçu rapide des routes de votre application en exécutant la route:listcommande Artisan.
+
+Vous pouvez même enregistrer plusieurs contrôleurs de ressources à la fois en passant un tableau à la resourcesméthode :
+
+Route::resources([
+    'photos' => PhotoController::class,
+    'posts' => PostController::class,
+]);
+
+Actions gérées par le contrôleur de ressources
+Verbe	URI	Action	Nom de l'itinéraire
+OBTENIR	/photos	indice	photos.index
+OBTENIR	/photos/create	créer	photos.créer
+PUBLIER	/photos	boutique	photos.store
+OBTENIR	/photos/{photo}	Afficher	photos.show
+OBTENIR	/photos/{photo}/edit	Éditer	photos.modifier
+PUT/PATCH	/photos/{photo}	mettre à jour	photos.mise à jour
+EFFACER	/photos/{photo}	détruire	photos.destroy
+Personnalisation du comportement du modèle manquant
+En règle générale, une réponse HTTP 404 est générée si un modèle de ressource implicitement lié n'est pas trouvé. Cependant, vous pouvez personnaliser ce comportement en appelant la missingméthode lors de la définition de votre route de ressource. La missingméthode accepte une fermeture qui sera invoquée si un modèle lié implicitement ne peut être trouvé pour aucune des routes de la ressource :
+
+use App\Http\Controllers\PhotoController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redirect;
+ 
+Route::resource('photos', PhotoController::class)
+        ->missing(function (Request $request) {
+            return Redirect::route('photos.index');
+        });
+
+Spécification du modèle de ressource
+Si vous utilisez la liaison de modèle de route et que vous souhaitez que les méthodes du contrôleur de ressources indiquent le type d'une instance de modèle, vous pouvez utiliser l' --modeloption lors de la génération du contrôleur :
+
+php artisan make:controller PhotoController --model=Photo --resource
+
+Génération de demandes de formulaire
+Vous pouvez fournir l' --requestsoption lors de la génération d'un contrôleur de ressources pour demander à Artisan de générer des classes de requête de formulaire pour les méthodes de stockage et de mise à jour du contrôleur :
+
+php artisan make:controller PhotoController --model=Photo --resource --requests
+
+Routes de ressources partielles
+Lors de la déclaration d'une route de ressources, vous pouvez spécifier un sous-ensemble d'actions que le contrôleur doit gérer au lieu de l'ensemble complet d'actions par défaut :
+
+use App\Http\Controllers\PhotoController;
+ 
+Route::resource('photos', PhotoController::class)->only([
+    'index', 'show'
+]);
+ 
+Route::resource('photos', PhotoController::class)->except([
+    'create', 'store', 'update', 'destroy'
+]);
+
+Itinéraires de ressources d'API
+Lors de la déclaration des routes de ressources qui seront consommées par les API, vous souhaiterez généralement exclure les routes qui présentent des modèles HTML tels que createet edit. Pour plus de commodité, vous pouvez utiliser la apiResourceméthode pour exclure automatiquement ces deux routes :
+
+use App\Http\Controllers\PhotoController;
+ 
+Route::apiResource('photos', PhotoController::class);
+
+Vous pouvez enregistrer plusieurs contrôleurs de ressources d'API à la fois en passant un tableau à la apiResourcesméthode :
+
+use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\PostController;
+ 
+Route::apiResources([
+    'photos' => PhotoController::class,
+    'posts' => PostController::class,
+]);
+
+Pour générer rapidement un contrôleur de ressources d'API qui n'inclut pas les méthodes createou , utilisez le commutateur lors de l'exécution de la commande :edit--apimake:controller
+
+php artisan make:controller PhotoController --api
+
+Ressources imbriquées
+Parfois, vous devrez peut-être définir des itinéraires vers une ressource imbriquée. Par exemple, une ressource photo peut avoir plusieurs commentaires qui peuvent être joints à la photo. Pour imbriquer les contrôleurs de ressources, vous pouvez utiliser la notation "point" dans votre déclaration de route :
+
+use App\Http\Controllers\PhotoCommentController;
+ 
+Route::resource('photos.comments', PhotoCommentController::class);
+
+Cette route enregistrera une ressource imbriquée accessible avec des URI comme suit :
+
+/photos/{photo}/comments/{comment}
+
+Étendue des ressources imbriquées
+La fonctionnalité de liaison de modèle implicite de Laravel peut automatiquement étendre les liaisons imbriquées de sorte que le modèle enfant résolu soit confirmé comme appartenant au modèle parent. En utilisant la scopedméthode lors de la définition de votre ressource imbriquée, vous pouvez activer la portée automatique et indiquer à Laravel par quel champ la ressource enfant doit être récupérée. Pour plus d'informations sur la façon d'accomplir cela, veuillez consulter la documentation sur la portée des routes de ressources .
+
+Nidification peu profonde
+Souvent, il n'est pas tout à fait nécessaire d'avoir à la fois les identifiants parent et enfant dans un URI puisque l'identifiant enfant est déjà un identifiant unique. Lorsque vous utilisez des identifiants uniques tels que des clés primaires à incrémentation automatique pour identifier vos modèles dans des segments d'URI, vous pouvez choisir d'utiliser une "imbrication peu profonde":
+
+use App\Http\Controllers\CommentController;
+ 
+Route::resource('photos.comments', CommentController::class)->shallow();
+
+Cette définition de route définira les routes suivantes :
+
+Verbe	URI	Action	Nom de l'itinéraire
+OBTENIR	/photos/{photo}/comments	indice	photos.commentaires.index
+OBTENIR	/photos/{photo}/comments/create	créer	photos.commentaires.créer
+PUBLIER	/photos/{photo}/comments	boutique	photos.comments.store
+OBTENIR	/comments/{comment}	Afficher	commentaires.afficher
+OBTENIR	/comments/{comment}/edit	Éditer	commentaires.modifier
+PUT/PATCH	/comments/{comment}	mettre à jour	commentaires.mise à jour
+EFFACER	/comments/{comment}	détruire	commentaires.détruire
+Nommer les routes de ressources
+Par défaut, toutes les actions du contrôleur de ressources ont un nom de route ; cependant, vous pouvez remplacer ces noms en transmettant un namestableau avec les noms de route souhaités :
+
+use App\Http\Controllers\PhotoController;
+ 
+Route::resource('photos', PhotoController::class)->names([
+    'create' => 'photos.build'
+]);
+
+Nommer les paramètres de route de ressource
+Par défaut, Route::resourcecréera les paramètres d'itinéraire pour vos itinéraires de ressources en fonction de la version "singularisée" du nom de la ressource. Vous pouvez facilement remplacer cela par ressource à l'aide de la parametersméthode . Le tableau transmis à la parametersméthode doit être un tableau associatif de noms de ressources et de noms de paramètres :
+
+use App\Http\Controllers\AdminUserController;
+ 
+Route::resource('users', AdminUserController::class)->parameters([
+    'users' => 'admin_user'
+]);
+
+L'exemple ci-dessus génère l'URI suivant pour la showroute de la ressource :
+
+/users/{admin_user}
+
+Évaluer les itinéraires des ressources
+La fonctionnalité de liaison de modèle implicite délimitée de Laravel peut automatiquement délimiter les liaisons imbriquées de sorte que le modèle enfant résolu soit confirmé comme appartenant au modèle parent. En utilisant la scopedméthode lors de la définition de votre ressource imbriquée, vous pouvez activer la portée automatique et indiquer à Laravel par quel champ la ressource enfant doit être récupérée :
+
+use App\Http\Controllers\PhotoCommentController;
+ 
+Route::resource('photos.comments', PhotoCommentController::class)->scoped([
+    'comment' => 'slug',
+]);
+
+Cette route enregistrera une ressource imbriquée délimitée accessible avec des URI comme suit :
+
+/photos/{photo}/comments/{comment:slug}
+
+Lors de l'utilisation d'une liaison implicite à clé personnalisée en tant que paramètre de route imbriqué, Laravel étendra automatiquement la requête pour récupérer le modèle imbriqué par son parent en utilisant des conventions pour deviner le nom de la relation sur le parent. Dans ce cas, on supposera que le Photomodèle a une relation nommée comments(le pluriel du nom du paramètre de route) qui peut être utilisée pour récupérer le Commentmodèle.
+
+Localisation des URI de ressources
+Par défaut, Route::resourcecréera des URI de ressource en utilisant des verbes anglais et des règles de pluriel. Si vous avez besoin de localiser les verbes d'action createet , vous pouvez utiliser la méthode . Cela peut être fait au début de la méthode dans votre application :editRoute::resourceVerbsbootApp\Providers\RouteServiceProvider
+
+/**
+ * Define your route model bindings, pattern filters, etc.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Route::resourceVerbs([
+        'create' => 'crear',
+        'edit' => 'editar',
+    ]);
+ 
+    // ...
+}
+
+Le pluraliseur de Laravel prend en charge plusieurs langues différentes que vous pouvez configurer en fonction de vos besoins . Une fois que les verbes et le langage de pluralisation ont été personnalisés, un enregistrement de route de ressources tel que Route::resource('publicacion', PublicacionController::class)produira les URI suivants :
+
+/publicacion/crear
+ 
+/publicacion/{publicaciones}/editar
+
+Compléter les contrôleurs de ressources
+Si vous devez ajouter des routes supplémentaires à un contrôleur de ressources au-delà de l'ensemble de routes de ressources par défaut, vous devez définir ces routes avant votre appel à la Route::resourceméthode ; sinon, les routes définies par la resourceméthode peuvent involontairement prendre le pas sur vos routes supplémentaires :
+
+use App\Http\Controller\PhotoController;
+ 
+Route::get('/photos/popular', [PhotoController::class, 'popular']);
+Route::resource('photos', PhotoController::class);
+
+
+N'oubliez pas de garder vos contrôleurs concentrés. Si vous avez régulièrement besoin de méthodes en dehors de l'ensemble typique d'actions de ressources, envisagez de diviser votre contrôleur en deux contrôleurs plus petits.
+
+
+Injection de dépendance et contrôleurs
+Injection de constructeur
+Le conteneur de service Laravel est utilisé pour résoudre tous les contrôleurs Laravel. En conséquence, vous pouvez indiquer toutes les dépendances dont votre contrôleur peut avoir besoin dans son constructeur. Les dépendances déclarées seront automatiquement résolues et injectées dans l'instance du contrôleur :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Repositories\UserRepository;
+ 
+class UserController extends Controller
+{
+    /**
+     * The user repository instance.
+     */
+    protected $users;
+ 
+    /**
+     * Create a new controller instance.
+     *
+     * @param  \App\Repositories\UserRepository  $users
+     * @return void
+     */
+    public function __construct(UserRepository $users)
+    {
+        $this->users = $users;
+    }
+}
+
+Injection de méthode
+En plus de l'injection de constructeur, vous pouvez également créer des dépendances d'indication de type sur les méthodes de votre contrôleur. Un cas d'utilisation courant pour l'injection de méthode consiste à injecter l' Illuminate\Http\Requestinstance dans les méthodes de votre contrôleur :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Http\Request;
+ 
+class UserController extends Controller
+{
+    /**
+     * Store a new user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $name = $request->name;
+ 
+        //
+    }
+}
+
+Si votre méthode de contrôleur attend également une entrée d'un paramètre de route, répertoriez vos arguments de route après vos autres dépendances. Par exemple, si votre route est définie comme ceci :
+
+use App\Http\Controllers\UserController;
+ 
+Route::put('/user/{id}', [UserController::class, 'update']);
+
+Vous pouvez toujours taper le Illuminate\Http\Requestet accéder à votre idparamètre en définissant votre méthode de contrôleur comme suit :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Http\Request;
+ 
+class UserController extends Controller
+{
+    /**
+     * Update the given user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        //
+    }
+}

@@ -1,0 +1,870 @@
+Base de données : Générateur de requêtes
+Introduction
+Exécution de requêtes de base de données
+Résultats de segmentation
+Résultats en streaming paresseusement
+Agrégats
+Sélectionnez les relevés
+Expressions brutes
+Jointures
+Les syndicats
+Clauses Where de base
+Clauses Où
+Ou Clauses Où
+Clauses Où Pas
+Clauses Where JSON
+Clauses Where supplémentaires
+Regroupement logique
+Clauses Where avancées
+Où existe les clauses
+Sous-requête Clauses Where
+Texte intégral Clauses Where
+Classement, regroupement, limite et décalage
+Commande
+Regroupement
+Limite et décalage
+Clauses conditionnelles
+Insérer des déclarations
+Upserts
+Mettre à jour les déclarations
+Mise à jour des colonnes JSON
+Incrémenter et décrémenter
+Supprimer les relevés
+Verrouillage pessimiste
+Débogage
+Introduction
+Le générateur de requêtes de base de données de Laravel fournit une interface pratique et fluide pour créer et exécuter des requêtes de base de données. Il peut être utilisé pour effectuer la plupart des opérations de base de données dans votre application et fonctionne parfaitement avec tous les systèmes de base de données pris en charge par Laravel.
+
+Le générateur de requêtes Laravel utilise la liaison de paramètres PDO pour protéger votre application contre les attaques par injection SQL. Il n'est pas nécessaire de nettoyer ou d'assainir les chaînes transmises au générateur de requêtes en tant que liaisons de requête.
+
+
+PDO ne prend pas en charge les noms de colonne de liaison. Par conséquent, vous ne devez jamais autoriser l'entrée de l'utilisateur à dicter les noms de colonne référencés par vos requêtes, y compris les colonnes « trier par ».
+
+
+Exécution de requêtes de base de données
+Récupération de toutes les lignes d'une table
+Vous pouvez utiliser la tableméthode fournie par la DBfaçade pour commencer une requête. La tableméthode renvoie une instance de générateur de requête fluide pour la table donnée, ce qui vous permet d'enchaîner davantage de contraintes sur la requête, puis de récupérer finalement les résultats de la requête à l'aide de la getméthode :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show a list of all of the application's users.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $users = DB::table('users')->get();
+ 
+        return view('user.index', ['users' => $users]);
+    }
+}
+
+La getméthode renvoie une Illuminate\Support\Collectioninstance contenant les résultats de la requête où chaque résultat est une instance de l' stdClassobjet PHP. Vous pouvez accéder à la valeur de chaque colonne en accédant à la colonne en tant que propriété de l'objet :
+
+use Illuminate\Support\Facades\DB;
+ 
+$users = DB::table('users')->get();
+ 
+foreach ($users as $user) {
+    echo $user->name;
+}
+
+
+Les collections Laravel fournissent une variété de méthodes extrêmement puissantes pour cartographier et réduire les données. Pour plus d'informations sur les collections Laravel, consultez la documentation de la collection .
+
+
+Récupération d'une seule ligne / colonne d'un tableau
+Si vous avez juste besoin de récupérer une seule ligne d'une table de base de données, vous pouvez utiliser la méthode DBde la façade first. Cette méthode renverra un seul stdClassobjet :
+
+$user = DB::table('users')->where('name', 'John')->first();
+ 
+return $user->email;
+
+Si vous n'avez pas besoin d'une ligne entière, vous pouvez extraire une seule valeur d'un enregistrement à l'aide de la valueméthode. Cette méthode renverra directement la valeur de la colonne :
+
+$email = DB::table('users')->where('name', 'John')->value('email');
+
+Pour récupérer une seule ligne par sa idvaleur de colonne, utilisez la findméthode :
+
+$user = DB::table('users')->find(3);
+
+Récupération d'une liste de valeurs de colonne
+Si vous souhaitez récupérer une Illuminate\Support\Collectioninstance contenant les valeurs d'une seule colonne, vous pouvez utiliser la pluckméthode. Dans cet exemple, nous allons récupérer une collection de titres d'utilisateur :
+
+use Illuminate\Support\Facades\DB;
+ 
+$titles = DB::table('users')->pluck('title');
+ 
+foreach ($titles as $title) {
+    echo $title;
+}
+
+Vous pouvez spécifier la colonne que la collection résultante doit utiliser comme clés en fournissant un deuxième argument à la pluckméthode :
+
+$titles = DB::table('users')->pluck('title', 'name');
+ 
+foreach ($titles as $name => $title) {
+    echo $title;
+}
+
+Résultats de segmentation
+Si vous devez travailler avec des milliers d'enregistrements de base de données, envisagez d'utiliser la chunkméthode fournie par la DBfaçade. Cette méthode récupère un petit bloc de résultats à la fois et alimente chaque bloc dans une fermeture pour le traitement. Par exemple, récupérons la userstable entière par tranches de 100 enregistrements à la fois :
+
+use Illuminate\Support\Facades\DB;
+ 
+DB::table('users')->orderBy('id')->chunk(100, function ($users) {
+    foreach ($users as $user) {
+        //
+    }
+});
+
+Vous pouvez arrêter le traitement d'autres blocs en revenant falsede la fermeture :
+
+DB::table('users')->orderBy('id')->chunk(100, function ($users) {
+    // Process the records...
+ 
+    return false;
+});
+
+Si vous mettez à jour des enregistrements de base de données lors de la segmentation des résultats, vos résultats de segmentation peuvent changer de manière inattendue. Si vous envisagez de mettre à jour les enregistrements récupérés lors de la segmentation, il est toujours préférable d'utiliser la chunkByIdméthode à la place. Cette méthode paginera automatiquement les résultats en fonction de la clé primaire de l'enregistrement :
+
+DB::table('users')->where('active', false)
+    ->chunkById(100, function ($users) {
+        foreach ($users as $user) {
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['active' => true]);
+        }
+    });
+
+
+Lors de la mise à jour ou de la suppression d'enregistrements dans le rappel de bloc, toute modification de la clé primaire ou des clés étrangères peut affecter la requête de bloc. Cela pourrait entraîner la non-inclusion d'enregistrements dans les résultats fragmentés.
+
+
+Résultats en streaming paresseusement
+La lazyméthode fonctionne de manière similaire à la chunkméthode en ce sens qu'elle exécute la requête par blocs. Cependant, au lieu de passer chaque bloc dans un rappel, la lazy()méthode renvoie un LazyCollection, ce qui vous permet d'interagir avec les résultats en tant que flux unique :
+
+use Illuminate\Support\Facades\DB;
+ 
+DB::table('users')->orderBy('id')->lazy()->each(function ($user) {
+    //
+});
+
+Encore une fois, si vous envisagez de mettre à jour les enregistrements récupérés tout en itérant dessus, il est préférable d'utiliser les méthodes lazyByIdou à la lazyByIdDescplace. Ces méthodes pagineront automatiquement les résultats en fonction de la clé primaire de l'enregistrement :
+
+DB::table('users')->where('active', false)
+    ->lazyById()->each(function ($user) {
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update(['active' => true]);
+    });
+
+
+Lors de la mise à jour ou de la suppression d'enregistrements lors d'une itération sur eux, toute modification de la clé primaire ou des clés étrangères peut affecter la requête de bloc. Cela pourrait entraîner l'absence d'enregistrements dans les résultats.
+
+
+Agrégats
+Le générateur de requêtes fournit également une variété de méthodes pour récupérer des valeurs agrégées telles que count, max, min, avget sum. Vous pouvez appeler l'une de ces méthodes après avoir construit votre requête :
+
+use Illuminate\Support\Facades\DB;
+ 
+$users = DB::table('users')->count();
+ 
+$price = DB::table('orders')->max('price');
+
+Bien sûr, vous pouvez combiner ces méthodes avec d'autres clauses pour affiner le calcul de votre valeur agrégée :
+
+$price = DB::table('orders')
+                ->where('finalized', 1)
+                ->avg('price');
+
+Déterminer si des enregistrements existent
+Au lieu d'utiliser la countméthode pour déterminer s'il existe des enregistrements correspondant aux contraintes de votre requête, vous pouvez utiliser les méthodes existset :doesntExist
+
+if (DB::table('orders')->where('finalized', 1)->exists()) {
+    // ...
+}
+ 
+if (DB::table('orders')->where('finalized', 1)->doesntExist()) {
+    // ...
+}
+
+Sélectionnez les relevés
+Spécification d'une clause de sélection
+Vous ne voudrez peut-être pas toujours sélectionner toutes les colonnes d'une table de base de données. À l'aide de la selectméthode, vous pouvez spécifier une clause "select" personnalisée pour la requête :
+
+use Illuminate\Support\Facades\DB;
+ 
+$users = DB::table('users')
+            ->select('name', 'email as user_email')
+            ->get();
+
+La distinctméthode permet de forcer la requête à renvoyer des résultats distincts :
+
+$users = DB::table('users')->distinct()->get();
+
+Si vous avez déjà une instance de générateur de requêtes et que vous souhaitez ajouter une colonne à sa clause select existante, vous pouvez utiliser la addSelectméthode :
+
+$query = DB::table('users')->select('name');
+ 
+$users = $query->addSelect('age')->get();
+
+Expressions brutes
+Parfois, vous devrez peut-être insérer une chaîne arbitraire dans une requête. Pour créer une expression de chaîne brute, vous pouvez utiliser la rawméthode fournie par la DBfaçade :
+
+$users = DB::table('users')
+             ->select(DB::raw('count(*) as user_count, status'))
+             ->where('status', '<>', 1)
+             ->groupBy('status')
+             ->get();
+
+
+Les instructions brutes seront injectées dans la requête sous forme de chaînes, vous devez donc être extrêmement prudent pour éviter de créer des vulnérabilités d'injection SQL.
+
+
+Méthodes brutes
+Au lieu d'utiliser la DB::rawméthode, vous pouvez également utiliser les méthodes suivantes pour insérer une expression brute dans différentes parties de votre requête. N'oubliez pas que Laravel ne peut garantir que toute requête utilisant des expressions brutes est protégée contre les vulnérabilités d'injection SQL.
+
+selectRaw
+La selectRawméthode peut être utilisée à la place de addSelect(DB::raw(/* ... */)). Cette méthode accepte un tableau optionnel de liaisons comme deuxième argument :
+
+$orders = DB::table('orders')
+                ->selectRaw('price * ? as price_with_tax', [1.0825])
+                ->get();
+
+whereRaw / orWhereRaw
+Les méthodes whereRawet orWhereRawpeuvent être utilisées pour injecter une clause "where" brute dans votre requête. Ces méthodes acceptent un tableau facultatif de liaisons comme deuxième argument :
+
+$orders = DB::table('orders')
+                ->whereRaw('price > IF(state = "TX", ?, 100)', [200])
+                ->get();
+
+havingRaw / orHavingRaw
+Les méthodes havingRawet orHavingRawpeuvent être utilisées pour fournir une chaîne brute comme valeur de la clause "having". Ces méthodes acceptent un tableau facultatif de liaisons comme deuxième argument :
+
+$orders = DB::table('orders')
+                ->select('department', DB::raw('SUM(price) as total_sales'))
+                ->groupBy('department')
+                ->havingRaw('SUM(price) > ?', [2500])
+                ->get();
+
+orderByRaw
+La orderByRawméthode peut être utilisée pour fournir une chaîne brute comme valeur de la clause "order by":
+
+$orders = DB::table('orders')
+                ->orderByRaw('updated_at - created_at DESC')
+                ->get();
+
+groupByRaw
+La groupByRawméthode peut être utilisée pour fournir une chaîne brute comme valeur de la group byclause :
+
+$orders = DB::table('orders')
+                ->select('city', 'state')
+                ->groupByRaw('city, state')
+                ->get();
+
+Jointures
+Clause de jointure interne
+Le générateur de requêtes peut également être utilisé pour ajouter des clauses de jointure à vos requêtes. Pour effectuer une "jointure interne" de base, vous pouvez utiliser la joinméthode sur une instance de générateur de requêtes. Le premier argument passé à la joinméthode est le nom de la table à laquelle vous devez joindre, tandis que les arguments restants spécifient les contraintes de colonne pour la jointure. Vous pouvez même joindre plusieurs tables en une seule requête :
+
+use Illuminate\Support\Facades\DB;
+ 
+$users = DB::table('users')
+            ->join('contacts', 'users.id', '=', 'contacts.user_id')
+            ->join('orders', 'users.id', '=', 'orders.user_id')
+            ->select('users.*', 'contacts.phone', 'orders.price')
+            ->get();
+
+Clause de jointure à gauche/à droite
+Si vous souhaitez effectuer une "jointure gauche" ou une "jointure droite" au lieu d'une "jointure interne", utilisez les méthodes leftJoinou . rightJoinCes méthodes ont la même signature que la joinméthode :
+
+$users = DB::table('users')
+            ->leftJoin('posts', 'users.id', '=', 'posts.user_id')
+            ->get();
+ 
+$users = DB::table('users')
+            ->rightJoin('posts', 'users.id', '=', 'posts.user_id')
+            ->get();
+
+Clause de jointure croisée
+Vous pouvez utiliser la crossJoinméthode pour effectuer une "jointure croisée". Les jointures croisées génèrent un produit cartésien entre la première table et la table jointe :
+
+$sizes = DB::table('sizes')
+            ->crossJoin('colors')
+            ->get();
+
+Clauses de jointure avancées
+Vous pouvez également spécifier des clauses de jointure plus avancées. Pour commencer, passez une fermeture comme deuxième argument à la joinméthode. La fermeture recevra une Illuminate\Database\Query\JoinClauseinstance qui vous permet de spécifier des contraintes sur la clause "join":
+
+DB::table('users')
+        ->join('contacts', function ($join) {
+            $join->on('users.id', '=', 'contacts.user_id')->orOn(/* ... */);
+        })
+        ->get();
+
+Si vous souhaitez utiliser une clause "where" sur vos jointures, vous pouvez utiliser les méthodes whereet orWherefournies par l' JoinClauseinstance. Au lieu de comparer deux colonnes, ces méthodes compareront la colonne à une valeur :
+
+DB::table('users')
+        ->join('contacts', function ($join) {
+            $join->on('users.id', '=', 'contacts.user_id')
+                 ->where('contacts.user_id', '>', 5);
+        })
+        ->get();
+
+Jointures de sous-requête
+Vous pouvez utiliser les méthodes joinSub, leftJoinSubet rightJoinSubpour joindre une requête à une sous-requête. Chacune de ces méthodes reçoit trois arguments : la sous-requête, son alias de table et une fermeture qui définit les colonnes associées. Dans cet exemple, nous allons récupérer une collection d'utilisateurs où chaque enregistrement d'utilisateur contient également l' created_athorodatage du dernier article de blog publié par l'utilisateur :
+
+$latestPosts = DB::table('posts')
+                   ->select('user_id', DB::raw('MAX(created_at) as last_post_created_at'))
+                   ->where('is_published', true)
+                   ->groupBy('user_id');
+ 
+$users = DB::table('users')
+        ->joinSub($latestPosts, 'latest_posts', function ($join) {
+            $join->on('users.id', '=', 'latest_posts.user_id');
+        })->get();
+
+Les syndicats
+Le générateur de requêtes fournit également une méthode pratique pour "unir" deux ou plusieurs requêtes ensemble. Par exemple, vous pouvez créer une requête initiale et utiliser la unionméthode pour l'unir à d'autres requêtes :
+
+use Illuminate\Support\Facades\DB;
+ 
+$first = DB::table('users')
+            ->whereNull('first_name');
+ 
+$users = DB::table('users')
+            ->whereNull('last_name')
+            ->union($first)
+            ->get();
+
+En plus de la unionméthode, le générateur de requête fournit une unionAllméthode. Les requêtes combinées à l'aide de la unionAllméthode ne verront pas leurs résultats en double supprimés. La unionAllméthode a la même signature de méthode que la unionméthode.
+
+Clauses Where de base
+Clauses Où
+Vous pouvez utiliser la méthode du générateur de requêtes wherepour ajouter des clauses "where" à la requête. L'appel le plus basique à la whereméthode nécessite trois arguments. Le premier argument est le nom de la colonne. Le deuxième argument est un opérateur, qui peut être n'importe lequel des opérateurs pris en charge par la base de données. Le troisième argument est la valeur à comparer à la valeur de la colonne.
+
+Par exemple, la requête suivante récupère les utilisateurs dont la valeur de la votescolonne est égale à 100et la valeur de la agecolonne est supérieure à35 :
+
+$users = DB::table('users')
+                ->where('votes', '=', 100)
+                ->where('age', '>', 35)
+                ->get();
+
+Pour plus de commodité, si vous souhaitez vérifier qu'une colonne correspond =à une valeur donnée, vous pouvez transmettre la valeur comme deuxième argument à la whereméthode. Laravel supposera que vous souhaitez utiliser l' =opérateur :
+
+$users = DB::table('users')->where('votes', 100)->get();
+
+Comme mentionné précédemment, vous pouvez utiliser n'importe quel opérateur pris en charge par votre système de base de données :
+
+$users = DB::table('users')
+                ->where('votes', '>=', 100)
+                ->get();
+ 
+$users = DB::table('users')
+                ->where('votes', '<>', 100)
+                ->get();
+ 
+$users = DB::table('users')
+                ->where('name', 'like', 'T%')
+                ->get();
+
+Vous pouvez également passer un tableau de conditions à la wherefonction. Chaque élément du tableau doit être un tableau contenant les trois arguments généralement passés à la whereméthode :
+
+$users = DB::table('users')->where([
+    ['status', '=', '1'],
+    ['subscribed', '<>', '1'],
+])->get();
+
+
+PDO ne prend pas en charge les noms de colonne de liaison. Par conséquent, vous ne devez jamais autoriser l'entrée de l'utilisateur à dicter les noms de colonne référencés par vos requêtes, y compris les colonnes « trier par ».
+
+
+Ou Clauses Où
+Lors de l'enchaînement d'appels à la méthode du générateur de requêtes where, les clauses "where" seront jointes à l'aide de l' andopérateur. Cependant, vous pouvez utiliser la orWhereméthode pour joindre une clause à la requête à l'aide de l' oropérateur. La orWhereméthode accepte les mêmes arguments que la whereméthode :
+
+$users = DB::table('users')
+                    ->where('votes', '>', 100)
+                    ->orWhere('name', 'John')
+                    ->get();
+
+Si vous avez besoin de regrouper une condition "ou" entre parenthèses, vous pouvez passer une fermeture comme premier argument à la orWhereméthode :
+
+$users = DB::table('users')
+            ->where('votes', '>', 100)
+            ->orWhere(function($query) {
+                $query->where('name', 'Abigail')
+                      ->where('votes', '>', 50);
+            })
+            ->get();
+
+L'exemple ci-dessus produira le SQL suivant :
+
+select * from users where votes > 100 or (name = 'Abigail' and votes > 50)
+
+
+Vous devez toujours regrouper les orWhereappels afin d'éviter un comportement inattendu lorsque des étendues globales sont appliquées.
+
+
+Clauses Où Pas
+Les méthodes whereNotet peuvent être utilisées pour annuler un groupe donné de contraintes de requête. orWhereNotPar exemple, la requête suivante exclut les produits en liquidation ou dont le prix est inférieur à dix :
+
+$products = DB::table('products')
+                ->whereNot(function ($query) {
+                    $query->where('clearance', true)
+                          ->orWhere('price', '<', 10);
+                })
+                ->get();
+
+Clauses Where JSON
+Laravel prend également en charge l'interrogation des types de colonnes JSON sur les bases de données qui prennent en charge les types de colonnes JSON. Actuellement, cela inclut MySQL 5.7+, PostgreSQL, SQL Server 2016 et SQLite 3.9.0 (avec l' extension JSON1 ). Pour interroger une colonne JSON, utilisez l' ->opérateur :
+
+$users = DB::table('users')
+                ->where('preferences->dining->meal', 'salad')
+                ->get();
+
+Vous pouvez utiliser whereJsonContainspour interroger des tableaux JSON. Cette fonctionnalité n'est pas prise en charge par la base de données SQLite :
+
+$users = DB::table('users')
+                ->whereJsonContains('options->languages', 'en')
+                ->get();
+
+Si votre application utilise les bases de données MySQL ou PostgreSQL, vous pouvez passer un tableau de valeurs à la whereJsonContainsméthode :
+
+$users = DB::table('users')
+                ->whereJsonContains('options->languages', ['en', 'de'])
+                ->get();
+
+Vous pouvez utiliser whereJsonLengthla méthode pour interroger les tableaux JSON par leur longueur :
+
+$users = DB::table('users')
+                ->whereJsonLength('options->languages', 0)
+                ->get();
+ 
+$users = DB::table('users')
+                ->whereJsonLength('options->languages', '>', 1)
+                ->get();
+
+Clauses Where supplémentaires
+oùEntre / ouOùEntre
+
+La whereBetweenméthode vérifie que la valeur d'une colonne est comprise entre deux valeurs :
+
+$users = DB::table('users')
+           ->whereBetween('votes', [1, 100])
+           ->get();
+
+whereNotBetween / ouWhereNotBetween
+
+La whereNotBetweenméthode vérifie que la valeur d'une colonne se trouve en dehors de deux valeurs :
+
+$users = DB::table('users')
+                    ->whereNotBetween('votes', [1, 100])
+                    ->get();
+
+oùdans / oùpasdans / ouoùdans / ouoùpasdans
+
+La whereInméthode vérifie que la valeur d'une colonne donnée est contenue dans le tableau donné :
+
+$users = DB::table('users')
+                    ->whereIn('id', [1, 2, 3])
+                    ->get();
+
+La whereNotInméthode vérifie que la valeur de la colonne donnée n'est pas contenue dans le tableau donné :
+
+$users = DB::table('users')
+                    ->whereNotIn('id', [1, 2, 3])
+                    ->get();
+
+
+Si vous ajoutez un grand nombre de liaisons d'entiers à votre requête, les méthodes whereIntegerInRawou whereIntegerNotInRawpeuvent être utilisées pour réduire considérablement votre utilisation de la mémoire.
+
+
+oùNull / oùNonNull / ouOùNull / ouOùNonNull
+
+La whereNullméthode vérifie que la valeur de la colonne donnée est NULL:
+
+$users = DB::table('users')
+                ->whereNull('updated_at')
+                ->get();
+
+La whereNotNullméthode vérifie que la valeur de la colonne n'est pas NULL:
+
+$users = DB::table('users')
+                ->whereNotNull('updated_at')
+                ->get();
+
+oùDate / oùMois / oùJour / oùAnnée / oùHeure
+
+La whereDateméthode peut être utilisée pour comparer la valeur d'une colonne à une date :
+
+$users = DB::table('users')
+                ->whereDate('created_at', '2016-12-31')
+                ->get();
+
+La whereMonthméthode peut être utilisée pour comparer la valeur d'une colonne à un mois spécifique :
+
+$users = DB::table('users')
+                ->whereMonth('created_at', '12')
+                ->get();
+
+La whereDayméthode peut être utilisée pour comparer la valeur d'une colonne à un jour spécifique du mois :
+
+$users = DB::table('users')
+                ->whereDay('created_at', '31')
+                ->get();
+
+La whereYearméthode peut être utilisée pour comparer la valeur d'une colonne à une année spécifique :
+
+$users = DB::table('users')
+                ->whereYear('created_at', '2016')
+                ->get();
+
+La whereTimeméthode peut être utilisée pour comparer la valeur d'une colonne à une heure spécifique :
+
+$users = DB::table('users')
+                ->whereTime('created_at', '=', '11:20:45')
+                ->get();
+
+oùColonne / ouOùColonne
+
+La whereColumnméthode peut être utilisée pour vérifier que deux colonnes sont égales :
+
+$users = DB::table('users')
+                ->whereColumn('first_name', 'last_name')
+                ->get();
+
+Vous pouvez également passer un opérateur de comparaison à la whereColumnméthode :
+
+$users = DB::table('users')
+                ->whereColumn('updated_at', '>', 'created_at')
+                ->get();
+
+Vous pouvez également passer un tableau de comparaisons de colonnes à la whereColumnméthode. Ces conditions seront jointes à l'aide de l' andopérateur :
+
+$users = DB::table('users')
+                ->whereColumn([
+                    ['first_name', '=', 'last_name'],
+                    ['updated_at', '>', 'created_at'],
+                ])->get();
+
+Regroupement logique
+Parfois, vous devrez peut-être regrouper plusieurs clauses "where" entre parenthèses afin d'obtenir le regroupement logique souhaité pour votre requête. En fait, vous devez généralement toujours regrouper les appels à la orWhereméthode entre parenthèses afin d'éviter un comportement de requête inattendu. Pour ce faire, vous pouvez passer une fermeture à la whereméthode :
+
+$users = DB::table('users')
+           ->where('name', '=', 'John')
+           ->where(function ($query) {
+               $query->where('votes', '>', 100)
+                     ->orWhere('title', '=', 'Admin');
+           })
+           ->get();
+
+Comme vous pouvez le voir, passer une fermeture dans la whereméthode indique au générateur de requêtes de commencer un groupe de contraintes. La fermeture recevra une instance de générateur de requête que vous pouvez utiliser pour définir les contraintes qui doivent être contenues dans le groupe de parenthèses. L'exemple ci-dessus produira le SQL suivant :
+
+select * from users where name = 'John' and (votes > 100 or title = 'Admin')
+
+
+Vous devez toujours regrouper les orWhereappels afin d'éviter un comportement inattendu lorsque des étendues globales sont appliquées.
+
+
+Clauses Where avancées
+Où existe les clauses
+La whereExistsméthode vous permet d'écrire des clauses SQL "où existe". La whereExistsméthode accepte une fermeture qui recevra une instance de générateur de requête, vous permettant de définir la requête qui doit être placée à l'intérieur de la clause "exists":
+
+$users = DB::table('users')
+           ->whereExists(function ($query) {
+               $query->select(DB::raw(1))
+                     ->from('orders')
+                     ->whereColumn('orders.user_id', 'users.id');
+           })
+           ->get();
+
+La requête ci-dessus produira le SQL suivant :
+
+select * from users
+where exists (
+    select 1
+    from orders
+    where orders.user_id = users.id
+)
+
+Sous-requête Clauses Where
+Parfois, vous devrez peut-être construire une clause "where" qui compare les résultats d'une sous-requête à une valeur donnée. Vous pouvez accomplir cela en passant une fermeture et une valeur à la whereméthode. Par exemple, la requête suivante récupérera tous les utilisateurs qui ont une « adhésion » récente d'un type donné ;
+
+use App\Models\User;
+ 
+$users = User::where(function ($query) {
+    $query->select('type')
+        ->from('membership')
+        ->whereColumn('membership.user_id', 'users.id')
+        ->orderByDesc('membership.start_date')
+        ->limit(1);
+}, 'Pro')->get();
+
+Ou, vous devrez peut-être construire une clause "where" qui compare une colonne aux résultats d'une sous-requête. Vous pouvez accomplir cela en passant une colonne, un opérateur et une fermeture à la whereméthode. Par exemple, la requête suivante récupérera tous les enregistrements de revenus dont le montant est inférieur à la moyenne ;
+
+use App\Models\Income;
+ 
+$incomes = Income::where('amount', '<', function ($query) {
+    $query->selectRaw('avg(i.amount)')->from('incomes as i');
+})->get();
+
+Texte intégral Clauses Where
+
+Les clauses where en texte intégral sont actuellement prises en charge par MySQL et PostgreSQL.
+
+
+Les méthodes whereFullTextet orWhereFullTextpeuvent être utilisées pour ajouter des clauses "where" de texte intégral à une requête pour les colonnes qui ont des index de texte intégral . Ces méthodes seront transformées en SQL approprié pour le système de base de données sous-jacent par Laravel. Par exemple, une MATCH AGAINSTclause sera générée pour les applications utilisant MySQL :
+
+$users = DB::table('users')
+           ->whereFullText('bio', 'web developer')
+           ->get();
+
+Classement, regroupement, limite et décalage
+Commande
+La orderByméthode
+La orderByméthode vous permet de trier les résultats de la requête par une colonne donnée. Le premier argument accepté par la orderByméthode doit être la colonne que vous souhaitez trier, tandis que le second argument détermine la direction du tri et peut être soit ascsoit desc:
+
+$users = DB::table('users')
+                ->orderBy('name', 'desc')
+                ->get();
+
+Pour trier sur plusieurs colonnes, vous pouvez simplement invoquer orderByautant de fois que nécessaire :
+
+$users = DB::table('users')
+                ->orderBy('name', 'desc')
+                ->orderBy('email', 'asc')
+                ->get();
+
+Les latest& oldestMéthodes
+Les méthodes latestet oldestvous permettent de classer facilement les résultats par date. Par défaut, le résultat sera trié par created_atcolonne du tableau. Ou, vous pouvez passer le nom de la colonne que vous souhaitez trier :
+
+$user = DB::table('users')
+                ->latest()
+                ->first();
+
+Commande aléatoire
+Le inRandomOrderprocédé peut être utilisé pour trier les résultats de la requête de manière aléatoire. Par exemple, vous pouvez utiliser cette méthode pour récupérer un utilisateur aléatoire :
+
+$randomUser = DB::table('users')
+                ->inRandomOrder()
+                ->first();
+
+Suppression des commandes existantes
+La reorderméthode supprime toutes les clauses "order by" qui ont été précédemment appliquées à la requête :
+
+$query = DB::table('users')->orderBy('name');
+ 
+$unorderedUsers = $query->reorder()->get();
+
+Vous pouvez passer une colonne et une direction lors de l'appel de la reorderméthode afin de supprimer toutes les clauses "order by" existantes et d'appliquer un tout nouvel ordre à la requête :
+
+$query = DB::table('users')->orderBy('name');
+ 
+$usersOrderedByEmail = $query->reorder('email', 'desc')->get();
+
+Regroupement
+Les groupBy& havingMéthodes
+Comme vous pouvez vous y attendre, les méthodes groupByet havingpeuvent être utilisées pour regrouper les résultats de la requête. La havingsignature de la méthode est similaire à celle de la whereméthode :
+
+$users = DB::table('users')
+                ->groupBy('account_id')
+                ->having('account_id', '>', 100)
+                ->get();
+
+Vous pouvez utiliser la havingBetweenméthode pour filtrer les résultats dans une plage donnée :
+
+$report = DB::table('orders')
+                ->selectRaw('count(id) as number_of_orders, customer_id')
+                ->groupBy('customer_id')
+                ->havingBetween('number_of_orders', [5, 15])
+                ->get();
+
+Vous pouvez passer plusieurs arguments à la groupByméthode pour grouper par plusieurs colonnes :
+
+$users = DB::table('users')
+                ->groupBy('first_name', 'status')
+                ->having('account_id', '>', 100)
+                ->get();
+
+Pour créer des havinginstructions plus avancées, consultez la havingRawméthode.
+
+Limite et décalage
+Les skip& takeMéthodes
+Vous pouvez utiliser les méthodes skipet takepour limiter le nombre de résultats renvoyés par la requête ou pour ignorer un nombre donné de résultats dans la requête :
+
+$users = DB::table('users')->skip(10)->take(5)->get();
+
+Alternativement, vous pouvez utiliser les méthodes limitet . offsetCes méthodes sont fonctionnellement équivalentes aux méthodes takeet skip, respectivement :
+
+$users = DB::table('users')
+                ->offset(10)
+                ->limit(5)
+                ->get();
+
+Clauses conditionnelles
+Parfois, vous souhaiterez peut-être que certaines clauses de requête s'appliquent à une requête basée sur une autre condition. Par exemple, vous pouvez uniquement appliquer une whereinstruction si une valeur d'entrée donnée est présente dans la requête HTTP entrante. Vous pouvez accomplir cela en utilisant la whenméthode :
+
+$role = $request->input('role');
+ 
+$users = DB::table('users')
+                ->when($role, function ($query, $role) {
+                    $query->where('role_id', $role);
+                })
+                ->get();
+
+La whenméthode n'exécute la fermeture donnée que lorsque le premier argument est true. Si le premier argument est false, la fermeture ne sera pas exécutée. Ainsi, dans l'exemple ci-dessus, la fermeture donnée à la whenméthode ne sera appelée que si le rolechamp est présent sur la requête entrante et évalue à true.
+
+Vous pouvez passer une autre fermeture comme troisième argument de la whenméthode. Cette fermeture ne s'exécutera que si le premier argument est évalué comme false. Pour illustrer comment cette fonctionnalité peut être utilisée, nous l'utiliserons pour configurer l'ordre par défaut d'une requête :
+
+$sortByVotes = $request->input('sort_by_votes');
+ 
+$users = DB::table('users')
+                ->when($sortByVotes, function ($query, $sortByVotes) {
+                    $query->orderBy('votes');
+                }, function ($query) {
+                    $query->orderBy('name');
+                })
+                ->get();
+
+Insérer des déclarations
+Le générateur de requête fournit également une insertméthode qui peut être utilisée pour insérer des enregistrements dans la table de base de données. La insertméthode accepte un tableau de noms de colonnes et de valeurs :
+
+DB::table('users')->insert([
+    'email' => 'kayla@example.com',
+    'votes' => 0
+]);
+
+Vous pouvez insérer plusieurs enregistrements à la fois en passant un tableau de tableaux. Chaque tableau représente un enregistrement qui doit être inséré dans la table :
+
+DB::table('users')->insert([
+    ['email' => 'picard@example.com', 'votes' => 0],
+    ['email' => 'janeway@example.com', 'votes' => 0],
+]);
+
+La insertOrIgnoreméthode ignorera les erreurs lors de l'insertion d'enregistrements dans la base de données. Lorsque vous utilisez cette méthode, vous devez savoir que les erreurs d'enregistrement en double seront ignorées et que d'autres types d'erreurs peuvent également être ignorés en fonction du moteur de base de données. Par exemple, insertOrIgnorecontournera le mode strict de MySQL :
+
+DB::table('users')->insertOrIgnore([
+    ['id' => 1, 'email' => 'sisko@example.com'],
+    ['id' => 2, 'email' => 'archer@example.com'],
+]);
+
+La insertUsingméthode insérera de nouveaux enregistrements dans la table tout en utilisant une sous-requête pour déterminer les données à insérer :
+
+DB::table('pruned_users')->insertUsing([
+    'id', 'name', 'email', 'email_verified_at'
+], DB::table('users')->select(
+    'id', 'name', 'email', 'email_verified_at'
+)->where('updated_at', '<=', now()->subMonth()));
+
+ID à incrémentation automatique
+Si la table a un identifiant auto-incrémenté, utilisez la insertGetIdméthode pour insérer un enregistrement, puis récupérez l'identifiant :
+
+$id = DB::table('users')->insertGetId(
+    ['email' => 'john@example.com', 'votes' => 0]
+);
+
+
+Lors de l'utilisation de PostgreSQL, la insertGetIdméthode s'attend à ce que la colonne auto-incrémentée soit nommée id. Si vous souhaitez récupérer l'ID d'une "séquence" différente, vous pouvez passer le nom de la colonne comme deuxième paramètre à la insertGetIdméthode.
+
+
+Upserts
+La upsertméthode insère des enregistrements qui n'existent pas et met à jour les enregistrements qui existent déjà avec de nouvelles valeurs que vous pouvez spécifier. Le premier argument de la méthode se compose des valeurs à insérer ou à mettre à jour, tandis que le deuxième argument répertorie la ou les colonnes qui identifient de manière unique les enregistrements dans la table associée. Le troisième et dernier argument de la méthode est un tableau de colonnes qui doit être mis à jour si un enregistrement correspondant existe déjà dans la base de données :
+
+DB::table('flights')->upsert(
+    [
+        ['departure' => 'Oakland', 'destination' => 'San Diego', 'price' => 99],
+        ['departure' => 'Chicago', 'destination' => 'New York', 'price' => 150]
+    ],
+    ['departure', 'destination'],
+    ['price']
+);
+
+Dans l'exemple ci-dessus, Laravel tentera d'insérer deux enregistrements. Si un enregistrement existe déjà avec les mêmes valeurs de colonne departureet , Laravel mettra à jour la colonne de cet enregistrement.destinationprice
+
+
+Toutes les bases de données, à l'exception de SQL Server, exigent que les colonnes du deuxième argument de la upsertméthode aient un index "primaire" ou "unique". De plus, le pilote de base de données MySQL ignore le deuxième argument de la upsertméthode et utilise toujours les index "primaire" et "unique" de la table pour détecter les enregistrements existants.
+
+
+Mettre à jour les déclarations
+Outre l'insertion d'enregistrements dans la base de données, le générateur de requêtes peut également mettre à jour les enregistrements existants à l'aide de la updateméthode. La updateméthode, comme la insertméthode, accepte un tableau de paires de colonnes et de valeurs indiquant les colonnes à mettre à jour. La updateméthode renvoie le nombre de lignes affectées. Vous pouvez contraindre la updaterequête à l'aide de whereclauses :
+
+$affected = DB::table('users')
+              ->where('id', 1)
+              ->update(['votes' => 1]);
+
+Mettre à jour ou insérer
+Parfois, vous souhaiterez peut-être mettre à jour un enregistrement existant dans la base de données ou le créer s'il n'existe aucun enregistrement correspondant. Dans ce scénario, la updateOrInsertméthode peut être utilisée. La updateOrInsertméthode accepte deux arguments : un tableau de conditions permettant de rechercher l'enregistrement et un tableau de paires de colonnes et de valeurs indiquant les colonnes à mettre à jour.
+
+La updateOrInsertméthode tentera de localiser un enregistrement de base de données correspondant à l'aide des paires colonne et valeur du premier argument. Si l'enregistrement existe, il sera mis à jour avec les valeurs du deuxième argument. Si l'enregistrement est introuvable, un nouvel enregistrement sera inséré avec les attributs fusionnés des deux arguments :
+
+DB::table('users')
+    ->updateOrInsert(
+        ['email' => 'john@example.com', 'name' => 'John'],
+        ['votes' => '2']
+    );
+
+Mise à jour des colonnes JSON
+Lors de la mise à jour d'une colonne JSON, vous devez utiliser ->la syntaxe pour mettre à jour la clé appropriée dans l'objet JSON. Cette opération est prise en charge sur MySQL 5.7+ et PostgreSQL 9.5+ :
+
+$affected = DB::table('users')
+              ->where('id', 1)
+              ->update(['options->enabled' => true]);
+
+Incrémenter et décrémenter
+Le générateur de requêtes fournit également des méthodes pratiques pour incrémenter ou décrémenter la valeur d'une colonne donnée. Ces deux méthodes acceptent au moins un argument : la colonne à modifier. Un deuxième argument peut être fourni pour spécifier le montant par lequel la colonne doit être incrémentée ou décrémentée :
+
+DB::table('users')->increment('votes');
+ 
+DB::table('users')->increment('votes', 5);
+ 
+DB::table('users')->decrement('votes');
+ 
+DB::table('users')->decrement('votes', 5);
+
+Vous pouvez également spécifier des colonnes supplémentaires à mettre à jour pendant l'opération :
+
+DB::table('users')->increment('votes', 1, ['name' => 'John']);
+
+Supprimer les relevés
+La deleteméthode du générateur de requêtes peut être utilisée pour supprimer des enregistrements de la table. La deleteméthode renvoie le nombre de lignes affectées. Vous pouvez contraindre les deleteinstructions en ajoutant des clauses "where" avant d'appeler la deleteméthode :
+
+$deleted = DB::table('users')->delete();
+ 
+$deleted = DB::table('users')->where('votes', '>', 100)->delete();
+
+Si vous souhaitez tronquer une table entière, ce qui supprimera tous les enregistrements de la table et réinitialisera l'ID d'auto-incrémentation à zéro, vous pouvez utiliser la truncateméthode :
+
+DB::table('users')->truncate();
+
+Troncation de table et PostgreSQL
+Lors de la troncation d'une base de données PostgreSQL, le CASCADEcomportement sera appliqué. Cela signifie que tous les enregistrements liés à la clé étrangère dans d'autres tables seront également supprimés.
+
+Verrouillage pessimiste
+Le générateur de requêtes inclut également quelques fonctions pour vous aider à obtenir un "verrouillage pessimiste" lors de l'exécution de vos selectinstructions. Pour exécuter une instruction avec un "verrou partagé", vous pouvez appeler la sharedLockméthode. Un verrou partagé empêche la modification des lignes sélectionnées tant que votre transaction n'est pas validée :
+
+DB::table('users')
+        ->where('votes', '>', 100)
+        ->sharedLock()
+        ->get();
+
+Alternativement, vous pouvez utiliser la lockForUpdateméthode. Un verrou "pour mise à jour" empêche les enregistrements sélectionnés d'être modifiés ou d'être sélectionnés avec un autre verrou partagé :
+
+DB::table('users')
+        ->where('votes', '>', 100)
+        ->lockForUpdate()
+        ->get();
+
+Débogage
+Vous pouvez utiliser les méthodes ddet dumplors de la création d'une requête pour vider les liaisons de requête actuelles et SQL. La ddméthode affichera les informations de débogage, puis arrêtera d'exécuter la requête. La dumpméthode affichera les informations de débogage mais permettra à la requête de continuer à s'exécuter :
+
+DB::table('users')->where('votes', '>', 100)->dd();
+ 
+DB::table('users')->where('votes', '>', 100)->dump();

@@ -1,0 +1,244 @@
+Vues
+Introduction
+Création et rendu des vues
+Répertoires de vue imbriqués
+Création de la première vue disponible
+Déterminer si une vue existe
+Transmission de données aux vues
+Partage de données avec toutes les vues
+Afficher les compositeurs
+Afficher les créateurs
+Optimisation des vues
+Introduction
+Bien sûr, il n'est pas pratique de renvoyer des chaînes de documents HTML entières directement à partir de vos routes et de vos contrôleurs. Heureusement, les vues offrent un moyen pratique de placer tout notre code HTML dans des fichiers séparés. Les vues séparent votre contrôleur / logique d'application de votre logique de présentation et sont stockées dans le resources/viewsrépertoire. Une vue simple pourrait ressembler à ceci :
+
+<!-- View stored in resources/views/greeting.blade.php -->
+ 
+<html>
+    <body>
+        <h1>Hello, {{ $name }}</h1>
+    </body>
+</html>
+
+Étant donné que cette vue est stockée dans resources/views/greeting.blade.php, nous pouvons la renvoyer en utilisant l' viewassistant global comme ceci :
+
+Route::get('/', function () {
+    return view('greeting', ['name' => 'James']);
+});
+
+
+Vous cherchez plus d'informations sur la façon d'écrire des modèles Blade ? Consultez la documentation complète de Blade pour commencer.
+
+
+Création et rendu des vues
+Vous pouvez créer une vue en plaçant un fichier avec l' .blade.phpextension dans le resources/viewsrépertoire de votre application. L' .blade.phpextension informe le framework que le fichier contient un modèle Blade . Les modèles de lame contiennent du HTML ainsi que des directives Blade qui vous permettent de faire facilement écho des valeurs, de créer des instructions "if", d'itérer sur les données, etc.
+
+Une fois que vous avez créé une vue, vous pouvez la renvoyer à partir de l'une des routes ou des contrôleurs de votre application à l'aide de l' viewassistant global :
+
+Route::get('/', function () {
+    return view('greeting', ['name' => 'James']);
+});
+
+Les vues peuvent également être renvoyées à l'aide de la Viewfaçade :
+
+use Illuminate\Support\Facades\View;
+ 
+return View::make('greeting', ['name' => 'James']);
+
+Comme vous pouvez le voir, le premier argument passé au viewhelper correspond au nom du fichier de vue dans le resources/viewsrépertoire. Le deuxième argument est un tableau de données qui doivent être mises à la disposition de la vue. Dans ce cas, nous transmettons la namevariable, qui est affichée dans la vue en utilisant la syntaxe Blade .
+
+Répertoires de vue imbriqués
+Les vues peuvent également être imbriquées dans des sous-répertoires du resources/viewsrépertoire. La notation "Point" peut être utilisée pour référencer des vues imbriquées. Par exemple, si votre vue est stockée dans resources/views/admin/profile.blade.php, vous pouvez la renvoyer depuis l'une des routes/contrôleurs de votre application comme suit :
+
+return view('admin.profile', $data);
+
+
+Les noms de répertoire d'affichage ne doivent pas contenir le .caractère.
+
+
+Création de la première vue disponible
+En utilisant la méthode Viewde la façade first, vous pouvez créer la première vue qui existe dans un tableau de vues donné. Cela peut être utile si votre application ou votre package permet de personnaliser ou d'écraser les vues :
+
+use Illuminate\Support\Facades\View;
+ 
+return View::first(['custom.admin', 'admin'], $data);
+
+Déterminer si une vue existe
+Si vous avez besoin de déterminer si une vue existe, vous pouvez utiliser la Viewfaçade. La existsméthode retournera truesi la vue existe :
+
+use Illuminate\Support\Facades\View;
+ 
+if (View::exists('emails.customer')) {
+    //
+}
+
+Transmission de données aux vues
+Comme vous l'avez vu dans les exemples précédents, vous pouvez passer un tableau de données aux vues pour rendre ces données disponibles à la vue :
+
+return view('greetings', ['name' => 'Victoria']);
+
+Lors de la transmission d'informations de cette manière, les données doivent être un tableau avec des paires clé/valeur. Après avoir fourni des données à une vue, vous pouvez ensuite accéder à chaque valeur de votre vue à l'aide des clés de données, telles que <?php echo $name; ?>.
+
+Au lieu de transmettre un tableau complet de données à la viewfonction d'assistance, vous pouvez utiliser la withméthode pour ajouter des éléments de données individuels à la vue. La withméthode renvoie une instance de l'objet view afin que vous puissiez continuer à enchaîner les méthodes avant de renvoyer la vue :
+
+return view('greeting')
+            ->with('name', 'Victoria')
+            ->with('occupation', 'Astronaut');
+
+Partage de données avec toutes les vues
+Parfois, vous devrez peut-être partager des données avec toutes les vues rendues par votre application. Vous pouvez le faire en utilisant la méthode Viewde la façade share. En règle générale, vous devez placer des appels à la shareméthode dans la méthode d'un fournisseur de services boot. Vous êtes libre de les ajouter à la App\Providers\AppServiceProviderclasse ou de générer un fournisseur de services distinct pour les héberger :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\View;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        View::share('key', 'value');
+    }
+}
+
+Afficher les compositeurs
+Les composeurs de vue sont des rappels ou des méthodes de classe qui sont appelées lors du rendu d'une vue. Si vous avez des données que vous souhaitez lier à une vue chaque fois que cette vue est rendue, un composeur de vue peut vous aider à organiser cette logique en un seul emplacement. Les compositeurs de vues peuvent s'avérer particulièrement utiles si la même vue est renvoyée par plusieurs routes ou contrôleurs au sein de votre application et a toujours besoin d'un élément de données particulier.
+
+En règle générale, les compositeurs de vues seront enregistrés auprès de l'un des fournisseurs de services de votre application . Dans cet exemple, nous supposerons que nous avons créé un new App\Providers\ViewServiceProviderpour héberger cette logique.
+
+Nous utiliserons la méthode de la Viewfaçade composerpour enregistrer le composeur de vue. Laravel n'inclut pas de répertoire par défaut pour les compositeurs de vues basés sur les classes, vous êtes donc libre de les organiser comme vous le souhaitez. Par exemple, vous pouvez créer un app/View/Composersrépertoire pour héberger tous les compositeurs de vues de votre application :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\View\Composers\ProfileComposer;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
+ 
+class ViewServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        // Using class based composers...
+        View::composer('profile', ProfileComposer::class);
+ 
+        // Using closure based composers...
+        View::composer('dashboard', function ($view) {
+            //
+        });
+    }
+}
+
+
+N'oubliez pas que si vous créez un nouveau fournisseur de services pour contenir vos enregistrements de composeur de vues, vous devrez ajouter le fournisseur de services au providerstableau dans le config/app.phpfichier de configuration.
+
+
+Maintenant que nous avons enregistré le composeur, la composeméthode de la App\View\Composers\ProfileComposerclasse sera exécutée à chaque profilerendu de la vue. Examinons un exemple de la classe composer :
+
+<?php
+ 
+namespace App\View\Composers;
+ 
+use App\Repositories\UserRepository;
+use Illuminate\View\View;
+ 
+class ProfileComposer
+{
+    /**
+     * The user repository implementation.
+     *
+     * @var \App\Repositories\UserRepository
+     */
+    protected $users;
+ 
+    /**
+     * Create a new profile composer.
+     *
+     * @param  \App\Repositories\UserRepository  $users
+     * @return void
+     */
+    public function __construct(UserRepository $users)
+    {
+        $this->users = $users;
+    }
+ 
+    /**
+     * Bind data to the view.
+     *
+     * @param  \Illuminate\View\View  $view
+     * @return void
+     */
+    public function compose(View $view)
+    {
+        $view->with('count', $this->users->count());
+    }
+}
+
+Comme vous pouvez le voir, tous les composeurs de vue sont résolus via le conteneur de service , vous pouvez donc indiquer toutes les dépendances dont vous avez besoin dans le constructeur d'un composeur.
+
+Attacher un compositeur à plusieurs vues
+Vous pouvez attacher un composeur de vues à plusieurs vues à la fois en passant un tableau de vues comme premier argument à la composerméthode :
+
+use App\Views\Composers\MultiComposer;
+ 
+View::composer(
+    ['profile', 'dashboard'],
+    MultiComposer::class
+);
+
+La composerméthode accepte également le *caractère comme caractère générique, vous permettant d'attacher un composeur à toutes les vues :
+
+View::composer('*', function ($view) {
+    //
+});
+
+Afficher les créateurs
+Les « créateurs » de vue sont très similaires aux compositeurs de vue ; cependant, ils sont exécutés immédiatement après l'instanciation de la vue au lieu d'attendre que la vue soit sur le point de s'afficher. Pour enregistrer un créateur de vue, utilisez la creatorméthode :
+
+use App\View\Creators\ProfileCreator;
+use Illuminate\Support\Facades\View;
+ 
+View::creator('profile', ProfileCreator::class);
+
+Optimisation des vues
+Par défaut, les vues du modèle Blade sont compilées à la demande. Lorsqu'une requête est exécutée qui rend une vue, Laravel déterminera si une version compilée de la vue existe. Si le fichier existe, Laravel déterminera alors si la vue non compilée a été modifiée plus récemment que la vue compilée. Si la vue compilée n'existe pas ou si la vue non compilée a été modifiée, Laravel recompilera la vue.
+
+La compilation des vues pendant la requête peut avoir un léger impact négatif sur les performances, c'est pourquoi Laravel fournit la view:cachecommande Artisan pour précompiler toutes les vues utilisées par votre application. Pour des performances accrues, vous pouvez exécuter cette commande dans le cadre de votre processus de déploiement :
+
+php artisan view:cache
+
+Vous pouvez utiliser la view:clearcommande pour vider le cache de la vue :
+
+php artisan view:clear

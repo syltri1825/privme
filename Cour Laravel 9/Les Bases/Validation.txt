@@ -1,0 +1,2340 @@
+
+Introduction
+Démarrage rapide de la validation
+Définir les itinéraires
+Création du contrôleur
+Écrire la logique de validation
+Affichage des erreurs de validation
+Remplir les formulaires
+Remarque sur les champs optionnels
+Format de réponse d'erreur de validation
+Validation de la demande de formulaire
+Créer des demandes de formulaire
+Autorisation des demandes de formulaire
+Personnalisation des messages d'erreur
+Préparation de l'entrée pour la validation
+Création manuelle de validateurs
+Redirection automatique
+Sacs d'erreur nommés
+Personnalisation des messages d'erreur
+Crochet après validation
+Travailler avec une entrée validée
+Travailler avec les messages d'erreur
+Spécification de messages personnalisés dans les fichiers de langue
+Spécification d'attributs dans les fichiers de langue
+Spécification de valeurs dans les fichiers de langue
+Règles de validation disponibles
+Ajout conditionnel de règles
+Validation des tableaux
+Validation de l'entrée de tableau imbriqué
+Index et positions des messages d'erreur
+Validation des fichiers
+Validation des mots de passe
+Règles de validation personnalisées
+Utilisation d'objets de règle
+Utiliser des fermetures
+Règles implicites
+Introduction
+Laravel propose plusieurs approches différentes pour valider les 
+
+données entrantes de votre application. 
+
+Il est plus courant d'utiliser la validate méthode disponible sur toutes les 
+
+requêtes HTTP entrantes. 
+
+Cependant, nous discuterons également d'autres approches de validation.
+
+Laravel inclut une grande variété de règles de validation pratiques que vous 
+
+pouvez appliquer aux données, 
+
+offrant même la possibilité de valider si les valeurs sont uniques 
+
+dans une table de base de données donnée. Nous couvrirons chacune de ces 
+
+règles de validation en détail afin que vous soyez familiarisé avec toutes 
+
+les fonctionnalités de validation de Laravel.
+
+Démarrage rapide de la validation
+Pour en savoir plus sur les puissantes fonctionnalités de validation de Laravel, 
+
+examinons un exemple complet de validation d'un formulaire et d'affichage des 
+
+messages d'erreur à l'utilisateur. En lisant cet aperçu de haut niveau, 
+
+vous serez en mesure d'acquérir une bonne compréhension générale de la façon 
+
+de valider les données de requête entrantes à l'aide de Laravel :
+
+Définir les itinéraires
+Supposons d'abord que nous ayons défini les routes suivantes 
+
+dans notre routes/web.phpfichier :
+
+use App\Http\Controllers\PostController;
+ 
+Route::get('/post/create', [PostController::class, 'create']);
+Route::post('/post', [PostController::class, 'store']);
+
+La GETroute affichera un formulaire permettant à l'utilisateur 
+
+de créer un nouveau billet de blog, tandis que la POSTroute 
+
+stockera le nouveau billet de blog dans la base de données.
+
+Création du contrôleur
+Examinons ensuite un contrôleur simple qui gère les requêtes 
+
+entrantes sur ces routes. Nous allons laisser la storeméthode 
+
+vide pour l'instant :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+ 
+class PostController extends Controller
+{
+    /**
+     * Show the form to create a new blog post.
+     *
+     * @return \Illuminate\View\View
+     */
+    public function create()
+    {
+        return view('post.create');
+    }
+ 
+    /**
+     * Store a new blog post.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        // Validate and store the blog post...
+    }
+}
+
+Écrire la logique de validation
+Nous sommes maintenant prêts à remplir notre storeméthode avec la 
+
+logique pour 
+
+valider le nouveau billet de blog. Pour ce faire, 
+
+nous allons utiliser la 
+
+validateméthode fournie par l' Illuminate\Http\Requestobjet. Si les règles 
+
+de validation sont acceptées, votre code continuera à 
+
+s'exécuter normalement ; 
+
+cependant, si la validation échoue, une 
+
+Illuminate\Validation\ValidationExceptionexception
+
+ sera levée et la réponse d'erreur appropriée sera 
+ 
+ automatiquement renvoyée à 
+ 
+ l'utilisateur.
+
+Si la validation échoue lors d'une requête HTTP 
+
+traditionnelle, une réponse de redirection vers 
+
+l'URL précédente sera générée. Si la requête 
+
+entrante est une requête XHR, une réponse JSON 
+
+contenant les messages d'erreur de validation sera renvoyée.
+
+Pour mieux comprendre la validateméthode, revenons dans la storeméthode :
+
+/**
+ * Store a new blog post.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return \Illuminate\Http\Response
+ */
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'title' => 'required|unique:posts|max:255',
+        'body' => 'required',
+    ]);
+ 
+    // The blog post is valid...
+}
+
+Comme vous pouvez le voir, les règles de validation 
+
+sont passées dans la validateméthode. Ne vous inquiétez 
+
+pas, toutes les règles de validation disponibles sont 
+
+documentées . Encore une fois, si la 
+
+validation échoue, la réponse appropriée sera 
+
+automatiquement générée. 
+
+Si la validation passe, notre contrôleur continuera 
+
+à s'exécuter normalement.
+
+Alternativement, les règles de validation peuvent être spécifiées sous 
+
+forme de tableaux de règles au lieu d'une seule |chaîne délimitée :
+
+$validatedData = $request->validate([
+    'title' => ['required', 'unique:posts', 'max:255'],
+    'body' => ['required'],
+]);
+
+De plus, vous pouvez utiliser la validateWithBagméthode pour valider 
+
+une requête et stocker tous les messages d'erreur dans un sac 
+
+d'erreurs nommé :
+
+$validatedData = $request->validateWithBag('post', [
+    'title' => ['required', 'unique:posts', 'max:255'],
+    'body' => ['required'],
+]);
+
+Arrêt au premier échec de validation
+Parfois, vous souhaiterez peut-être arrêter l'exécution 
+
+des règles de validation sur un attribut après le premier 
+
+échec de validation. Pour ce faire, affectez la bailrègle à l'attribut :
+
+$request->validate([
+    'title' => 'bail|required|unique:posts|max:255',
+    'body' => 'required',
+]);
+
+Dans cet exemple, si la uniquerègle sur l' titleattribut échoue, 
+
+la maxrègle ne sera pas vérifiée. Les règles seront validées dans 
+
+l'ordre dans lequel elles sont attribuées.
+
+Une note sur les attributs imbriqués
+Si la requête HTTP entrante contient des données de champ "imbriquées", 
+
+vous pouvez spécifier ces champs dans vos règles de validation à l'aide 
+
+de la syntaxe "point" :
+
+$request->validate([
+    'title' => 'required|unique:posts|max:255',
+    'author.name' => 'required',
+    'author.description' => 'required',
+]);
+
+D'autre part, si votre nom de champ contient un point littéral, 
+
+vous pouvez empêcher explicitement que cela soit interprété 
+
+comme une syntaxe "point" en échappant le point avec une barre oblique inverse :
+
+$request->validate([
+    'title' => 'required|unique:posts|max:255',
+    'v1\.0' => 'required',
+]);
+
+Affichage des erreurs de validation
+Alors, que se passe-t-il si les champs de requête 
+
+entrants ne respectent pas les règles de validation données ? 
+
+Comme mentionné précédemment, Laravel redirigera automatiquement 
+
+l'utilisateur vers son emplacement précédent. De plus, toutes 
+
+les erreurs de validation et les saisies de requêtes seront 
+
+automatiquement flashées sur la session .
+
+Une $errorsvariable est partagée avec toutes les vues de votre 
+
+application par le Illuminate\View\Middleware\ShareErrorsFromSessionmiddleware, 
+
+qui est fourni par le webgroupe middleware. Lorsque ce middleware est 
+
+appliqué, une $errorsvariable sera toujours disponible dans vos vues, 
+
+ce qui vous permet de supposer facilement que la $errorsvariable est 
+
+toujours définie et peut être utilisée en toute sécurité. La $errorsvariable 
+
+sera une instance de Illuminate\Support\MessageBag. Pour plus 
+
+d'informations sur l'utilisation de cet objet, consultez sa documentation .
+
+Ainsi, dans notre exemple, l'utilisateur sera redirigé vers la 
+
+createméthode de notre contrôleur lorsque la validation échoue, nous 
+
+permettant d'afficher les messages d'erreur dans la vue :
+
+<!-- /resources/views/post/create.blade.php -->
+ 
+<h1>Create Post</h1>
+ 
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+ 
+<!-- Create Post Form -->
+
+Personnalisation des messages d'erreur
+Les règles de validation intégrées de Laravel ont chacune un 
+
+message d'erreur qui se trouve dans le lang/en/validation.phpfichier de 
+
+votre application. Dans ce fichier, vous trouverez une entrée de 
+
+traduction pour chaque règle de validation. Vous êtes libre de changer 
+
+ou de modifier ces messages en fonction des besoins de votre application.
+
+De plus, vous pouvez copier ce fichier dans un autre répertoire de 
+
+langue de traduction pour traduire les messages dans la langue de votre 
+
+application. Pour en savoir plus sur la localisation de Laravel, 
+
+consultez la documentation complète sur la localisation .
+
+Demandes et validation XHR
+Dans cet exemple, nous avons utilisé un formulaire traditionnel 
+
+pour envoyer des données à l'application. Cependant, de 
+
+nombreuses applications reçoivent des requêtes XHR d'une interface 
+
+alimentée par JavaScript. Lors de l'utilisation de la validateméthode 
+
+lors d'une requête XHR, Laravel ne générera pas de réponse de 
+
+redirection. Au lieu de cela, Laravel génère une réponse JSON contenant 
+
+toutes les erreurs de validation . Cette réponse JSON sera envoyée 
+
+avec un code d'état HTTP 422.
+
+La @errorDirective
+Vous pouvez utiliser la directive @error Blade pour déterminer 
+
+rapidement si des messages d'erreur de validation existent pour 
+
+un attribut donné. Dans une @errordirective, vous pouvez faire écho 
+
+à la $messagevariable pour afficher le message d'erreur :
+
+<!-- /resources/views/post/create.blade.php -->
+ 
+<label for="title">Post Title</label>
+ 
+<input id="title"
+    type="text"
+    name="title"
+    class="@error('title') is-invalid @enderror">
+ 
+@error('title')
+    <div class="alert alert-danger">{{ $message }}</div>
+@enderror
+
+Si vous utilisez des sacs d'erreurs nommés , vous pouvez passer le nom du sac d'erreurs comme deuxième argument de la @errordirective :
+
+<input ... class="@error('title', 'post') is-invalid @enderror">
+
+Remplir les formulaires
+Lorsque Laravel génère une réponse de redirection en raison d'une 
+
+erreur de validation, le framework flashera automatiquement toutes 
+
+les entrées de la requête dans la session . Ceci est fait pour 
+
+que vous puissiez facilement accéder à l'entrée lors de la prochaine 
+
+demande et remplir à nouveau le formulaire que l'utilisateur a 
+
+tenté de soumettre.
+
+Pour récupérer l'entrée flashée de la requête précédente, appelez 
+
+la oldméthode sur une instance de Illuminate\Http\Request. La oldméthode 
+
+extraira les données d'entrée précédemment flashées de la session :
+
+$title = $request->old('title');
+
+Laravel fournit également une oldaide globale. Si vous affichez 
+
+d'anciennes entrées dans un modèle Blade , il est plus pratique 
+
+d'utiliser l' oldassistant pour remplir à nouveau le formulaire. 
+
+Si aucune ancienne entrée n'existe pour le champ donné, nullsera 
+
+renvoyé :
+
+<input type="text" name="title" value="{{ old('title') }}">
+
+Remarque sur les champs optionnels
+Par défaut, Laravel inclut le middleware TrimStringset 
+
+ConvertEmptyStringsToNulldans la pile middleware globale de 
+
+votre application. Ces intergiciels sont répertoriés dans la 
+
+pile par la App\Http\Kernelclasse. Pour cette raison, vous devrez 
+
+souvent marquer vos champs de requête "facultatifs" comme nullablesi 
+
+vous ne vouliez pas que le validateur considère nullles valeurs 
+
+comme invalides. Par exemple:
+
+$request->validate([
+    'title' => 'required|unique:posts|max:255',
+    'body' => 'required',
+    'publish_at' => 'nullable|date',
+]);
+
+Dans cet exemple, nous spécifions que le publish_atchamp 
+
+peut être soit nullsoit une représentation de date valide. Si le 
+
+nullablemodificateur n'est pas ajouté à la définition de la règle, 
+
+le validateur considérera nullune date invalide.
+
+Format de réponse d'erreur de validation
+Lorsque votre application lève une 
+
+Illuminate\Validation\ValidationExceptionexception 
+
+et que la requête HTTP entrante attend une réponse JSON, 
+
+Laravel formatera automatiquement les messages d'erreur pour 
+
+vous et renverra une 422 Unprocessable Entityréponse HTTP.
+
+Ci-dessous, vous pouvez consulter un exemple du format de 
+
+réponse JSON pour les erreurs de validation. Notez que 
+
+les clés d'erreur imbriquées sont aplaties au format de 
+
+notation "point" :
+
+{
+    "message": "The team name must be a string. (and 4 more errors)",
+    "errors": {
+        "team_name": [
+            "The team name must be a string.",
+            "The team name must be at least 1 characters."
+        ],
+        "authorization.role": [
+            "The selected authorization.role is invalid."
+        ],
+        "users.0.email": [
+            "The users.0.email field is required."
+        ],
+        "users.2.email": [
+            "The users.2.email must be a valid email address."
+        ]
+    }
+}
+
+Validation de la demande de formulaire
+Créer des demandes de formulaire
+Pour des scénarios de validation plus complexes, 
+
+vous pouvez créer une "demande de formulaire". Les demandes de 
+
+formulaire sont des classes de demandes personnalisées qui 
+
+encapsulent leur propre logique de validation et d'autorisation. 
+
+Pour créer une classe de requête de formulaire, vous pouvez utiliser la 
+
+make:requestcommande CLI Artisan :
+
+php artisan make:request StorePostRequest
+
+La classe de demande de formulaire générée sera placée 
+
+dans le app/Http/Requestsrépertoire. Si ce répertoire n'existe pas, 
+
+il sera créé lorsque vous exécuterez la make:requestcommande. Chaque requête 
+
+de formulaire générée par Laravel a deux méthodes : authorizeet rules.
+
+Comme vous l'avez peut-être deviné, la authorizeméthode est 
+
+chargée de déterminer si l'utilisateur actuellement authentifié peut 
+
+effectuer l'action représentée par la requête, tandis que la rulesméthode 
+
+renvoie les règles de validation qui doivent s'appliquer aux données 
+
+de la requête :
+
+/**
+ * Get the validation rules that apply to the request.
+ *
+ * @return array
+ */
+public function rules()
+{
+    return [
+        'title' => 'required|unique:posts|max:255',
+        'body' => 'required',
+    ];
+}
+
+
+Vous pouvez indiquer toutes les dépendances dont vous avez 
+
+besoin dans la rulessignature de la méthode. Ils seront automatiquement 
+
+résolus via le conteneur de service Laravel .
+
+
+Alors, comment les règles de validation sont-elles évaluées ? 
+
+Tout ce que vous avez à faire est de taper la requête sur votre 
+
+méthode de contrôleur. La demande de formulaire entrante est validée 
+
+avant l'appel de la méthode du contrôleur, ce qui signifie que 
+
+vous n'avez pas besoin d'encombrer votre contrôleur avec une 
+
+logique de validation :
+
+/**
+ * Store a new blog post.
+ *
+ * @param  \App\Http\Requests\StorePostRequest  $request
+ * @return Illuminate\Http\Response
+ */
+public function store(StorePostRequest $request)
+{
+    // The incoming request is valid...
+ 
+    // Retrieve the validated input data...
+    $validated = $request->validated();
+ 
+    // Retrieve a portion of the validated input data...
+    $validated = $request->safe()->only(['name', 'email']);
+    $validated = $request->safe()->except(['name', 'email']);
+}
+
+Si la validation échoue, une réponse de redirection sera 
+
+générée pour renvoyer l'utilisateur à son emplacement précédent. 
+
+Les erreurs seront également flashées sur la session afin qu'elles 
+
+soient disponibles pour l'affichage. Si la requête était une requête 
+
+XHR, une réponse HTTP avec un code d'état 422 sera renvoyée à 
+
+l'utilisateur, y compris une représentation JSON des erreurs de 
+
+validation .
+
+Ajout de crochets après aux demandes de formulaire
+Si vous souhaitez ajouter un crochet de validation "après" à une 
+
+demande de formulaire, vous pouvez utiliser la withValidatorméthode. 
+
+Cette méthode reçoit le validateur entièrement construit, vous 
+
+permettant d'appeler n'importe laquelle de ses méthodes avant que 
+
+les règles de validation ne soient réellement évaluées :
+
+/**
+ * Configure the validator instance.
+ *
+ * @param  \Illuminate\Validation\Validator  $validator
+ * @return void
+ */
+public function withValidator($validator)
+{
+    $validator->after(function ($validator) {
+        if ($this->somethingElseIsInvalid()) {
+            $validator->errors()->add('field', 'Something is wrong with this field!');
+        }
+    });
+}
+
+Arrêt au premier attribut d'échec de validation
+En ajoutant une stopOnFirstFailurepropriété à votre classe de requête, 
+
+vous pouvez informer le validateur qu'il doit arrêter de valider 
+
+tous les attributs une fois qu'un seul échec de validation 
+
+s'est produit :
+
+/**
+ * Indicates if the validator should stop on the first rule failure.
+ *
+ * @var bool
+ */
+protected $stopOnFirstFailure = true;
+
+Personnalisation de l'emplacement de redirection
+Comme indiqué précédemment, une réponse de redirection 
+
+sera générée pour renvoyer l'utilisateur à son emplacement 
+
+précédent lorsque la validation de la demande de formulaire échoue. 
+
+Cependant, vous êtes libre de personnaliser ce comportement. Pour cela, 
+
+définissez une $redirectpropriété sur votre demande de formulaire :
+
+/**
+ * The URI that users should be redirected to if validation fails.
+ *
+ * @var string
+ */
+protected $redirect = '/dashboard';
+
+Ou, si vous souhaitez rediriger les utilisateurs vers une route nommée,
+
+vous pouvez définir une $redirectRoutepropriété à la place :
+
+/**
+ * The route that users should be redirected to if validation fails.
+ *
+ * @var string
+ */
+protected $redirectRoute = 'dashboard';
+
+Autorisation des demandes de formulaire
+La classe de demande de formulaire contient également une authorizeméthode. 
+
+Dans cette méthode, vous pouvez déterminer si l'utilisateur authentifié 
+
+est réellement autorisé à mettre à jour une ressource donnée. Par exemple, 
+
+vous pouvez déterminer si un utilisateur possède réellement un commentaire 
+
+de blog qu'il tente de mettre à jour. Très probablement, vous interagirez 
+
+avec vos portes d'autorisation et vos politiques dans le cadre de cette méthode :
+
+use App\Models\Comment;
+ 
+/**
+ * Determine if the user is authorized to make this request.
+ *
+ * @return bool
+ */
+public function authorize()
+{
+    $comment = Comment::find($this->route('comment'));
+ 
+    return $comment && $this->user()->can('update', $comment);
+}
+
+Étant donné que toutes les demandes de formulaire étendent la 
+
+classe de demande Laravel de base, nous pouvons utiliser la userméthode 
+
+pour accéder à l'utilisateur actuellement authentifié. Notez également 
+
+l'appel à la routeméthode dans l'exemple ci-dessus. Cette méthode 
+
+vous accorde l'accès aux paramètres URI définis sur la route appelée, 
+
+comme le {comment}paramètre dans l'exemple ci-dessous :
+
+Route::post('/comment/{comment}');
+
+Par conséquent, si votre application tire parti de la liaison du 
+
+modèle de route , votre code peut être rendu encore plus succinct en 
+
+accédant au modèle résolu en tant que propriété de la requête :
+
+return $this->user()->can('update', $this->comment);
+
+Si la authorizeméthode renvoie false, une réponse HTTP avec un 
+
+code d'état 403 sera automatiquement renvoyée et votre méthode de 
+
+contrôleur ne s'exécutera pas.
+
+Si vous envisagez de gérer la logique d'autorisation pour la requête 
+
+dans une autre partie de votre application, vous pouvez simplement 
+
+revenir truede la authorizeméthode :
+
+/**
+ * Determine if the user is authorized to make this request.
+ *
+ * @return bool
+ */
+public function authorize()
+{
+    return true;
+}
+
+
+Vous pouvez taper toutes les dépendances dont vous avez besoin dans 
+
+la authorizesignature de la méthode. Ils seront automatiquement résolus 
+
+via le conteneur de service Laravel .
+
+
+Personnalisation des messages d'erreur
+Vous pouvez personnaliser les messages d'erreur utilisés par la 
+
+demande de formulaire en remplaçant la messagesméthode. Cette méthode 
+
+doit renvoyer un tableau de paires attribut/règle et leurs messages 
+
+d'erreur correspondants :
+
+/**
+ * Get the error messages for the defined validation rules.
+ *
+ * @return array
+ */
+public function messages()
+{
+    return [
+        'title.required' => 'A title is required',
+        'body.required' => 'A message is required',
+    ];
+}
+
+Personnalisation des attributs de validation
+De nombreux messages d'erreur de règle de validation intégrée de 
+
+Laravel contiennent un :attributeespace réservé. Si vous souhaitez que 
+
+l' :attributeespace réservé de votre message de validation soit remplacé 
+
+par un nom d'attribut personnalisé, vous pouvez spécifier les noms 
+
+personnalisés en remplaçant la attributesméthode. Cette méthode doit 
+
+renvoyer un tableau de paires attribut/nom :
+
+/**
+ * Get custom attributes for validator errors.
+ *
+ * @return array
+ */
+public function attributes()
+{
+    return [
+        'email' => 'email address',
+    ];
+}
+
+Préparation de l'entrée pour la validation
+Si vous devez préparer ou assainir des données de la requête avant 
+
+d'appliquer vos règles de validation, vous pouvez utiliser 
+
+la prepareForValidationméthode :
+
+use Illuminate\Support\Str;
+ 
+/**
+ * Prepare the data for validation.
+ *
+ * @return void
+ */
+protected function prepareForValidation()
+{
+    $this->merge([
+        'slug' => Str::slug($this->slug),
+    ]);
+}
+
+Création manuelle de validateurs
+Si vous ne souhaitez pas utiliser la validateméthode sur la requête, 
+
+vous pouvez créer manuellement une instance de validateur à l'aide 
+
+de la Validator façade . La makeméthode sur la façade génère une 
+
+nouvelle instance de validateur :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+ 
+class PostController extends Controller
+{
+    /**
+     * Store a new blog post.
+     *
+     * @param  Request  $request
+     * @return Response
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|unique:posts|max:255',
+            'body' => 'required',
+        ]);
+ 
+        if ($validator->fails()) {
+            return redirect('post/create')
+                        ->withErrors($validator)
+                        ->withInput();
+        }
+ 
+        // Retrieve the validated input...
+        $validated = $validator->validated();
+ 
+        // Retrieve a portion of the validated input...
+        $validated = $validator->safe()->only(['name', 'email']);
+        $validated = $validator->safe()->except(['name', 'email']);
+ 
+        // Store the blog post...
+    }
+}
+
+Le premier argument passé à la makeméthode est la donnée en 
+
+cours de validation. Le deuxième argument est un tableau des 
+
+règles de validation qui doivent être appliquées aux données.
+
+Après avoir déterminé si la validation de la demande a échoué, 
+
+vous pouvez utiliser la withErrorsméthode pour envoyer les 
+
+messages d'erreur à la session. Lorsque vous utilisez cette 
+
+méthode, la $errorsvariable sera automatiquement partagée 
+
+avec vos vues après la redirection, ce qui vous permettra 
+
+de les afficher facilement à l'utilisateur. La withErrorsméthode 
+
+accepte un validateur, un MessageBag, ou un PHP array.
+
+Arrêt au premier échec de validation
+La stopOnFirstFailureméthode informera le validateur qu'il doit arrêter de valider tous les attributs une fois qu'un seul échec de validation s'est produit :
+
+if ($validator->stopOnFirstFailure()->fails()) {
+    // ...
+}
+
+Redirection automatique
+Si vous souhaitez créer une instance de validateur 
+
+manuellement tout en profitant de la redirection 
+
+automatique offerte par la validateméthode de la 
+
+requête HTTP, vous pouvez appeler la validateméthode 
+
+sur une instance de validateur existante. Si la validation 
+
+échoue, l'utilisateur sera automatiquement redirigé ou, 
+
+dans le cas d'une requête XHR, une réponse JSON sera retournée :
+
+Validator::make($request->all(), [
+    'title' => 'required|unique:posts|max:255',
+    'body' => 'required',
+])->validate();
+
+Vous pouvez utiliser la validateWithBagméthode pour 
+
+stocker les messages d'erreur dans un conteneur d'erreurs 
+
+nommé si la validation échoue :
+
+Validator::make($request->all(), [
+    'title' => 'required|unique:posts|max:255',
+    'body' => 'required',
+])->validateWithBag('post');
+
+Sacs d'erreur nommés
+Si vous avez plusieurs formulaires sur une même page, 
+
+vous pouvez nommer le MessageBagcontenant les erreurs 
+
+de validation, ce qui vous permet de récupérer les messages 
+
+d'erreur pour un formulaire spécifique. Pour cela, passez 
+
+un nom en second argument à withErrors:
+
+return redirect('register')->withErrors($validator, 'login');
+
+MessageBagVous pouvez alors accéder à l' instance nommée à 
+
+partir de la $errorsvariable :
+
+{{ $errors->login->first('email') }}
+
+Personnalisation des messages d'erreur
+Si nécessaire, vous pouvez fournir des messages d'erreur 
+
+personnalisés qu'une instance de validateur doit utiliser 
+
+à la place des messages d'erreur par défaut fournis par Laravel. 
+
+Il existe plusieurs façons de spécifier des messages personnalisés. 
+
+Tout d'abord, vous pouvez passer les messages personnalisés comme 
+
+troisième argument à la Validator::makeméthode :
+
+$validator = Validator::make($input, $rules, $messages = [
+    'required' => 'The :attribute field is required.',
+]);
+
+Dans cet exemple, l' :attributeespace réservé sera remplacé par le nom réel du champ en cours de validation. Vous pouvez également utiliser d'autres espaces réservés dans les messages de validation. Par exemple:
+
+$messages = [
+    'same' => 'The :attribute and :other must match.',
+    'size' => 'The :attribute must be exactly :size.',
+    'between' => 'The :attribute value :input is not between :min - :max.',
+    'in' => 'The :attribute must be one of the following types: :values',
+];
+
+Spécification d'un message personnalisé pour un attribut donné
+Parfois, vous souhaiterez peut-être spécifier un message d'erreur personnalisé uniquement pour un attribut spécifique. Vous pouvez le faire en utilisant la notation "point". Spécifiez d'abord le nom de l'attribut, suivi de la règle :
+
+$messages = [
+    'email.required' => 'We need to know your email address!',
+];
+
+Spécification des valeurs d'attribut personnalisé
+De nombreux messages d'erreur intégrés à Laravel incluent un :attributeespace réservé qui est remplacé par le nom du champ ou de l'attribut en cours de validation. Pour personnaliser les valeurs utilisées pour remplacer ces espaces réservés pour des champs spécifiques, vous pouvez passer un tableau d'attributs personnalisés comme quatrième argument à la Validator::makeméthode :
+
+$validator = Validator::make($input, $rules, $messages, [
+    'email' => 'email address',
+]);
+
+Crochet après validation
+Vous pouvez également joindre des rappels à exécuter une fois la validation terminée. Cela vous permet d'effectuer facilement une validation supplémentaire et même d'ajouter plus de messages d'erreur à la collection de messages. Pour commencer, appelez la afterméthode sur une instance de validateur :
+
+$validator = Validator::make(/* ... */);
+ 
+$validator->after(function ($validator) {
+    if ($this->somethingElseIsInvalid()) {
+        $validator->errors()->add(
+            'field', 'Something is wrong with this field!'
+        );
+    }
+});
+ 
+if ($validator->fails()) {
+    //
+}
+
+Travailler avec une entrée validée
+Après avoir validé les données de la demande entrante à 
+
+l'aide d'une demande de formulaire ou d'une instance de validateur 
+
+créée manuellement, vous souhaiterez peut-être récupérer les 
+
+données de la demande entrante qui ont effectivement subi une validation. 
+
+Cela peut être accompli de plusieurs manières. Tout d'abord, vous 
+
+pouvez appeler la validatedméthode sur une demande de formulaire 
+
+ou une instance de validateur. Cette méthode renvoie un tableau des 
+
+données qui ont été validées :
+
+$validated = $request->validated();
+ 
+$validated = $validator->validated();
+
+Alternativement, vous pouvez appeler la safeméthode sur une 
+
+demande de formulaire ou une instance de validateur. Cette 
+
+méthode renvoie une instance de Illuminate\Support\ValidatedInput. 
+
+Cet objet expose les méthodes only, exceptet allpour récupérer un 
+
+sous-ensemble des données validées ou le tableau complet des données validées :
+
+$validated = $request->safe()->only(['name', 'email']);
+ 
+$validated = $request->safe()->except(['name', 'email']);
+ 
+$validated = $request->safe()->all();
+
+De plus, l' Illuminate\Support\ValidatedInputinstance peut être 
+
+itérée et accessible comme un tableau :
+
+// Validated data may be iterated...
+foreach ($request->safe() as $key => $value) {
+    //
+}
+ 
+// Validated data may be accessed as an array...
+$validated = $request->safe();
+ 
+$email = $validated['email'];
+
+Si vous souhaitez ajouter des champs supplémentaires aux données validées, 
+
+vous pouvez appeler la mergeméthode :
+
+$validated = $request->safe()->merge(['name' => 'Taylor Otwell']);
+
+Si vous souhaitez récupérer les données validées en tant qu'instance 
+
+de collection , vous pouvez appeler la collectméthode :
+
+$collection = $request->safe()->collect();
+
+Travailler avec les messages d'erreur
+Après avoir appelé la errorsméthode sur une Validatorinstance, 
+
+vous recevrez une Illuminate\Support\MessageBaginstance, qui dispose 
+
+d'une variété de méthodes pratiques pour travailler avec les 
+
+messages d'erreur. La $errorsvariable qui est automatiquement mise 
+
+à la disposition de toutes les vues est également une instance 
+
+de la MessageBagclasse.
+
+Récupération du premier message d'erreur pour un champ
+Pour récupérer le premier message d'erreur d'un champ donné, 
+
+utilisez la firstméthode :
+
+$errors = $validator->errors();
+ 
+echo $errors->first('email');
+
+Récupération de tous les messages d'erreur pour un champ
+Si vous avez besoin de récupérer un tableau de tous les messages 
+
+pour un champ donné, utilisez la getméthode :
+
+foreach ($errors->get('email') as $message) {
+    //
+}
+
+Si vous validez un champ de formulaire de tableau, vous pouvez 
+
+récupérer tous les messages pour chacun des éléments du tableau en 
+
+utilisant le *caractère :
+
+foreach ($errors->get('attachments.*') as $message) {
+    //
+}
+
+Récupération de tous les messages d'erreur pour tous les champs
+Pour récupérer un tableau de tous les messages pour tous les champs, utilisez la allméthode :
+
+foreach ($errors->all() as $message) {
+    //
+}
+
+Déterminer si des messages existent pour un champ
+La hasméthode peut être utilisée pour déterminer si des messages 
+
+d'erreur existent pour un champ donné :
+
+if ($errors->has('email')) {
+    //
+}
+
+Spécification de messages personnalisés dans les fichiers de langue
+Les règles de validation intégrées de Laravel ont chacune un message 
+
+d'erreur qui se trouve dans le lang/en/validation.phpfichier de votre 
+
+application. Dans ce fichier, vous trouverez une entrée de traduction 
+
+pour chaque règle de validation. Vous êtes libre de changer ou de 
+
+modifier ces messages en fonction des besoins de votre application.
+
+De plus, vous pouvez copier ce fichier dans un autre répertoire de langue de traduction pour traduire les messages dans la langue de votre application. Pour en savoir plus sur la localisation de Laravel, consultez la documentation complète sur la localisation .
+
+Messages personnalisés pour des attributs spécifiques
+Vous pouvez personnaliser les messages d'erreur utilisés pour les combinaisons d'attributs et de règles spécifiées dans les fichiers de langage de validation de votre application. Pour ce faire, ajoutez vos personnalisations de message au customtableau du lang/xx/validation.phpfichier de langue de votre application :
+
+'custom' => [
+    'email' => [
+        'required' => 'We need to know your email address!',
+        'max' => 'Your email address is too long!'
+    ],
+],
+
+Spécification d'attributs dans les fichiers de langue
+De nombreux messages d'erreur intégrés à Laravel incluent un :attributeespace réservé qui est remplacé par le nom du champ ou de l'attribut en cours de validation. Si vous souhaitez que la :attributepartie de votre message de validation soit remplacée par une valeur personnalisée, vous pouvez spécifier le nom de l'attribut personnalisé dans le attributestableau de votre lang/xx/validation.phpfichier de langue :
+
+'attributes' => [
+    'email' => 'email address',
+],
+
+Spécification de valeurs dans les fichiers de langue
+Certains des messages d'erreur de la règle de validation intégrée de Laravel contiennent un :valueespace réservé qui est remplacé par la valeur actuelle de l'attribut de requête. Cependant, vous devrez peut-être occasionnellement :valueremplacer la partie de votre message de validation par une représentation personnalisée de la valeur. Par exemple, considérons la règle suivante qui spécifie qu'un numéro de carte de crédit est requis si payment_typea une valeur decc :
+
+Validator::make($request->all(), [
+    'credit_card_number' => 'required_if:payment_type,cc'
+]);
+
+Si cette règle de validation échoue, elle produira le message d'erreur suivant :
+
+The credit card number field is required when payment type is cc.
+
+Au lieu d'afficher ccla valeur du type de paiement, vous pouvez 
+
+spécifier une représentation de valeur plus conviviale dans votre 
+
+lang/xx/validation.phpfichier de langue en définissant un valuestableau :
+
+'values' => [
+    'payment_type' => [
+        'cc' => 'credit card'
+    ],
+],
+
+Après avoir défini cette valeur, la règle de validation produira 
+
+le message d'erreur suivant :
+
+The credit card number field is required when payment type is credit card.
+
+Règles de validation disponibles
+Vous trouverez ci-dessous une liste de toutes les règles de validation 
+
+disponibles et leur fonction :
+
+Accepté
+Accepté si
+URL active
+Après (date)
+Après ou égal (date)
+Alpha
+Tiret alpha
+Alphanumérique
+Déployer
+Caution
+Avant (date)
+Avant ou égal (date)
+Entre
+booléen
+Confirmé
+Mot de passe actuel
+Date
+Date égale
+Format de date
+Diminué
+Refusé si
+Différent
+Chiffres
+Chiffres entre
+Dimensions (fichiers image)
+Distinct
+E-mail
+Se termine par
+Énumération
+Exclure
+Exclure si
+Exclure sauf si
+Exclure avec
+Exclure Sans
+Existe (base de données)
+Dossier
+Rempli
+Plus grand que
+Meilleur que ou égal
+Fichier d'image)
+Dans
+Dans le tableau
+Entier
+Adresse IP
+JSON
+Moins que
+Inférieur ou égal
+Adresse Mac
+Max
+Type MIME
+Type MIME par extension de fichier
+Min
+Multiple de
+Pas dedans
+Pas Regex
+Nullable
+Numérique
+Mot de passe
+Cadeau
+Interdit
+Interdit si
+Interdit sauf si
+Interdit
+Expression régulière
+Obligatoire
+Obligatoire si
+Requis sauf si
+Requis avec
+Requis avec tous
+Requis Sans
+Requis Sans Tout
+Clés de tableau requises
+Même
+Taille
+quelquefois
+Commence avec
+Chaîne de caractères
+Fuseau horaire
+Unique (base de données)
+URL
+UUID
+
+accepté
+Le champ en cours de validation doit être "yes", "on", 1, ou true. 
+
+Ceci est utile pour valider l'acceptation des "Conditions d'utilisation" 
+
+ou des champs similaires.
+
+accept_if : autre champ, valeur,...
+Le champ en cours de validation doit être "yes", "on", 1, ou truesi 
+
+un autre champ en cours de validation est égal à une valeur spécifiée. 
+
+Ceci est utile pour valider l'acceptation des "Conditions d'utilisation" 
+
+ou des champs similaires.
+
+active_url
+Le champ en cours de validation doit avoir un enregistrement A ou AAAA 
+
+valide selon la dns_get_recordfonction PHP. Le nom d'hôte de l'URL 
+
+fournie est extrait à l'aide de la parse_urlfonction PHP avant d'être 
+
+transmis à dns_get_record.
+
+après : date
+Le champ en cours de validation doit être une valeur postérieure à une date donnée. Les dates seront passées dans la strtotimefonction PHP afin d'être converties en une DateTimeinstance valide :
+
+'start_date' => 'required|date|after:tomorrow'
+
+Au lieu de transmettre une chaîne de date à évaluer par strtotime, vous pouvez spécifier un autre champ à comparer à la date :
+
+'finish_date' => 'required|date|after:start_date'
+
+after_or_equal : date
+Le champ en cours de validation doit être une valeur postérieure ou égale à la date donnée. Pour plus d'informations, consultez la règle après .
+
+alpha
+Le champ en cours de validation doit être entièrement composé de caractères alphabétiques.
+
+alpha_dash
+Le champ en cours de validation peut contenir des caractères alphanumériques, ainsi que des tirets et des traits de soulignement.
+
+alpha_num
+Le champ en cours de validation doit être entièrement composé de caractères alphanumériques.
+
+déployer
+Le champ en cours de validation doit être un PHP array.
+
+Lorsque des valeurs supplémentaires sont fournies à la arrayrègle, chaque clé du tableau d'entrée doit être présente dans la liste des valeurs fournies à la règle. Dans l'exemple suivant, la adminclé du tableau d'entrée n'est pas valide car elle ne figure pas dans la liste de valeurs fournie à la arrayrègle :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$input = [
+    'user' => [
+        'name' => 'Taylor Otwell',
+        'username' => 'taylorotwell',
+        'admin' => true,
+    ],
+];
+ 
+Validator::make($input, [
+    'user' => 'array:name,username',
+]);
+
+En général, vous devez toujours spécifier les clés de tableau autorisées à être présentes dans votre tableau.
+
+caution
+Arrêtez l'exécution des règles de validation pour le champ après le premier échec de validation.
+
+Alors que la bailrègle n'arrêtera de valider un champ spécifique que lorsqu'elle rencontre un échec de validation, la stopOnFirstFailureméthode informera le validateur qu'il doit arrêter de valider tous les attributs une fois qu'un seul échec de validation s'est produit :
+
+if ($validator->stopOnFirstFailure()->fails()) {
+    // ...
+}
+
+avant : date
+Le champ en cours de validation doit être une valeur précédant la date donnée. Les dates seront passées dans la strtotimefonction PHP afin d'être converties en une DateTimeinstance valide. De plus, comme la afterrègle, le nom d'un autre champ en cours de validation peut être fourni comme valeur de date.
+
+avant_ou_égal : date
+Le champ en cours de validation doit être une valeur antérieure ou égale à la date donnée. Les dates seront passées dans la strtotimefonction PHP afin d'être converties en une DateTimeinstance valide. De plus, comme la afterrègle, le nom d'un autre champ en cours de validation peut être fourni comme valeur de date.
+
+entre : min , max
+Le champ en cours de validation doit avoir une taille comprise entre le min et le max donnés . Les chaînes, les nombres, les tableaux et les fichiers sont évalués de la même manière que la sizerègle.
+
+booléen
+Le champ en cours de validation doit pouvoir être converti en booléen. Les entrées acceptées sont true, false, 1, 0, "1"et "0".
+
+confirmé
+Le champ en cours de validation doit avoir un champ correspondant de {field}_confirmation. Par exemple, si le champ en cours de validation est password, un password_confirmationchamp correspondant doit être présent dans l'entrée.
+
+Mot de passe actuel
+Le champ en cours de validation doit correspondre au mot de passe de l'utilisateur authentifié. Vous pouvez spécifier une protection d'authentification à l'aide du premier paramètre de la règle :
+
+'password' => 'current_password:api'
+
+Date
+Le champ en cours de validation doit être une date valide et non relative selon la strtotimefonction PHP.
+
+date_equals : date
+Le champ en cours de validation doit être égal à la date donnée. Les dates seront passées dans la strtotimefonction PHP afin d'être converties en une DateTimeinstance valide.
+
+date_format : format
+Le champ en cours de validation doit correspondre au format donné . Vous devez utiliser soit date ou date_formatlors de la validation d'un champ, pas les deux. Cette règle de validation prend en charge tous les formats pris en charge par la classe DateTime de PHP .
+
+diminué
+Le champ en cours de validation doit être "no", "off", 0, ou false.
+
+refuse_if : un autre champ, valeur,...
+Le champ en cours de validation doit être "no", "off", 0, ou falsesi un autre champ en cours de validation est égal à une valeur spécifiée.
+
+différent : champ
+Le champ en cours de validation doit avoir une valeur différente de field .
+
+chiffres : valeur
+L'entier en cours de validation doit avoir une longueur exacte de value .
+
+chiffres_entre: min , max
+La validation d'entier doit avoir une longueur comprise entre min et max donnés .
+
+dimensions
+Le fichier en cours de validation doit être une image respectant les contraintes de dimension spécifiées par les paramètres de la règle :
+
+'avatar' => 'dimensions:min_width=100,min_height=200'
+
+Les contraintes disponibles sont : min_width , max_width , min_height , max_height , width , height , ratio .
+
+Une contrainte de ratio doit être représentée par la largeur divisée par la hauteur. Cela peut être spécifié soit par une fraction comme 3/2soit par un flottant comme 1.5:
+
+'avatar' => 'dimensions:ratio=3/2'
+
+Étant donné que cette règle nécessite plusieurs arguments, vous pouvez utiliser la Rule::dimensionsméthode pour construire couramment la règle :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($data, [
+    'avatar' => [
+        'required',
+        Rule::dimensions()->maxWidth(1000)->maxHeight(500)->ratio(3 / 2),
+    ],
+]);
+
+distinct
+Lors de la validation des tableaux, le champ en cours de validation ne doit pas avoir de valeurs en double :
+
+'foo.*.id' => 'distinct'
+
+Distinct utilise par défaut des comparaisons de variables lâches. Pour utiliser des comparaisons strictes, vous pouvez ajouter le strictparamètre à votre définition de règle de validation :
+
+'foo.*.id' => 'distinct:strict'
+
+Vous pouvez ajouter ignore_caseaux arguments de la règle de validation pour que la règle ignore les différences de capitalisation :
+
+'foo.*.id' => 'distinct:ignore_case'
+
+e-mail
+Le champ en cours de validation doit être formaté comme une adresse e-mail. 
+
+Cette règle de validation utilise le egulias/email-validatorpackage pour 
+
+valider l'adresse e-mail. Par défaut, le RFCValidationvalidateur est 
+
+appliqué, mais vous pouvez également appliquer d'autres styles de validation :
+
+'email' => 'email:rfc,dns'
+
+L'exemple ci-dessus appliquera les validations RFCValidationet . 
+
+DNSCheckValidationVoici une liste complète des styles de validation 
+
+que vous pouvez appliquer :
+
+rfc:RFCValidation
+strict:NoRFCWarningsValidation
+dns:DNSCheckValidation
+spoof:SpoofCheckValidation
+filter:FilterEmailValidation
+Le filtervalidateur, qui utilise la filter_varfonction de PHP, 
+
+est livré avec Laravel et était le comportement de validation des 
+
+e-mails par défaut de Laravel avant la version 5.8 de Laravel.
+
+
+Les validateurs dnset nécessitent l' extension PHP.spoofintl
+
+
+se termine par : foo , bar ,...
+Le champ en cours de validation doit se terminer par l'une des valeurs données.
+
+énumération
+La Enumrègle est une règle basée sur une classe qui valide 
+
+si le champ en cours de validation contient une valeur d'énumération 
+
+valide. La Enumrègle accepte le nom de l'énumération comme seul 
+
+argument de constructeur :
+
+use App\Enums\ServerStatus;
+use Illuminate\Validation\Rules\Enum;
+ 
+$request->validate([
+    'status' => [new Enum(ServerStatus::class)],
+]);
+
+
+Les énumérations ne sont disponibles que sur PHP 8.1+.
+
+
+exclure
+Le champ en cours de validation sera exclu des données de la 
+
+requête renvoyées par les méthodes validateet .validated
+
+exclude_if : autre champ , valeur
+Le champ en cours de validation sera exclu des données de 
+
+requête renvoyées par les méthodes validateet si le champ 
+
+anotherfield est égal à value .validated
+
+Si une logique d'exclusion conditionnelle complexe est requise, 
+
+vous pouvez utiliser la Rule::excludeIfméthode. Cette méthode 
+
+accepte un booléen ou une fermeture. Lorsqu'une fermeture est donnée, 
+
+la fermeture doit renvoyer trueou falsepour indiquer si le champ en 
+
+cours de validation doit être exclu :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::excludeIf($request->user()->is_admin),
+]);
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::excludeIf(fn () => $request->user()->is_admin),
+]);
+
+exclude_unless : autre champ , valeur
+Le champ en cours de validation sera exclu des données de 
+
+requête renvoyées par les méthodes validateet sauf si le champ 
+
+d'un autre champ est égal à valeur . Si la valeur est ( ), le 
+
+champ en cours de validation sera exclu sauf si le champ de 
+
+comparaison est ou le champ de comparaison est absent des données 
+
+de la demande.validatednullexclude_unless:name,nullnull
+
+exclure_avec : un autre champ
+Le champ en cours de validation sera exclu des données de requête 
+
+retournées par les méthodes validateet si le champ anotherfield 
+
+est présent.validated
+
+exclure_sans : un autre champ
+Le champ en cours de validation sera exclu des données de requête retournées par les méthodes validateet si le champ anotherfield n'est pas présent.validated
+
+existe : table , colonne
+Le champ en cours de validation doit exister dans une table de base de données donnée.
+
+Utilisation de base de la règle existe
+'state' => 'exists:states'
+
+Si l' columnoption n'est pas spécifiée, le nom du champ sera utilisé. 
+
+Ainsi, dans ce cas, la règle validera que la statestable de base de 
+
+données contient un enregistrement avec une valeur de colonne 
+
+correspondant à la valeur d'attribut statede la demande .state
+
+Spécification d'un nom de colonne personnalisé
+Vous pouvez spécifier explicitement le nom de colonne de base de 
+
+données qui doit être utilisé par la règle de validation en le 
+
+plaçant après le nom de table de base de données :
+
+'state' => 'exists:states,abbreviation'
+
+Parfois, vous devrez peut-être spécifier une connexion de base de données 
+
+spécifique à utiliser pour la existsrequête. Pour ce faire, ajoutez 
+
+le nom de la connexion au nom de la table :
+
+'email' => 'exists:connection.staff,email'
+
+Au lieu de spécifier directement le nom de la table, 
+
+vous pouvez spécifier le modèle Eloquent qui doit être utilisé 
+
+pour déterminer le nom de la table :
+
+'user_id' => 'exists:App\Models\User,id'
+
+Si vous souhaitez personnaliser la requête exécutée par 
+
+la règle de validation, vous pouvez utiliser la Ruleclasse 
+
+pour définir couramment la règle. Dans cet exemple, nous spécifierons 
+
+également les règles de validation sous forme de tableau au lieu 
+
+d'utiliser le |caractère pour les délimiter :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($data, [
+    'email' => [
+        'required',
+        Rule::exists('staff')->where(function ($query) {
+            return $query->where('account_id', 1);
+        }),
+    ],
+]);
+
+Vous pouvez spécifier explicitement le nom de la colonne de la base de données qui doit être utilisée par la existsrègle générée par la Rule::existsméthode en fournissant le nom de la colonne comme deuxième argument de la existsméthode :
+
+'state' => Rule::exists('states', 'abbreviation'),
+
+dossier
+Le champ en cours de validation doit être un fichier téléchargé avec succès.
+
+rempli
+Le champ en cours de validation ne doit pas être vide lorsqu'il est présent.
+
+gt : champ
+Le champ en cours de validation doit être supérieur au champ donné . Les deux champs doivent être du même type. Les chaînes, les nombres, les tableaux et les fichiers sont évalués en utilisant les mêmes conventions que la sizerègle.
+
+gîte : terrain
+Le champ en cours de validation doit être supérieur ou égal au champ donné . Les deux champs doivent être du même type. Les chaînes, les nombres, les tableaux et les fichiers sont évalués en utilisant les mêmes conventions que la sizerègle.
+
+image
+Le fichier en cours de validation doit être une image (jpg, jpeg, png, bmp, gif, svg ou webp).
+
+dans: foo , bar ,...
+Le champ en cours de validation doit être inclus dans la liste de valeurs donnée. Étant donné que cette règle vous oblige souvent à utiliser implodeun tableau, la Rule::inméthode peut être utilisée pour construire facilement la règle :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($data, [
+    'zones' => [
+        'required',
+        Rule::in(['first-zone', 'second-zone']),
+    ],
+]);
+
+Lorsque la inrègle est combinée avec la arrayrègle, chaque valeur du tableau d'entrée doit être présente dans la liste des valeurs fournies à la inrègle. Dans l'exemple suivant, le LAScode de l'aéroport dans le tableau d'entrée n'est pas valide car il n'est pas contenu dans la liste des aéroports fournie à la inrègle :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+$input = [
+    'airports' => ['NYC', 'LAS'],
+];
+ 
+Validator::make($input, [
+    'airports' => [
+        'required',
+        'array',
+    ],
+    'airports.*' => Rule::in(['NYC', 'LIT']),
+]);
+
+in_array : un autre champ .*
+Le champ en cours de validation doit exister dans les valeurs d'un autre champ .
+
+entier
+Le champ en cours de validation doit être un entier.
+
+
+Cette règle de validation ne vérifie pas que l'entrée est de type variable "entier", seulement que l'entrée est d'un type accepté par la FILTER_VALIDATE_INTrègle de PHP. Si vous avez besoin de valider l'entrée comme étant un nombre, veuillez utiliser cette règle en combinaison avec la numericrègle de validation .
+
+
+IP
+Le champ en cours de validation doit être une adresse IP.
+
+ipv4
+Le champ en cours de validation doit être une adresse IPv4.
+
+ipv6
+Le champ en cours de validation doit être une adresse IPv6.
+
+json
+Le champ en cours de validation doit être une chaîne JSON valide.
+
+lt : champ
+Le champ en cours de validation doit être inférieur au champ donné . Les deux champs doivent être du même type. Les chaînes, les nombres, les tableaux et les fichiers sont évalués en utilisant les mêmes conventions que la sizerègle.
+
+lte : champ
+Le champ en cours de validation doit être inférieur ou égal au champ donné . Les deux champs doivent être du même type. Les chaînes, les nombres, les tableaux et les fichiers sont évalués en utilisant les mêmes conventions que la sizerègle.
+
+Adresse Mac
+Le champ en cours de validation doit être une adresse MAC.
+
+max : valeur
+Le champ en cours de validation doit être inférieur ou égal à une valeur maximale . Les chaînes, les nombres, les tableaux et les fichiers sont évalués de la même manière que la sizerègle.
+
+types mime : text/plain ,...
+Le fichier en cours de validation doit correspondre 
+
+à l'un des types MIME indiqués :
+
+'video' => 'mimetypes:video/avi,video/mpeg,video/quicktime'
+
+Pour déterminer le type MIME du fichier téléchargé, 
+
+le contenu du fichier sera lu et le framework tentera de deviner 
+
+le type MIME, qui peut être différent du type MIME fourni par le client.
+
+mimes : foo , bar ,...
+Le fichier en cours de validation doit avoir un type MIME 
+
+correspondant à l'une des extensions listées.
+
+Utilisation de base de la règle MIME
+'photo' => 'mimes:jpg,bmp,png'
+
+Même si vous n'avez qu'à spécifier les extensions, cette règle 
+
+valide en fait le type MIME du fichier en lisant le contenu du 
+
+fichier et en devinant son type MIME. Une liste complète des 
+
+types MIME et de leurs extensions correspondantes est disponible 
+
+à l'emplacement suivant :
+
+https://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types
+
+min : valeur
+Le champ en cours de validation doit avoir une valeur minimale . 
+
+Les chaînes, les nombres, les tableaux et les fichiers sont 
+
+évalués de la même manière que la sizerègle.
+
+multiple_of : valeur
+Le champ en cours de validation doit être un multiple de value .
+
+
+L' bcmathextension PHP est requise pour utiliser la multiple_ofrègle.
+
+
+not_in: foo , bar ,...
+Le champ en cours de validation ne doit pas être inclus dans la liste de valeurs donnée. La Rule::notInméthode peut être utilisée pour construire couramment la règle :
+
+use Illuminate\Validation\Rule;
+ 
+Validator::make($data, [
+    'toppings' => [
+        'required',
+        Rule::notIn(['sprinkles', 'cherries']),
+    ],
+]);
+
+not_regex : modèle
+Le champ en cours de validation ne doit pas correspondre à l'expression régulière donnée.
+
+En interne, cette règle utilise la preg_matchfonction PHP. Le modèle spécifié doit obéir au même formatage requis par preg_matchet donc également inclure des délimiteurs valides. Par exemple : 'email' => 'not_regex:/^.+$/i'.
+
+
+Lorsque vous utilisez les modèles regex/ not_regex, il peut être nécessaire de spécifier vos règles de validation à l'aide d'un tableau au lieu d'utiliser des |délimiteurs, en particulier si l'expression régulière contient un |caractère.
+
+
+nullable
+Le champ en cours de validation peut être null.
+
+numérique
+Le champ en cours de validation doit être numérique .
+
+le mot de passe
+Le champ en cours de validation doit correspondre au mot de passe de l'utilisateur authentifié.
+
+
+Cette règle a été renommée current_passwordavec l'intention de la supprimer dans Laravel 9. Veuillez utiliser la règle du mot de passe actuel à la place.
+
+
+cadeau
+Le champ en cours de validation doit être présent dans les données d'entrée mais peut être vide.
+
+interdit
+Le champ en cours de validation doit être vide ou absent.
+
+interdit_if : autrechamp , valeur ,...
+Le champ en cours de validation doit être vide ou absent si le champ anotherfield est égal à n'importe quelle valeur .
+
+Si une logique d'interdiction conditionnelle complexe est requise, vous pouvez utiliser la Rule::prohibitedIfméthode. Cette méthode accepte un booléen ou une fermeture. Lorsqu'une fermeture est donnée, la fermeture doit retourner trueou falsepour indiquer si le champ en cours de validation doit être interdit :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::prohibitedIf($request->user()->is_admin),
+]);
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::prohibitedIf(fn () => $request->user()->is_admin),
+]);
+
+interdit_sauf si : un autre champ , valeur ,...
+Le champ en cours de validation doit être vide ou absent sauf si le champ anotherfield est égal à n'importe quelle valeur .
+
+interdit : un autre champ ,...
+Si le champ en cours de validation est présent, aucun champ d' un autre champ ne peut être présent, même s'il est vide.
+
+regex : modèle
+Le champ en cours de validation doit correspondre à l'expression régulière donnée.
+
+En interne, cette règle utilise la preg_matchfonction PHP. Le modèle spécifié doit obéir au même formatage requis par preg_matchet donc également inclure des délimiteurs valides. Par exemple : 'email' => 'regex:/^.+@.+$/i'.
+
+
+Lors de l'utilisation des modèles regex/ not_regex, il peut être nécessaire de spécifier des règles dans un tableau au lieu d'utiliser des |délimiteurs, en particulier si l'expression régulière contient un |caractère.
+
+
+obligatoire
+Le champ en cours de validation doit être présent dans les données d'entrée et non vide. Un champ est considéré comme "vide" si l'une des conditions suivantes est vraie :
+
+La valeur est null.
+La valeur est une chaîne vide.
+La valeur est un tableau vide ou un Countableobjet vide.
+La valeur est un fichier téléchargé sans chemin.
+required_if : autre champ , valeur ,...
+Le champ en cours de validation doit être présent et non vide si le champ anotherfield est égal à n'importe quelle valeur .
+
+Si vous souhaitez construire une condition plus complexe pour la required_ifrègle, vous pouvez utiliser la Rule::requiredIfméthode. Cette méthode accepte un booléen ou une fermeture. Lorsqu'une fermeture est passée, la fermeture doit retourner trueou falsepour indiquer si le champ en cours de validation est obligatoire :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::requiredIf($request->user()->is_admin),
+]);
+ 
+Validator::make($request->all(), [
+    'role_id' => Rule::requiredIf(fn () => $request->user()->is_admin),
+]);
+
+required_unless : autre champ , valeur ,...
+Le champ en cours de validation doit être présent et non vide sauf si le champ anotherfield est égal à n'importe quelle valeur . Cela signifie également qu'un autre champ doit être présent dans les données de la requête, sauf si la valeur est null. Si la valeur est null( required_unless:name,null), le champ en cours de validation sera requis sauf si le champ de comparaison est nullou le champ de comparaison est absent des données de la demande.
+
+required_with : foo , bar ,...
+Le champ en cours de validation doit être présent et non vide uniquement si l'un des autres champs spécifiés est présent et non vide.
+
+required_with_all : foo , bar ,...
+Le champ en cours de validation doit être présent et non vide uniquement si tous les autres champs spécifiés sont présents et non vides.
+
+requis_sans : foo , bar ,...
+Le champ en cours de validation doit être présent et non vide uniquement lorsque l'un des autres champs spécifiés est vide ou absent.
+
+required_without_all : foo , bar ,...
+Le champ en cours de validation doit être présent et non vide uniquement lorsque tous les autres champs spécifiés sont vides ou non présents.
+
+required_array_keys : foo , bar ,...
+Le champ en cours de validation doit être un tableau et doit contenir au moins les clés spécifiées.
+
+idem : champ
+Le champ donné doit correspondre au champ en cours de validation.
+
+taille : valeur
+Le champ en cours de validation doit avoir une taille correspondant à la valeur donnée . Pour les données de chaîne, la valeur correspond au nombre de caractères. Pour les données numériques, valeur correspond à une valeur entière donnée (l'attribut doit également avoir la règle numericou ). integerPour un tableau, la taille correspond à la taille countdu tableau. Pour les fichiers, la taille correspond à la taille du fichier en kilo-octets. Regardons quelques exemples :
+
+// Validate that a string is exactly 12 characters long...
+'title' => 'size:12';
+ 
+// Validate that a provided integer equals 10...
+'seats' => 'integer|size:10';
+ 
+// Validate that an array has exactly 5 elements...
+'tags' => 'array|size:5';
+ 
+// Validate that an uploaded file is exactly 512 kilobytes...
+'image' => 'file|size:512';
+
+commence_par : foo , bar ,...
+Le champ en cours de validation doit commencer par l'une des valeurs données.
+
+chaîne de caractères
+Le champ en cours de validation doit être une chaîne. Si vous souhaitez autoriser le champ à être également null, vous devez affecter la nullablerègle au champ.
+
+fuseau horaire
+Le champ en cours de validation doit être un identifiant de fuseau horaire valide selon la timezone_identifiers_listfonction PHP.
+
+unique : table , colonne
+Le champ en cours de validation ne doit pas exister dans la table de base de données donnée.
+
+Spécification d'un nom de tableau/colonne personnalisé :
+
+Au lieu de spécifier directement le nom de la table, vous pouvez spécifier le modèle Eloquent qui doit être utilisé pour déterminer le nom de la table :
+
+'email' => 'unique:App\Models\User,email_address'
+
+L' columnoption peut être utilisée pour spécifier la colonne de base de données correspondante du champ. Si l' columnoption n'est pas spécifiée, le nom du champ en cours de validation sera utilisé.
+
+'email' => 'unique:users,email_address'
+
+Spécification d'une connexion de base de données personnalisée
+
+Parfois, vous devrez peut-être définir une connexion personnalisée pour les requêtes de base de données effectuées par le validateur. Pour ce faire, vous pouvez ajouter le nom de la connexion au nom de la table :
+
+'email' => 'unique:connection.users,email_address'
+
+Forcer une règle unique à ignorer un ID donné :
+
+Parfois, vous souhaiterez peut-être ignorer un identifiant donné lors de la validation unique. Par exemple, considérez un écran "mettre à jour le profil" qui inclut le nom, l'adresse e-mail et l'emplacement de l'utilisateur. Vous voudrez probablement vérifier que l'adresse e-mail est unique. Cependant, si l'utilisateur modifie uniquement le champ du nom et non le champ de l'e-mail, vous ne souhaitez pas qu'une erreur de validation soit générée car l'utilisateur est déjà le propriétaire de l'adresse e-mail en question.
+
+Pour demander au validateur d'ignorer l'ID de l'utilisateur, nous utiliserons la Ruleclasse pour définir de manière fluide la règle. Dans cet exemple, nous spécifierons également les règles de validation sous forme de tableau au lieu d'utiliser le |caractère pour délimiter les règles :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+Validator::make($data, [
+    'email' => [
+        'required',
+        Rule::unique('users')->ignore($user->id),
+    ],
+]);
+
+
+Vous ne devez jamais transmettre une entrée de requête contrôlée par l'utilisateur dans la ignoreméthode. Au lieu de cela, vous ne devez transmettre qu'un identifiant unique généré par le système, tel qu'un identifiant à incrémentation automatique ou un UUID à partir d'une instance de modèle Eloquent. Sinon, votre application sera vulnérable à une attaque par injection SQL.
+
+
+Au lieu de transmettre la valeur de la clé de modèle à la ignoreméthode, vous pouvez également transmettre l'intégralité de l'instance de modèle. Laravel extraira automatiquement la clé du modèle :
+
+Rule::unique('users')->ignore($user)
+
+Si votre table utilise un nom de colonne de clé primaire autre que id, vous pouvez spécifier le nom de la colonne lors de l'appel de la ignoreméthode :
+
+Rule::unique('users')->ignore($user->id, 'user_id')
+
+Par défaut, la uniquerègle vérifiera l'unicité de la colonne correspondant au nom de l'attribut en cours de validation. Cependant, vous pouvez passer un nom de colonne différent comme deuxième argument à la uniqueméthode :
+
+Rule::unique('users', 'email_address')->ignore($user->id),
+
+Ajout de clauses Where supplémentaires :
+
+Vous pouvez spécifier des conditions de requête supplémentaires en personnalisant la requête à l'aide de la whereméthode. Par exemple, ajoutons une condition de requête qui étend la requête pour rechercher uniquement les enregistrements dont la account_idvaleur de colonne est1 :
+
+'email' => Rule::unique('users')->where(fn ($query) => $query->where('account_id', 1))
+
+URL
+Le champ en cours de validation doit être une URL valide.
+
+uuid
+Le champ en cours de validation doit être un identifiant unique universel (UUID) RFC 4122 (version 1, 3, 4 ou 5) valide.
+
+Ajout conditionnel de règles
+Ignorer la validation lorsque les champs ont certaines valeurs
+Il se peut que vous souhaitiez parfois ne pas valider un champ donné si un autre champ a une valeur donnée. Vous pouvez accomplir cela en utilisant la exclude_ifrègle de validation. Dans cet exemple, les champs appointment_dateet doctor_namene seront pas validés si le has_appointmentchamp vaut false:
+
+use Illuminate\Support\Facades\Validator;
+ 
+$validator = Validator::make($data, [
+    'has_appointment' => 'required|boolean',
+    'appointment_date' => 'exclude_if:has_appointment,false|required|date',
+    'doctor_name' => 'exclude_if:has_appointment,false|required|string',
+]);
+
+Alternativement, vous pouvez utiliser la exclude_unlessrègle pour ne pas valider un champ donné à moins qu'un autre champ ait une valeur donnée :
+
+$validator = Validator::make($data, [
+    'has_appointment' => 'required|boolean',
+    'appointment_date' => 'exclude_unless:has_appointment,true|required|date',
+    'doctor_name' => 'exclude_unless:has_appointment,true|required|string',
+]);
+
+Validation lorsqu'elle est présente
+Dans certaines situations, vous souhaiterez peut-être exécuter des contrôles de validation sur un champ uniquement si ce champ est présent dans les données en cours de validation. Pour y parvenir rapidement, ajoutez la sometimesrègle à votre liste de règles :
+
+$v = Validator::make($data, [
+    'email' => 'sometimes|required|email',
+]);
+
+Dans l'exemple ci-dessus, le emailchamp ne sera validé que s'il est présent dans le $datatableau.
+
+
+Si vous tentez de valider un champ qui devrait toujours être présent mais qui peut être vide, consultez cette note sur les champs optionnels .
+
+
+Validation conditionnelle complexe
+Parfois, vous souhaiterez peut-être ajouter des règles de validation basées sur une logique conditionnelle plus complexe. Par exemple, vous souhaiterez peut-être exiger un champ donné uniquement si un autre champ a une valeur supérieure à 100. Ou, vous pouvez avoir besoin que deux champs aient une valeur donnée uniquement lorsqu'un autre champ est présent. L'ajout de ces règles de validation ne doit pas être une corvée. Tout d'abord, créez une Validatorinstance avec vos règles statiques qui ne changent jamais :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$validator = Validator::make($request->all(), [
+    'email' => 'required|email',
+    'games' => 'required|numeric',
+]);
+
+Supposons que notre application Web soit destinée aux collectionneurs de jeux. Si un collectionneur de jeux s'inscrit à notre application et qu'il possède plus de 100 jeux, nous voulons qu'il explique pourquoi il possède autant de jeux. Par exemple, ils gèrent peut-être un magasin de revente de jeux ou ils aiment simplement collectionner des jeux. Pour ajouter conditionnellement cette exigence, nous pouvons utiliser la sometimesméthode sur l' Validatorinstance.
+
+$validator->sometimes('reason', 'required|max:500', function ($input) {
+    return $input->games >= 100;
+});
+
+Le premier argument passé à la sometimesméthode est le nom du champ que nous validons conditionnellement. Le deuxième argument est une liste des règles que nous voulons ajouter. Si la fermeture passée comme troisième argument renvoie true, les règles seront ajoutées. Cette méthode facilite la création de validations conditionnelles complexes. Vous pouvez même ajouter des validations conditionnelles pour plusieurs champs à la fois :
+
+$validator->sometimes(['reason', 'cost'], 'required', function ($input) {
+    return $input->games >= 100;
+});
+
+
+Le $inputparamètre transmis à votre fermeture sera une instance de Illuminate\Support\Fluentet pourra être utilisé pour accéder à vos entrées et fichiers en cours de validation.
+
+
+Validation de tableau conditionnel complexe
+Parfois, vous voudrez peut-être valider un champ basé sur un autre champ dans le même tableau imbriqué dont vous ne connaissez pas l'index. Dans ces situations, vous pouvez autoriser votre fermeture à recevoir un deuxième argument qui sera l'élément individuel actuel dans le tableau en cours de validation :
+
+$input = [
+    'channels' => [
+        [
+            'type' => 'email',
+            'address' => 'abigail@example.com',
+        ],
+        [
+            'type' => 'url',
+            'address' => 'https://example.com',
+        ],
+    ],
+];
+ 
+$validator->sometimes('channels.*.address', 'email', function ($input, $item) {
+    return $item->type === 'email';
+});
+ 
+$validator->sometimes('channels.*.address', 'url', function ($input, $item) {
+    return $item->type !== 'email';
+});
+
+Comme le $inputparamètre passé à la fermeture, le $itemparamètre est une instance Illuminate\Support\Fluentlorsque les données d'attribut sont un tableau ; sinon, c'est une chaîne.
+
+Validation des tableaux
+Comme indiqué dans la arraydocumentation de la règle de validation , la arrayrègle accepte une liste de clés de tableau autorisées. Si des clés supplémentaires sont présentes dans le tableau, la validation échoue :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$input = [
+    'user' => [
+        'name' => 'Taylor Otwell',
+        'username' => 'taylorotwell',
+        'admin' => true,
+    ],
+];
+ 
+Validator::make($input, [
+    'user' => 'array:username,locale',
+]);
+
+En général, vous devez toujours spécifier les clés de tableau autorisées à être présentes dans votre tableau. Sinon, le validateur validateet les validatedméthodes renverront toutes les données validées, y compris le tableau et toutes ses clés, même si ces clés n'ont pas été validées par d'autres règles de validation de tableau imbriqué.
+
+Validation de l'entrée de tableau imbriqué
+La validation des champs de saisie de formulaire basés sur un tableau imbriqué ne doit pas être une corvée. Vous pouvez utiliser la "notation par points" pour valider les attributs dans un tableau. Par exemple, si la requête HTTP entrante contient un photos[profile]champ, vous pouvez le valider comme suit :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$validator = Validator::make($request->all(), [
+    'photos.profile' => 'required|image',
+]);
+
+Vous pouvez également valider chaque élément d'un tableau. Par exemple, pour valider que chaque e-mail dans un champ d'entrée de tableau donné est unique, vous pouvez procéder comme suit :
+
+$validator = Validator::make($request->all(), [
+    'person.*.email' => 'email|unique:users',
+    'person.*.first_name' => 'required_with:person.*.last_name',
+]);
+
+De même, vous pouvez utiliser le *caractère lors de la spécification de messages de validation personnalisés dans vos fichiers de langue , ce qui facilite l'utilisation d'un seul message de validation pour les champs basés sur un tableau :
+
+'custom' => [
+    'person.*.email' => [
+        'unique' => 'Each person must have a unique email address',
+    ]
+],
+
+Accéder aux données des tableaux imbriqués
+Parfois, vous devrez peut-être accéder à la valeur d'un élément de tableau imbriqué donné lors de l'attribution de règles de validation à l'attribut. Vous pouvez accomplir cela en utilisant la Rule::forEachméthode. La forEachméthode accepte une fermeture qui sera invoquée pour chaque itération de l'attribut de tableau en cours de validation et recevra la valeur de l'attribut et le nom d'attribut explicite et entièrement développé. La fermeture doit renvoyer un tableau de règles à affecter à l'élément de tableau :
+
+use App\Rules\HasPermission;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+ 
+$validator = Validator::make($request->all(), [
+    'companies.*.id' => Rule::forEach(function ($value, $attribute) {
+        return [
+            Rule::exists(Company::class, 'id'),
+            new HasPermission('manage-company', $value),
+        ];
+    }),
+]);
+
+Index et positions des messages d'erreur
+Lors de la validation de tableaux, vous souhaiterez peut-être référencer l'index ou la position d'un élément particulier dont la validation a échoué dans le message d'erreur affiché par votre application. Pour ce faire, vous pouvez inclure les espaces réservés :indexet :positiondans votre message de validation personnalisé :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$input = [
+    'photos' => [
+        [
+            'name' => 'BeachVacation.jpg',
+            'description' => 'A photo of my beach vacation!',
+        ],
+        [
+            'name' => 'GrandCanyon.jpg',
+            'description' => '',
+        ],
+    ],
+];
+ 
+Validator::validate($input, [
+    'photos.*.description' => 'required',
+], [
+    'photos.*.description.required' => 'Please describe photo #:position.',
+]);
+
+Dans l'exemple ci-dessus, la validation échouera et l'utilisateur se verra présenter l'erreur suivante : "Veuillez décrire la photo n° 2".
+
+Validation des fichiers
+Laravel fournit une variété de règles de validation qui peuvent être utilisées pour valider les fichiers téléchargés, tels que mimes, image, minet max. Bien que vous soyez libre de spécifier ces règles individuellement lors de la validation des fichiers, Laravel propose également un générateur de règles de validation de fichiers fluide que vous trouverez peut-être pratique :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\File;
+ 
+Validator::validate($input, [
+    'attachment' => [
+        'required',
+        File::types(['mp3', 'wav'])
+            ->min(1024)
+            ->max(12 * 1024),
+    ],
+]);
+
+Si votre application accepte les images téléchargées par vos utilisateurs, vous pouvez utiliser la méthode constructeur Filede la règle imagepour indiquer que le fichier téléchargé doit être une image. De plus, la dimensionsrègle peut être utilisée pour limiter les dimensions de l'image :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\File;
+ 
+Validator::validate($input, [
+    'photo' => [
+        'required',
+        File::image()
+            ->min(1024)
+            ->max(12 * 1024)
+            ->dimensions(Rule::dimensions()->maxWidth(1000)->maxHeight(500)),
+    ],
+]);
+
+
+Vous trouverez plus d'informations sur la validation des dimensions de l'image dans la documentation sur les règles de dimension .
+
+
+Types de fichier
+Même si vous n'avez qu'à spécifier les extensions lors de l'appel de la typesméthode, cette méthode valide en fait le type MIME du fichier en lisant le contenu du fichier et en devinant son type MIME. Une liste complète des types MIME et de leurs extensions correspondantes est disponible à l'emplacement suivant :
+
+https://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types
+
+Validation des mots de passe
+Pour vous assurer que les mots de passe ont un niveau de complexité adéquat, vous pouvez utiliser l' Passwordobjet de règle de Laravel :
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
+ 
+$validator = Validator::make($request->all(), [
+    'password' => ['required', 'confirmed', Password::min(8)],
+]);
+
+L' Passwordobjet de règle vous permet de personnaliser facilement les exigences de complexité des mots de passe pour votre application, par exemple en spécifiant que les mots de passe nécessitent au moins une lettre, un chiffre, un symbole ou des caractères à casse mixte :
+
+// Require at least 8 characters...
+Password::min(8)
+ 
+// Require at least one letter...
+Password::min(8)->letters()
+ 
+// Require at least one uppercase and one lowercase letter...
+Password::min(8)->mixedCase()
+ 
+// Require at least one number...
+Password::min(8)->numbers()
+ 
+// Require at least one symbol...
+Password::min(8)->symbols()
+
+De plus, vous pouvez vous assurer qu'un mot de passe n'a pas été compromis lors d'une fuite de données de mot de passe public en utilisant la uncompromisedméthode :
+
+Password::min(8)->uncompromised()
+
+En interne, l' Passwordobjet de règle utilise le modèle k-Anonymity pour déterminer si un mot de passe a été divulgué via le service haveibeenpwned.com sans sacrifier la confidentialité ou la sécurité de l'utilisateur.
+
+Par défaut, si un mot de passe apparaît au moins une fois dans une fuite de données, il sera considéré comme compromis. Vous pouvez personnaliser ce seuil en utilisant le premier argument de la uncompromisedméthode :
+
+// Ensure the password appears less than 3 times in the same data leak...
+Password::min(8)->uncompromised(3);
+
+Bien sûr, vous pouvez enchaîner toutes les méthodes dans les exemples ci-dessus :
+
+Password::min(8)
+    ->letters()
+    ->mixedCase()
+    ->numbers()
+    ->symbols()
+    ->uncompromised()
+
+Définition des règles de mot de passe par défaut
+Vous trouverez peut-être pratique de spécifier les règles de validation par défaut pour les mots de passe dans un emplacement unique de votre application. Vous pouvez facilement accomplir cela en utilisant la Password::defaultsméthode, qui accepte une fermeture. La fermeture donnée à la defaultsméthode doit renvoyer la configuration par défaut de la règle de mot de passe. En règle générale, la defaultsrègle doit être appelée dans la bootméthode de l'un des fournisseurs de services de votre application :
+
+use Illuminate\Validation\Rules\Password;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Password::defaults(function () {
+        $rule = Password::min(8);
+ 
+        return $this->app->isProduction()
+                    ? $rule->mixedCase()->uncompromised()
+                    : $rule;
+    });
+}
+
+Ensuite, lorsque vous souhaitez appliquer les règles par défaut à un mot de passe particulier en cours de validation, vous pouvez invoquer la defaultsméthode sans arguments :
+
+'password' => ['required', Password::defaults()],
+
+Parfois, vous souhaiterez peut-être joindre des règles de validation supplémentaires à vos règles de validation de mot de passe par défaut. Vous pouvez utiliser la rulesméthode pour y parvenir :
+
+use App\Rules\ZxcvbnRule;
+ 
+Password::defaults(function () {
+    $rule = Password::min(8)->rules([new ZxcvbnRule]);
+ 
+    // ...
+});
+
+Règles de validation personnalisées
+Utilisation d'objets de règle
+Laravel fournit une variété de règles de validation utiles ; cependant, vous souhaiterez peut-être spécifier certains des vôtres. Une méthode d'enregistrement des règles de validation personnalisées consiste à utiliser des objets de règle. Pour générer un nouvel objet de règle, vous pouvez utiliser la make:rulecommande Artisan. Utilisons cette commande pour générer une règle qui vérifie qu'une chaîne est en majuscule. Laravel placera la nouvelle règle dans le app/Rulesrépertoire. Si ce répertoire n'existe pas, Laravel le créera lorsque vous exécuterez la commande Artisan pour créer votre règle :
+
+php artisan make:rule Uppercase --invokable
+
+Une fois la règle créée, nous sommes prêts à définir son comportement. Un objet règle contient une seule méthode : __invoke. Cette méthode reçoit le nom de l'attribut, sa valeur et un rappel qui doit être invoqué en cas d'échec avec le message d'erreur de validation :
+
+<?php
+ 
+namespace App\Rules;
+ 
+use Illuminate\Contracts\Validation\InvokableRule;
+ 
+class Uppercase implements InvokableRule
+{
+    /**
+     * Run the validation rule.
+     *
+     * @param  string  $attribute
+     * @param  mixed  $value
+     * @param  \Closure  $fail
+     * @return void
+     */
+    public function __invoke($attribute, $value, $fail)
+    {
+        if (strtoupper($value) !== $value) {
+            $fail('The :attribute must be uppercase.');
+        }
+    }
+}
+
+Une fois la règle définie, vous pouvez l'attacher à un validateur en passant une instance de l'objet de règle avec vos autres règles de validation :
+
+use App\Rules\Uppercase;
+ 
+$request->validate([
+    'name' => ['required', 'string', new Uppercase],
+]);
+
+Traduction des messages de validation
+Au lieu de fournir un message d'erreur littéral à la $failfermeture, vous pouvez également fournir une clé de chaîne de traduction et demander à Laravel de traduire le message d'erreur :
+
+if (strtoupper($value) !== $value) {
+    $fail('validation.uppercase')->translate();
+}
+
+Si nécessaire, vous pouvez fournir des remplacements d'espace réservé et la langue préférée comme premier et deuxième arguments de la translateméthode :
+
+$fail('validation.location')->translate([
+    'value' => $this->value,
+], 'fr')
+
+Accéder à des données supplémentaires
+Si votre classe de règles de validation personnalisée doit accéder à toutes les autres données en cours de validation, votre classe de règles peut implémenter l' Illuminate\Contracts\Validation\DataAwareRuleinterface. Cette interface nécessite que votre classe définisse une setDataméthode. Cette méthode sera automatiquement invoquée par Laravel (avant la validation) avec toutes les données en cours de validation :
+
+<?php
+ 
+namespace App\Rules;
+ 
+use Illuminate\Contracts\Validation\DataAwareRule;
+use Illuminate\Contracts\Validation\InvokableRule;
+ 
+class Uppercase implements DataAwareRule, InvokableRule
+{
+    /**
+     * All of the data under validation.
+     *
+     * @var array
+     */
+    protected $data = [];
+ 
+    // ...
+ 
+    /**
+     * Set the data under validation.
+     *
+     * @param  array  $data
+     * @return $this
+     */
+    public function setData($data)
+    {
+        $this->data = $data;
+ 
+        return $this;
+    }
+}
+
+Ou, si votre règle de validation nécessite l'accès à l'instance de validateur effectuant la validation, vous pouvez implémenter l' ValidatorAwareRuleinterface :
+
+<?php
+ 
+namespace App\Rules;
+ 
+use Illuminate\Contracts\Validation\InvokableRule;
+use Illuminate\Contracts\Validation\ValidatorAwareRule;
+ 
+class Uppercase implements InvokableRule, ValidatorAwareRule
+{
+    /**
+     * The validator instance.
+     *
+     * @var \Illuminate\Validation\Validator
+     */
+    protected $validator;
+ 
+    // ...
+ 
+    /**
+     * Set the current validator.
+     *
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @return $this
+     */
+    public function setValidator($validator)
+    {
+        $this->validator = $validator;
+ 
+        return $this;
+    }
+}
+
+Utiliser des fermetures
+Si vous n'avez besoin de la fonctionnalité d'une règle personnalisée qu'une seule fois dans votre application, vous pouvez utiliser une fermeture au lieu d'un objet de règle. La fermeture reçoit le nom de l'attribut, la valeur de l'attribut et un $failrappel qui doit être appelé si la validation échoue :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$validator = Validator::make($request->all(), [
+    'title' => [
+        'required',
+        'max:255',
+        function ($attribute, $value, $fail) {
+            if ($value === 'foo') {
+                $fail('The '.$attribute.' is invalid.');
+            }
+        },
+    ],
+]);
+
+Règles implicites
+Par défaut, lorsqu'un attribut en cours de validation n'est pas présent ou contient une chaîne vide, les règles de validation normales, y compris les règles personnalisées, ne sont pas exécutées. Par exemple, la uniquerègle ne sera pas exécutée sur une chaîne vide :
+
+use Illuminate\Support\Facades\Validator;
+ 
+$rules = ['name' => 'unique:users,name'];
+ 
+$input = ['name' => ''];
+ 
+Validator::make($input, $rules)->passes(); // true
+
+Pour qu'une règle personnalisée s'exécute même lorsqu'un attribut est vide, la règle doit impliquer que l'attribut est obligatoire. Pour créer une règle "implicite", implémentez l' Illuminate\Contracts\Validation\ImplicitRuleinterface. Cette interface sert d'"interface de marqueur" pour le validateur ; par conséquent, il ne contient aucune méthode supplémentaire que vous devez implémenter au-delà des méthodes requises par l' Ruleinterface typique.
+
+Pour générer un nouvel objet règle implicite, vous pouvez utiliser la make:rulecommande Artisan avec l' --implicitoption :
+
+php artisan make:rule Uppercase --invokable --implicit

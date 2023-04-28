@@ -1,0 +1,349 @@
+Développement de packages
+Introduction
+Une note sur les façades
+Découverte de forfaits
+Les fournisseurs de services
+Ressources
+Configuration
+Migrations
+Itinéraires
+Traductions
+Vues
+Afficher les composants
+"À propos" de la commande artisanale
+Commandes
+Biens publics
+Publication de groupes de fichiers
+Introduction
+Les packages sont le principal moyen d'ajouter des fonctionnalités à Laravel. Les packages peuvent être un excellent moyen de travailler avec des dates comme Carbon ou un package qui vous permet d'associer des fichiers à des modèles Eloquent comme Laravel Media Library de Spatie .
+
+Il existe différents types de forfaits. Certains packages sont autonomes, ce qui signifie qu'ils fonctionnent avec n'importe quel framework PHP. Carbon et PHPUnit sont des exemples de packages autonomes. N'importe lequel de ces packages peut être utilisé avec Laravel en les exigeant dans votre composer.jsonfichier.
+
+D'autre part, d'autres packages sont spécifiquement destinés à être utilisés avec Laravel. Ces packages peuvent avoir des itinéraires, des contrôleurs, des vues et une configuration spécifiquement destinés à améliorer une application Laravel. Ce guide couvre principalement le développement des packages spécifiques à Laravel.
+
+Une note sur les façades
+Lors de l'écriture d'une application Laravel, peu importe généralement si vous utilisez des contrats ou des façades, car les deux offrent des niveaux de testabilité essentiellement égaux. Cependant, lors de l'écriture de packages, votre package n'aura généralement pas accès à tous les assistants de test de Laravel. Si vous souhaitez pouvoir écrire vos tests de package comme si le package était installé dans une application Laravel typique, vous pouvez utiliser le package Orchestral Testbench .
+
+Découverte de forfaits
+config/app.phpDans le fichier de configuration d'une application Laravel , l' providersoption définit une liste de fournisseurs de services qui doivent être chargés par Laravel. Lorsque quelqu'un installe votre package, vous souhaiterez généralement que votre fournisseur de services soit inclus dans cette liste. Au lieu d'obliger les utilisateurs à ajouter manuellement votre fournisseur de services à la liste, vous pouvez définir le fournisseur dans la extrasection de la fiche de votre forfait composer.json. En plus des prestataires de services, vous pouvez également lister les façades que vous souhaitez enregistrer :
+
+"extra": {
+    "laravel": {
+        "providers": [
+            "Barryvdh\\Debugbar\\ServiceProvider"
+        ],
+        "aliases": {
+            "Debugbar": "Barryvdh\\Debugbar\\Facade"
+        }
+    }
+},
+
+Une fois votre package configuré pour la découverte, Laravel enregistrera automatiquement ses fournisseurs de services et ses façades lors de son installation, créant ainsi une expérience d'installation pratique pour les utilisateurs de votre package.
+
+Désactivation de la découverte de packages
+Si vous êtes le consommateur d'un package et que vous souhaitez désactiver la découverte de packages pour un package, vous pouvez indiquer le nom du package dans la extrasection du composer.jsonfichier de votre application :
+
+"extra": {
+    "laravel": {
+        "dont-discover": [
+            "barryvdh/laravel-debugbar"
+        ]
+    }
+},
+
+Vous pouvez désactiver la découverte de packages pour tous les packages en utilisant le *caractère à l'intérieur de la dont-discoverdirective de votre application :
+
+"extra": {
+    "laravel": {
+        "dont-discover": [
+            "*"
+        ]
+    }
+},
+
+Les fournisseurs de services
+Les fournisseurs de services sont le point de connexion entre votre package et Laravel. Un fournisseur de services est chargé de lier les éléments dans le conteneur de services de Laravel et d'informer Laravel de l'endroit où charger les ressources de package telles que les vues, la configuration et les fichiers de localisation.
+
+Un fournisseur de services étend la Illuminate\Support\ServiceProviderclasse et contient deux méthodes : registeret boot. La ServiceProviderclasse de base se trouve dans le illuminate/supportpackage Composer, que vous devez ajouter aux dépendances de votre propre package. Pour en savoir plus sur la structure et l'objectif des fournisseurs de services, consultez leur documentation .
+
+Ressources
+Configuration
+Généralement, vous devrez publier le fichier de configuration de votre package dans le répertoire de l'application config. Cela permettra aux utilisateurs de votre package de remplacer facilement vos options de configuration par défaut. Pour autoriser la publication de vos fichiers de configuration, appelez la publishesméthode depuis la bootméthode de votre fournisseur de services :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->publishes([
+        __DIR__.'/../config/courier.php' => config_path('courier.php'),
+    ]);
+}
+
+Désormais, lorsque les utilisateurs de votre package exécutent la vendor:publishcommande de Laravel, votre fichier sera copié à l'emplacement de publication spécifié. Une fois votre configuration publiée, ses valeurs sont accessibles comme n'importe quel autre fichier de configuration :
+
+$value = config('courier.option');
+
+
+Vous ne devez pas définir de fermetures dans vos fichiers de configuration. Ils ne peuvent pas être sérialisés correctement lorsque les utilisateurs exécutent la config:cachecommande Artisan.
+
+
+Configuration du paquet par défaut
+Vous pouvez également fusionner votre propre fichier de configuration de package avec la copie publiée de l'application. Cela permettra à vos utilisateurs de définir uniquement les options qu'ils souhaitent réellement remplacer dans la copie publiée du fichier de configuration. Pour fusionner les valeurs du fichier de configuration, utilisez la mergeConfigFromméthode de la méthode de votre fournisseur de services register.
+
+La mergeConfigFromméthode accepte le chemin d'accès au fichier de configuration de votre package comme premier argument et le nom de la copie de l'application du fichier de configuration comme deuxième argument :
+
+/**
+ * Register any application services.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->mergeConfigFrom(
+        __DIR__.'/../config/courier.php', 'courier'
+    );
+}
+
+
+Cette méthode ne fusionne que le premier niveau du tableau de configuration. Si vos utilisateurs définissent partiellement un tableau de configuration multidimensionnel, les options manquantes ne seront pas fusionnées.
+
+
+Itinéraires
+Si votre package contient des routes, vous pouvez les charger en utilisant la loadRoutesFromméthode. Cette méthode déterminera automatiquement si les routes de l'application sont mises en cache et ne chargera pas votre fichier de routes si les routes ont déjà été mises en cache :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+}
+
+Migrations
+Si votre package contient des migrations de base de données , vous pouvez utiliser la loadMigrationsFromméthode pour informer Laravel comment les charger. La loadMigrationsFromméthode accepte le chemin vers les migrations de votre package comme seul argument :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+}
+
+Une fois les migrations de votre package enregistrées, elles seront automatiquement exécutées lors de l'exécution de la php artisan migratecommande. Vous n'avez pas besoin de les exporter dans le database/migrationsrépertoire de l'application.
+
+Traductions
+Si votre package contient des fichiers de traduction , vous pouvez utiliser la loadTranslationsFromméthode pour indiquer à Laravel comment les charger. Par exemple, si votre package s'appelle courier, vous devez ajouter ce qui suit à la méthode de votre fournisseur de servicesboot :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+}
+
+Les traductions de packages sont référencées à l'aide de la package::file.lineconvention de syntaxe. Ainsi, vous pouvez charger la ligne du courierpackage welcomeà partir du messagesfichier comme ceci :
+
+echo trans('courier::messages.welcome');
+
+Publication de traductions
+Si vous souhaitez publier les traductions de votre package dans le lang/vendorrépertoire de l'application, vous pouvez utiliser la méthode du fournisseur de services publishes. La publishesméthode accepte un tableau de chemins de package et leurs emplacements de publication souhaités. Par exemple, pour publier les fichiers de traduction du courierpackage, vous pouvez procéder comme suit :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+ 
+    $this->publishes([
+        __DIR__.'/../lang' => $this->app->langPath('vendor/courier'),
+    ]);
+}
+
+Désormais, lorsque les utilisateurs de votre package exécutent la vendor:publishcommande Artisan de Laravel, les traductions de votre package seront publiées à l'emplacement de publication spécifié.
+
+Vues
+Pour enregistrer les vues de votre package avec Laravel, vous devez indiquer à Laravel où se trouvent les vues. Vous pouvez le faire en utilisant la méthode du fournisseur de services loadViewsFrom. La loadViewsFromméthode accepte deux arguments : le chemin d'accès à vos modèles de vue et le nom de votre package. Par exemple, si le nom de votre package est courier, vous ajouterez ce qui suit à la méthode de votre fournisseur de servicesboot :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+}
+
+Les vues de package sont référencées à l'aide de la package::viewconvention de syntaxe. Ainsi, une fois votre chemin de vue enregistré auprès d'un fournisseur de services, vous pouvez charger la dashboardvue à partir du courierpackage comme suit :
+
+Route::get('/dashboard', function () {
+    return view('courier::dashboard');
+});
+
+Remplacement des vues de package
+Lorsque vous utilisez la loadViewsFromméthode, Laravel enregistre en fait deux emplacements pour vos vues : le répertoire de l'application resources/views/vendoret le répertoire que vous spécifiez. Ainsi, en utilisant le courierpackage comme exemple, Laravel vérifiera d'abord si une version personnalisée de la vue a été placée dans le resources/views/vendor/courierrépertoire par le développeur. Ensuite, si la vue n'a pas été personnalisée, Laravel recherchera le répertoire de vue du paquet que vous avez spécifié dans votre appel à loadViewsFrom. Cela permet aux utilisateurs de package de personnaliser / remplacer facilement les vues de votre package.
+
+Vues de publication
+Si vous souhaitez rendre vos vues disponibles pour publication dans le resources/views/vendorrépertoire de l'application, vous pouvez utiliser la méthode du fournisseur de services publishes. La publishesméthode accepte un tableau de chemins d'affichage de package et leurs emplacements de publication souhaités :
+
+/**
+ * Bootstrap the package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+ 
+    $this->publishes([
+        __DIR__.'/../resources/views' => resource_path('views/vendor/courier'),
+    ]);
+}
+
+Désormais, lorsque les utilisateurs de votre package exécutent la vendor:publishcommande Artisan de Laravel, les vues de votre package seront copiées à l'emplacement de publication spécifié.
+
+Afficher les composants
+Si vous créez un package qui utilise des composants Blade ou placez des composants dans des répertoires non conventionnels, vous devrez enregistrer manuellement votre classe de composant et son alias de balise HTML afin que Laravel sache où trouver le composant. Vous devez généralement enregistrer vos composants dans la bootméthode du fournisseur de services de votre package :
+
+use Illuminate\Support\Facades\Blade;
+use VendorPackage\View\Components\AlertComponent;
+ 
+/**
+ * Bootstrap your package's services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::component('package-alert', AlertComponent::class);
+}
+
+Une fois votre composant enregistré, il peut être rendu à l'aide de son alias de balise :
+
+<x-package-alert/>
+
+Chargement automatique des composants de package
+Vous pouvez également utiliser la componentNamespaceméthode pour charger automatiquement les classes de composants par convention. Par exemple, un Nightshadepackage peut avoir Calendaret des ColorPickercomposants résidant dans l' espace de Nightshade\Views\Componentsnoms :
+
+use Illuminate\Support\Facades\Blade;
+ 
+/**
+ * Bootstrap your package's services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::componentNamespace('Nightshade\\Views\\Components', 'nightshade');
+}
+
+Cela permettra l'utilisation des composants du package par leur espace de noms de fournisseur en utilisant la package-name::syntaxe :
+
+<x-nightshade::calendar />
+<x-nightshade::color-picker />
+
+Blade détectera automatiquement la classe liée à ce composant en mettant en pascal le nom du composant. Les sous-répertoires sont également pris en charge en utilisant la notation "point".
+
+Composants anonymes
+Si votre package contient des composants anonymes, ils doivent être placés dans un componentsrépertoire du répertoire "views" de votre package (comme spécifié par la loadViewsFromméthode ). Ensuite, vous pouvez les afficher en préfixant le nom du composant avec l'espace de noms de la vue du package :
+
+<x-courier::alert />
+
+"À propos" de la commande artisanale
+La commande Artisan intégrée de Laravel aboutfournit un résumé de l'environnement et de la configuration de l'application. Les packages peuvent envoyer des informations supplémentaires à la sortie de cette commande via la AboutCommandclasse. En règle générale, ces informations peuvent être ajoutées à partir de la méthode de votre fournisseur de services de colisregister :
+
+use Illuminate\Foundation\Console\AboutCommand;
+ 
+/**
+ * Register any application services.
+ *
+ * @return void
+ */
+public function register()
+{
+    AboutCommand::add('My Package', 'Version', '1.0.0');
+}
+
+Les aboutvaleurs de la commande peuvent également être fournies comme fermetures si une exécution différée est souhaitable :
+
+AboutCommand::add('My Package', [
+    'Version' => '1.0.0',
+    'Driver' => fn () => config('my-package.driver'),
+]);
+
+Commandes
+Pour enregistrer les commandes Artisan de votre package avec Laravel, vous pouvez utiliser la commandsméthode. Cette méthode attend un tableau de noms de classes de commandes. Une fois les commandes enregistrées, vous pouvez les exécuter à l'aide de la CLI Artisan :
+
+use Courier\Console\Commands\InstallCommand;
+use Courier\Console\Commands\NetworkCommand;
+ 
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    if ($this->app->runningInConsole()) {
+        $this->commands([
+            InstallCommand::class,
+            NetworkCommand::class,
+        ]);
+    }
+}
+
+Biens publics
+Votre package peut contenir des ressources telles que JavaScript, CSS et des images. Pour publier ces ressources dans le publicrépertoire de l'application, utilisez la méthode du fournisseur de services publishes. Dans cet exemple, nous ajouterons également une publicbalise de groupe d'actifs, qui peut être utilisée pour publier facilement des groupes d'actifs associés :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->publishes([
+        __DIR__.'/../public' => public_path('vendor/courier'),
+    ], 'public');
+}
+
+Désormais, lorsque les utilisateurs de votre package exécuteront la vendor:publishcommande, vos actifs seront copiés à l'emplacement de publication spécifié. Étant donné que les utilisateurs devront généralement écraser les ressources à chaque mise à jour du package, vous pouvez utiliser l' --forceindicateur :
+
+php artisan vendor:publish --tag=public --force
+
+Publication de groupes de fichiers
+Vous souhaiterez peut-être publier des groupes d'actifs et de ressources de package séparément. Par exemple, vous pouvez autoriser vos utilisateurs à publier les fichiers de configuration de votre package sans être obligés de publier les actifs de votre package. Vous pouvez le faire en les "étiquetant" lors de l'appel de la publishesméthode depuis le fournisseur de services d'un package. Par exemple, utilisons des balises pour définir deux groupes de publication pour le courierpackage ( courier-configet courier-migrations) dans la bootméthode du fournisseur de services du package :
+
+/**
+ * Bootstrap any package services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->publishes([
+        __DIR__.'/../config/package.php' => config_path('package.php')
+    ], 'courier-config');
+ 
+    $this->publishes([
+        __DIR__.'/../database/migrations/' => database_path('migrations')
+    ], 'courier-migrations');
+}
+
+Désormais, vos utilisateurs peuvent publier ces groupes séparément en référençant leur balise lors de l'exécution de la vendor:publishcommande :
+
+php artisan vendor:publish --tag=courier-config

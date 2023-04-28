@@ -1,0 +1,79 @@
+Hachage
+Introduction
+Configuration
+Utilisation de base
+Hachage des mots de passe
+Vérifier qu'un mot de passe correspond à un hachage
+Déterminer si un mot de passe doit être ressassé
+Introduction
+Hash La façade Laravel fournit un hachage sécurisé Bcrypt et Argon2 pour stocker les mots de passe des utilisateurs. Si vous utilisez l'un des kits de démarrage de l'application Laravel , Bcrypt sera utilisé par défaut pour l'enregistrement et l'authentification.
+
+Bcrypt est un excellent choix pour hacher les mots de passe car son "facteur de travail" est ajustable, ce qui signifie que le temps nécessaire pour générer un hachage peut être augmenté à mesure que la puissance du matériel augmente. Lors du hachage des mots de passe, la lenteur est bonne. Plus un algorithme prend de temps pour hacher un mot de passe, plus il faut de temps aux utilisateurs malveillants pour générer des "tables arc-en-ciel" de toutes les valeurs de hachage de chaîne possibles qui peuvent être utilisées dans des attaques par force brute contre des applications.
+
+Configuration
+Le pilote de hachage par défaut de votre application est configuré dans le config/hashing.phpfichier de configuration de votre application. Il existe actuellement plusieurs pilotes pris en charge : Bcrypt et Argon2 (variantes Argon2i et Argon2id).
+
+Utilisation de base
+Hachage des mots de passe
+Vous pouvez hacher un mot de passe en appelant la makeméthode sur la Hashfaçade :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+ 
+class PasswordController extends Controller
+{
+    /**
+     * Update the password for the user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request)
+    {
+        // Validate the new password length...
+ 
+        $request->user()->fill([
+            'password' => Hash::make($request->newPassword)
+        ])->save();
+    }
+}
+
+Ajustement du facteur de travail Bcrypt
+Si vous utilisez l'algorithme Bcrypt, la makeméthode permet de gérer le facteur de travail de l'algorithme à l'aide de l' roundsoption ; cependant, le facteur de travail par défaut géré par Laravel est acceptable pour la plupart des applications :
+
+$hashed = Hash::make('password', [
+    'rounds' => 12,
+]);
+
+Réglage du facteur de travail Argon2
+Si vous utilisez l'algorithme Argon2, la makeméthode permet de gérer le facteur de travail de l'algorithme à l'aide des options memory, time, et ; threadscependant, les valeurs par défaut gérées par Laravel sont acceptables pour la plupart des applications :
+
+$hashed = Hash::make('password', [
+    'memory' => 1024,
+    'time' => 2,
+    'threads' => 2,
+]);
+
+
+Pour plus d'informations sur ces options, veuillez vous référer à la documentation officielle de PHP concernant le hachage Argon .
+
+
+Vérifier qu'un mot de passe correspond à un hachage
+La checkméthode fournie par la Hashfaçade permet de vérifier qu'une chaîne de texte en clair donnée correspond à un hachage donné :
+
+if (Hash::check('plain-text', $hashedPassword)) {
+    // The passwords match...
+}
+
+Déterminer si un mot de passe doit être ressassé
+La needsRehashméthode fournie par la Hashfaçade permet de déterminer si le facteur de travail utilisé par le hacheur a changé depuis le hachage du mot de passe. Certaines applications choisissent d'effectuer cette vérification lors du processus d'authentification de l'application :
+
+if (Hash::needsRehash($hashed)) {
+    $hashed = Hash::make('plain-text');
+}
+

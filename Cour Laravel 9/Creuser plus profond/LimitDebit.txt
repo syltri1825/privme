@@ -1,0 +1,400 @@
+Planification des tâches
+Introduction
+Définition des horaires
+Planification des commandes artisanales
+Planification des travaux en file d'attente
+Planification des commandes Shell
+Options de fréquence de planification
+Fuseaux horaires
+Empêcher les chevauchements de tâches
+Exécution de tâches sur un serveur
+Tâches d'arrière-plan
+Mode de Maintenance
+Exécution du planificateur
+Exécuter le planificateur localement
+Sortie de tâche
+Crochets de tâche
+Événements
+Introduction
+Dans le passé, vous avez peut-être écrit une entrée de configuration cron pour chaque tâche que vous deviez planifier sur votre serveur. Cependant, cela peut rapidement devenir pénible car votre planification de tâches n'est plus sous contrôle de code source et vous devez vous connecter en SSH à votre serveur pour afficher vos entrées cron existantes ou ajouter des entrées supplémentaires.
+
+Le planificateur de commandes de Laravel offre une nouvelle approche de la gestion des tâches planifiées sur votre serveur. Le planificateur vous permet de définir de manière fluide et expressive votre programme de commandes dans votre application Laravel elle-même. Lorsque vous utilisez le planificateur, une seule entrée cron est nécessaire sur votre serveur. Votre planning de tâches est défini dans la méthode app/Console/Kernel.phpdu fichier schedule. Pour vous aider à démarrer, un exemple simple est défini dans la méthode.
+
+Définition des horaires
+Vous pouvez définir toutes vos tâches planifiées dans la scheduleméthode de la App\Console\Kernelclasse de votre application. Pour commencer, regardons un exemple. Dans cet exemple, nous allons programmer une fermeture à appeler tous les jours à minuit. Dans la fermeture, nous exécuterons une requête de base de données pour effacer une table :
+
+<?php
+ 
+namespace App\Console;
+ 
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Facades\DB;
+ 
+class Kernel extends ConsoleKernel
+{
+    /**
+     * Define the application's command schedule.
+     *
+     * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
+     * @return void
+     */
+    protected function schedule(Schedule $schedule)
+    {
+        $schedule->call(function () {
+            DB::table('recent_users')->delete();
+        })->daily();
+    }
+}
+
+Outre la planification à l'aide de fermetures, vous pouvez également planifier des objets invocables . Les objets invocables sont de simples classes PHP qui contiennent une __invokeméthode :
+
+$schedule->call(new DeleteRecentUsers)->daily();
+
+Si vous souhaitez afficher un aperçu de vos tâches planifiées et la prochaine fois qu'elles sont planifiées, vous pouvez utiliser la schedule:listcommande Artisan :
+
+php artisan schedule:list
+
+Planification des commandes artisanales
+En plus de programmer des fermetures, vous pouvez également programmer des commandes Artisan et des commandes système. Par exemple, vous pouvez utiliser la commandméthode pour planifier une commande Artisan en utilisant le nom ou la classe de la commande.
+
+Lors de la planification de commandes Artisan à l'aide du nom de classe de la commande, vous pouvez transmettre un tableau d'arguments de ligne de commande supplémentaires qui doivent être fournis à la commande lorsqu'elle est invoquée :
+
+use App\Console\Commands\SendEmailsCommand;
+ 
+$schedule->command('emails:send Taylor --force')->daily();
+ 
+$schedule->command(SendEmailsCommand::class, ['Taylor', '--force'])->daily();
+
+Planification des travaux en file d'attente
+La jobméthode peut être utilisée pour planifier une tâche en file d'attente . Cette méthode offre un moyen pratique de planifier des travaux en file d'attente sans utiliser la callméthode pour définir des fermetures pour mettre le travail en file d'attente :
+
+use App\Jobs\Heartbeat;
+ 
+$schedule->job(new Heartbeat)->everyFiveMinutes();
+
+Des deuxième et troisième arguments facultatifs peuvent être fournis à la jobméthode qui spécifie le nom de la file d'attente et la connexion à la file d'attente qui doivent être utilisés pour mettre le travail en file d'attente :
+
+use App\Jobs\Heartbeat;
+ 
+// Dispatch the job to the "heartbeats" queue on the "sqs" connection...
+$schedule->job(new Heartbeat, 'heartbeats', 'sqs')->everyFiveMinutes();
+
+Planification des commandes Shell
+La execméthode peut être utilisée pour envoyer une commande au système d'exploitation :
+
+$schedule->exec('node /home/forge/script.js')->daily();
+
+Options de fréquence de planification
+Nous avons déjà vu quelques exemples de la façon dont vous pouvez configurer une tâche pour qu'elle s'exécute à des intervalles spécifiés. Cependant, il existe de nombreuses autres fréquences de planification de tâches que vous pouvez attribuer à une tâche :
+
+Méthode	La description
+->cron('* * * * *');	Exécutez la tâche selon une planification cron personnalisée
+->everyMinute();	Exécutez la tâche toutes les minutes
+->everyTwoMinutes();	Exécutez la tâche toutes les deux minutes
+->everyThreeMinutes();	Exécutez la tâche toutes les trois minutes
+->everyFourMinutes();	Exécutez la tâche toutes les quatre minutes
+->everyFiveMinutes();	Exécutez la tâche toutes les cinq minutes
+->everyTenMinutes();	Exécutez la tâche toutes les dix minutes
+->everyFifteenMinutes();	Exécutez la tâche toutes les quinze minutes
+->everyThirtyMinutes();	Exécutez la tâche toutes les trente minutes
+->hourly();	Exécutez la tâche toutes les heures
+->hourlyAt(17);	Exécutez la tâche toutes les heures à 17 minutes après l'heure
+->everyTwoHours();	Exécutez la tâche toutes les deux heures
+->everyThreeHours();	Exécutez la tâche toutes les trois heures
+->everyFourHours();	Exécutez la tâche toutes les quatre heures
+->everySixHours();	Exécutez la tâche toutes les six heures
+->daily();	Exécutez la tâche tous les jours à minuit
+->dailyAt('13:00');	Exécutez la tâche tous les jours à 13h00
+->twiceDaily(1, 13);	Exécutez la tâche quotidiennement à 1h00 et 13h00
+->weekly();	Exécutez la tâche tous les dimanches à 00:00
+->weeklyOn(1, '8:00');	Exécutez la tâche chaque semaine le lundi à 8h00
+->monthly();	Exécutez la tâche le premier jour de chaque mois à 00:00
+->monthlyOn(4, '15:00');	Exécutez la tâche tous les mois le 4 à 15h00
+->twiceMonthly(1, 16, '13:00');	Exécutez la tâche mensuellement le 1er et le 16 à 13h00
+->lastDayOfMonth('15:00');	Exécutez la tâche le dernier jour du mois à 15h00
+->quarterly();	Exécutez la tâche le premier jour de chaque trimestre à 00:00
+->yearly();	Exécutez la tâche le premier jour de chaque année à 00:00
+->yearlyOn(6, 1, '17:00');	Exécutez la tâche chaque année le 1er juin à 17h00
+->timezone('America/New_York');	Définir le fuseau horaire de la tâche
+Ces méthodes peuvent être combinées avec des contraintes supplémentaires pour créer des horaires encore plus précis qui ne fonctionnent que certains jours de la semaine. Par exemple, vous pouvez programmer une commande pour qu'elle s'exécute chaque semaine le lundi :
+
+// Run once per week on Monday at 1 PM...
+$schedule->call(function () {
+    //
+})->weekly()->mondays()->at('13:00');
+ 
+// Run hourly from 8 AM to 5 PM on weekdays...
+$schedule->command('foo')
+          ->weekdays()
+          ->hourly()
+          ->timezone('America/Chicago')
+          ->between('8:00', '17:00');
+
+Une liste de contraintes de calendrier supplémentaires peut être trouvée ci-dessous :
+
+Méthode	La description
+->weekdays();	Limiter la tâche aux jours de la semaine
+->weekends();	Limiter la tâche aux week-ends
+->sundays();	Limiter la tâche au dimanche
+->mondays();	Limiter la tâche au lundi
+->tuesdays();	Limiter la tâche à mardi
+->wednesdays();	Limiter la tâche au mercredi
+->thursdays();	Limiter la tâche au jeudi
+->fridays();	Limiter la tâche au vendredi
+->saturdays();	Limiter la tâche au samedi
+->days(array|mixed);	Limiter la tâche à des jours spécifiques
+->between($startTime, $endTime);	Limiter l'exécution de la tâche entre les heures de début et de fin
+->unlessBetween($startTime, $endTime);	Limiter la tâche pour qu'elle ne s'exécute pas entre les heures de début et de fin
+->when(Closure);	Limiter la tâche sur la base d'un test de vérité
+->environments($env);	Limiter la tâche à des environnements spécifiques
+Contraintes de jour
+Le daysprocédé peut être utilisé pour limiter l'exécution d'une tâche à des jours spécifiques de la semaine. Par exemple, vous pouvez programmer une commande pour qu'elle s'exécute toutes les heures les dimanches et mercredis :
+
+$schedule->command('emails:send')
+                ->hourly()
+                ->days([0, 3]);
+
+Alternativement, vous pouvez utiliser les constantes disponibles sur la Illuminate\Console\Scheduling\Scheduleclasse lors de la définition des jours d'exécution d'une tâche :
+
+use Illuminate\Console\Scheduling\Schedule;
+ 
+$schedule->command('emails:send')
+                ->hourly()
+                ->days([Schedule::SUNDAY, Schedule::WEDNESDAY]);
+
+Entre les contraintes de temps
+La betweenméthode peut être utilisée pour limiter l'exécution d'une tâche en fonction de l'heure de la journée :
+
+$schedule->command('emails:send')
+                    ->hourly()
+                    ->between('7:00', '22:00');
+
+De même, la unlessBetweenméthode peut être utilisée pour exclure l'exécution d'une tâche pendant un certain temps :
+
+$schedule->command('emails:send')
+                    ->hourly()
+                    ->unlessBetween('23:00', '4:00');
+
+Contraintes du test de vérité
+Le whenprocédé peut être utilisé pour limiter l'exécution d'une tâche sur la base du résultat d'un test de vérité donné. En d'autres termes, si la fermeture donnée renvoie true, la tâche s'exécutera tant qu'aucune autre condition contraignante n'empêchera la tâche de s'exécuter :
+
+$schedule->command('emails:send')->daily()->when(function () {
+    return true;
+});
+
+La skipméthode peut être considérée comme l'inverse de when. Si la skipméthode retourne true, la tâche planifiée ne sera pas exécutée :
+
+$schedule->command('emails:send')->daily()->skip(function () {
+    return true;
+});
+
+Lors de l'utilisation de méthodes chaînées when, la commande planifiée ne s'exécutera que si toutes les whenconditions renvoient true.
+
+Contraintes environnementales
+La environmentsméthode peut être utilisée pour exécuter des tâches uniquement sur les environnements donnés (tels que définis par la APP_ENV variable d'environnement ):
+
+$schedule->command('emails:send')
+            ->daily()
+            ->environments(['staging', 'production']);
+
+Fuseaux horaires
+En utilisant la timezoneméthode, vous pouvez spécifier que l'heure d'une tâche planifiée doit être interprétée dans un fuseau horaire donné :
+
+$schedule->command('report:generate')
+         ->timezone('America/New_York')
+         ->at('2:00')
+
+Si vous attribuez à plusieurs reprises le même fuseau horaire à toutes vos tâches planifiées, vous souhaiterez peut-être définir une scheduleTimezoneméthode dans votre App\Console\Kernelclasse. Cette méthode doit renvoyer le fuseau horaire par défaut qui doit être attribué à toutes les tâches planifiées :
+
+/**
+ * Get the timezone that should be used by default for scheduled events.
+ *
+ * @return \DateTimeZone|string|null
+ */
+protected function scheduleTimezone()
+{
+    return 'America/Chicago';
+}
+
+
+N'oubliez pas que certains fuseaux horaires utilisent l'heure d'été. Lorsque l'heure d'été change, votre tâche planifiée peut s'exécuter deux fois ou même ne pas s'exécuter du tout. Pour cette raison, nous vous recommandons d'éviter la programmation par fuseau horaire dans la mesure du possible.
+
+
+Empêcher les chevauchements de tâches
+Par défaut, les tâches planifiées seront exécutées même si l'instance précédente de la tâche est toujours en cours d'exécution. Pour éviter cela, vous pouvez utiliser la withoutOverlappingméthode :
+
+$schedule->command('emails:send')->withoutOverlapping();
+
+Dans cet exemple, la emails:send commande Artisan sera exécutée toutes les minutes si elle n'est pas déjà en cours d'exécution. La withoutOverlappingméthode est particulièrement utile si vous avez des tâches dont le temps d'exécution varie considérablement, ce qui vous empêche de prédire exactement combien de temps prendra une tâche donnée.
+
+Si nécessaire, vous pouvez spécifier le nombre de minutes devant s'écouler avant l'expiration du verrouillage "sans chevauchement". Par défaut, le verrouillage expirera après 24 heures :
+
+$schedule->command('emails:send')->withoutOverlapping(10);
+
+Dans les coulisses, la withoutOverlappingméthode utilise le cache de votre application pour obtenir des verrous. Si nécessaire, vous pouvez effacer ces verrous de cache à l'aide de la schedule:clear-cachecommande Artisan. Cela n'est généralement nécessaire que si une tâche est bloquée en raison d'un problème de serveur inattendu.
+
+Exécution de tâches sur un serveur
+
+Pour utiliser cette fonctionnalité, votre application doit utiliser le pilote de cache database, memcached, dynamodbou rediscomme pilote de cache par défaut de votre application. De plus, tous les serveurs doivent communiquer avec le même serveur de cache central.
+
+
+Si le planificateur de votre application s'exécute sur plusieurs serveurs, vous pouvez limiter une tâche planifiée pour qu'elle s'exécute uniquement sur un seul serveur. Par exemple, supposons que vous ayez une tâche planifiée qui génère un nouveau rapport tous les vendredis soirs. Si le planificateur de tâches s'exécute sur trois serveurs de travail, la tâche planifiée s'exécutera sur les trois serveurs et générera le rapport trois fois. Pas bon!
+
+Pour indiquer que la tâche ne doit s'exécuter que sur un seul serveur, utilisez la onOneServerméthode lors de la définition de la tâche planifiée. Le premier serveur à obtenir la tâche sécurisera un verrou atomique sur le travail pour empêcher d'autres serveurs d'exécuter la même tâche en même temps :
+
+$schedule->command('report:generate')
+                ->fridays()
+                ->at('17:00')
+                ->onOneServer();
+
+Tâches d'arrière-plan
+Par défaut, plusieurs tâches planifiées en même temps s'exécuteront séquentiellement en fonction de l'ordre dans lequel elles sont définies dans votre scheduleméthode. Si vous avez des tâches de longue durée, cela peut entraîner le démarrage des tâches suivantes beaucoup plus tard que prévu. Si vous souhaitez exécuter des tâches en arrière-plan afin qu'elles puissent toutes s'exécuter simultanément, vous pouvez utiliser la runInBackgroundméthode :
+
+$schedule->command('analytics:report')
+         ->daily()
+         ->runInBackground();
+
+
+La runInBackgroundméthode ne peut être utilisée que lors de la planification de tâches via les méthodes commandet .exec
+
+
+Mode de Maintenance
+Les tâches planifiées de votre application ne s'exécuteront pas lorsque l'application est en mode maintenance , car nous ne voulons pas que vos tâches interfèrent avec une maintenance inachevée que vous pourriez effectuer sur votre serveur. Cependant, si vous souhaitez forcer une tâche à s'exécuter même en mode maintenance, vous pouvez appeler la evenInMaintenanceModeméthode lors de la définition de la tâche :
+
+$schedule->command('emails:send')->evenInMaintenanceMode();
+
+Exécution du planificateur
+Maintenant que nous avons appris à définir des tâches planifiées, discutons de la manière de les exécuter réellement sur notre serveur. La schedule:runcommande Artisan évaluera toutes vos tâches planifiées et déterminera si elles doivent être exécutées en fonction de l'heure actuelle du serveur.
+
+Ainsi, lorsque vous utilisez le planificateur de Laravel, nous n'avons qu'à ajouter une seule entrée de configuration cron à notre serveur qui exécute la schedule:runcommande toutes les minutes. Si vous ne savez pas comment ajouter des entrées cron à votre serveur, pensez à utiliser un service tel que Laravel Forge qui peut gérer les entrées cron pour vous :
+
+* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+
+Exécuter le planificateur localement
+En règle générale, vous n'ajouteriez pas d'entrée cron de planificateur à votre ordinateur de développement local. Au lieu de cela, vous pouvez utiliser la schedule:workcommande Artisan. Cette commande s'exécutera au premier plan et invoquera le planificateur toutes les minutes jusqu'à ce que vous terminiez la commande :
+
+php artisan schedule:work
+
+Sortie de tâche
+Le planificateur Laravel fournit plusieurs méthodes pratiques pour travailler avec la sortie générée par les tâches planifiées. Tout d'abord, en utilisant la sendOutputTométhode, vous pouvez envoyer la sortie vers un fichier pour une inspection ultérieure :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->sendOutputTo($filePath);
+
+Si vous souhaitez ajouter la sortie à un fichier donné, vous pouvez utiliser la appendOutputTométhode :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->appendOutputTo($filePath);
+
+En utilisant la emailOutputTométhode, vous pouvez envoyer la sortie par e-mail à une adresse e-mail de votre choix. Avant d'envoyer par e-mail la sortie d'une tâche, vous devez configurer les services de messagerie de Laravel :
+
+$schedule->command('report:generate')
+         ->daily()
+         ->sendOutputTo($filePath)
+         ->emailOutputTo('taylor@example.com');
+
+Si vous souhaitez envoyer la sortie par e-mail uniquement si la commande Artisan ou système planifiée se termine par un code de sortie différent de zéro, utilisez la emailOutputOnFailureméthode :
+
+$schedule->command('report:generate')
+         ->daily()
+         ->emailOutputOnFailure('taylor@example.com');
+
+
+Les méthodes emailOutputTo, emailOutputOnFailure, sendOutputToet appendOutputTosont exclusives aux méthodes commandet exec.
+
+
+Crochets de tâche
+En utilisant les méthodes beforeet after, vous pouvez spécifier le code à exécuter avant et après l'exécution de la tâche planifiée :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->before(function () {
+             // The task is about to execute...
+         })
+         ->after(function () {
+             // The task has executed...
+         });
+
+Les méthodes onSuccesset onFailurevous permettent de spécifier le code à exécuter si la tâche planifiée réussit ou échoue. Un échec indique que la commande Artisan ou système planifiée s'est terminée avec un code de sortie différent de zéro :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->onSuccess(function () {
+             // The task succeeded...
+         })
+         ->onFailure(function () {
+             // The task failed...
+         });
+
+Si la sortie est disponible à partir de votre commande, vous pouvez y accéder dans vos crochets after, onSuccessou onFailureen indiquant une Illuminate\Support\Stringableinstance comme $outputargument de la définition de fermeture de votre crochet :
+
+use Illuminate\Support\Stringable;
+ 
+$schedule->command('emails:send')
+         ->daily()
+         ->onSuccess(function (Stringable $output) {
+             // The task succeeded...
+         })
+         ->onFailure(function (Stringable $output) {
+             // The task failed...
+         });
+
+URL de ping
+À l'aide des méthodes pingBeforeet thenPing, le planificateur peut automatiquement envoyer un ping à une URL donnée avant ou après l'exécution d'une tâche. Cette méthode est utile pour notifier à un service externe, tel que Envoyer , que votre tâche planifiée commence ou a terminé son exécution :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->pingBefore($url)
+         ->thenPing($url);
+
+Les méthodes pingBeforeIfet thenPingIfpeuvent être utilisées pour pinger une URL donnée uniquement si une condition donnée est true:
+
+$schedule->command('emails:send')
+         ->daily()
+         ->pingBeforeIf($condition, $url)
+         ->thenPingIf($condition, $url);
+
+Les méthodes pingOnSuccesset pingOnFailurepeuvent être utilisées pour envoyer un ping à une URL donnée uniquement si la tâche réussit ou échoue. Un échec indique que la commande Artisan ou système planifiée s'est terminée avec un code de sortie différent de zéro :
+
+$schedule->command('emails:send')
+         ->daily()
+         ->pingOnSuccess($successUrl)
+         ->pingOnFailure($failureUrl);
+
+Toutes les méthodes ping nécessitent la bibliothèque HTTP Guzzle. Guzzle est généralement installé par défaut dans tous les nouveaux projets Laravel, mais vous pouvez installer manuellement Guzzle dans votre projet à l'aide du gestionnaire de packages Composer s'il a été supprimé par inadvertance :
+
+composer require guzzlehttp/guzzle
+
+Événements
+Si nécessaire, vous pouvez écouter les événements envoyés par le planificateur. En règle générale, les mappages d'écouteurs d'événements seront définis dans la App\Providers\EventServiceProviderclasse de votre application :
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Console\Events\ScheduledTaskStarting' => [
+        'App\Listeners\LogScheduledTaskStarting',
+    ],
+ 
+    'Illuminate\Console\Events\ScheduledTaskFinished' => [
+        'App\Listeners\LogScheduledTaskFinished',
+    ],
+ 
+    'Illuminate\Console\Events\ScheduledBackgroundTaskFinished' => [
+        'App\Listeners\LogScheduledBackgroundTaskFinished',
+    ],
+ 
+    'Illuminate\Console\Events\ScheduledTaskSkipped' => [
+        'App\Listeners\LogScheduledTaskSkipped',
+    ],
+ 
+    'Illuminate\Console\Events\ScheduledTaskFailed' => [
+        'App\Listeners\LogScheduledTaskFailed',
+    ],
+];
+

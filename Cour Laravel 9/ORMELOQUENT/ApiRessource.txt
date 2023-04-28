@@ -1,0 +1,786 @@
+Éloquent : ressources API
+Introduction
+Génération de ressources
+Présentation du concept
+Collections de ressources
+Ressources d'écriture
+Emballage de données
+Pagination
+Attributs conditionnels
+Relations conditionnelles
+Ajout de métadonnées
+Réponses des ressources
+Introduction
+Lors de la création d'une API, vous aurez peut-être besoin d'une couche de transformation située entre vos modèles Eloquent et les réponses JSON qui sont réellement renvoyées aux utilisateurs de votre application. Par exemple, vous souhaiterez peut-être afficher certains attributs pour un sous-ensemble d'utilisateurs et pas d'autres, ou vous souhaiterez peut-être toujours inclure certaines relations dans la représentation JSON de vos modèles. Les classes de ressources d'Eloquent vous permettent de transformer facilement et de manière expressive vos modèles et collections de modèles en JSON.
+
+Bien sûr, vous pouvez toujours convertir des modèles ou des collections Eloquent en JSON en utilisant leurs toJsonméthodes ; cependant, les ressources Eloquent offrent un contrôle plus granulaire et plus robuste sur la sérialisation JSON de vos modèles et leurs relations.
+
+Génération de ressources
+Pour générer une classe de ressources, vous pouvez utiliser la make:resourcecommande Artisan. Par défaut, les ressources seront placées dans le app/Http/Resourcesrépertoire de votre application. Les ressources étendent la Illuminate\Http\Resources\Json\JsonResourceclasse :
+
+php artisan make:resource UserResource
+
+Collections de ressources
+Outre la génération de ressources qui transforment des modèles individuels, vous pouvez générer des ressources chargées de transformer des ensembles de modèles. Cela permet à vos réponses JSON d'inclure des liens et d'autres méta-informations pertinentes pour une collection entière d'une ressource donnée.
+
+Pour créer une collection de ressources, vous devez utiliser l' --collectionindicateur lors de la création de la ressource. Ou, inclure le mot Collectiondans le nom de la ressource indiquera à Laravel qu'il doit créer une ressource de collection. Les ressources de collection étendent la Illuminate\Http\Resources\Json\ResourceCollectionclasse :
+
+php artisan make:resource User --collection
+ 
+php artisan make:resource UserCollection
+
+Présentation du concept
+
+Il s'agit d'un aperçu de haut niveau des ressources et des collections de ressources. Nous vous encourageons vivement à lire les autres sections de cette documentation pour mieux comprendre la personnalisation et la puissance que vous offrent les ressources.
+
+
+Avant de plonger dans toutes les options qui s'offrent à vous lors de l'écriture de ressources, examinons d'abord comment les ressources sont utilisées dans Laravel. Une classe de ressources représente un modèle unique qui doit être transformé en une structure JSON. Par exemple, voici une UserResourceclasse de ressource simple :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+ 
+class UserResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}
+
+Chaque classe de ressources définit une toArrayméthode qui renvoie le tableau d'attributs qui doivent être convertis en JSON lorsque la ressource est renvoyée en réponse d'une route ou d'une méthode de contrôleur.
+
+Notez que nous pouvons accéder aux propriétés du modèle directement à partir de la $thisvariable. Cela est dû au fait qu'une classe de ressources transmettra automatiquement l'accès aux propriétés et aux méthodes au modèle sous-jacent pour un accès pratique. Une fois la ressource définie, elle peut être renvoyée par une route ou un contrôleur. La ressource accepte l'instance de modèle sous-jacente via son constructeur :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/user/{id}', function ($id) {
+    return new UserResource(User::findOrFail($id));
+});
+
+Collections de ressources
+Si vous renvoyez une collection de ressources ou une réponse paginée, vous devez utiliser la collectionméthode fournie par votre classe de ressources lors de la création de l'instance de ressource dans votre route ou votre contrôleur :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return UserResource::collection(User::all());
+});
+
+Notez que cela ne permet aucun ajout de métadonnées personnalisées qui pourraient devoir être renvoyées avec votre collection. Si vous souhaitez personnaliser la réponse de la collection de ressources, vous pouvez créer une ressource dédiée pour représenter la collection :
+
+php artisan make:resource UserCollection
+
+Une fois la classe de collection de ressources générée, vous pouvez facilement définir les métadonnées à inclure dans la réponse :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\ResourceCollection;
+ 
+class UserCollection extends ResourceCollection
+{
+    /**
+     * Transform the resource collection into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'data' => $this->collection,
+            'links' => [
+                'self' => 'link-value',
+            ],
+        ];
+    }
+}
+
+Après avoir défini votre collection de ressources, elle peut être renvoyée par une route ou un contrôleur :
+
+use App\Http\Resources\UserCollection;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return new UserCollection(User::all());
+});
+
+Conservation des clés de collection
+Lors du retour d'une collection de ressources à partir d'un itinéraire, Laravel réinitialise les clés de la collection afin qu'elles soient dans l'ordre numérique. Cependant, vous pouvez ajouter une preserveKeyspropriété à votre classe de ressources indiquant si les clés d'origine d'une collection doivent être conservées :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+ 
+class UserResource extends JsonResource
+{
+    /**
+     * Indicates if the resource's collection keys should be preserved.
+     *
+     * @var bool
+     */
+    public $preserveKeys = true;
+}
+
+Lorsque la preserveKeyspropriété est définie surtrue , les clés de collection sont conservées lorsque la collection est renvoyée par une route ou un contrôleur :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return UserResource::collection(User::all()->keyBy->id);
+});
+
+Personnalisation de la classe de ressources sous-jacente
+En règle générale, la $this->collectionpropriété d'une collection de ressources est automatiquement renseignée avec le résultat du mappage de chaque élément de la collection à sa classe de ressources singulière. La classe de ressource singulière est supposée être le nom de classe de la collection sans la Collectionpartie finale du nom de classe. De plus, selon vos préférences personnelles, la classe de ressource singulière peut ou non être suffixée par Resource.
+
+Par exemple, UserCollectiontentera de mapper les instances d'utilisateur données dans la UserResourceressource. Pour personnaliser ce comportement, vous pouvez remplacer la $collectspropriété de votre collection de ressources :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\ResourceCollection;
+ 
+class UserCollection extends ResourceCollection
+{
+    /**
+     * The resource that this resource collects.
+     *
+     * @var string
+     */
+    public $collects = Member::class;
+}
+
+Ressources d'écriture
+
+Si vous n'avez pas lu la présentation du concept , nous vous encourageons 
+
+vivement à le faire avant de poursuivre avec cette documentation.
+
+
+Essentiellement, les ressources sont simples. Ils n'ont qu'à transformer 
+
+un modèle donné en un tableau. Ainsi, chaque ressource contient une 
+
+toArrayméthode qui traduit les attributs de votre modèle en un tableau 
+
+compatible avec l'API qui peut être renvoyé par les routes ou les 
+
+contrôleurs de votre application :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+ 
+class UserResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}
+
+Une fois qu'une ressource a été définie, elle peut être renvoyée directement depuis une route ou un contrôleur :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/user/{id}', function ($id) {
+    return new UserResource(User::findOrFail($id));
+});
+
+Des relations
+Si vous souhaitez inclure des ressources associées dans votre réponse, vous pouvez les ajouter au tableau renvoyé par la toArrayméthode de votre ressource. Dans cet exemple, nous utiliserons la méthode de la PostResourceressource collectionpour ajouter les articles de blog de l'utilisateur à la réponse de la ressource :
+
+use App\Http\Resources\PostResource;
+ 
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'email' => $this->email,
+        'posts' => PostResource::collection($this->posts),
+        'created_at' => $this->created_at,
+        'updated_at' => $this->updated_at,
+    ];
+}
+
+
+Si vous souhaitez inclure des relations uniquement lorsqu'elles ont déjà été chargées, consultez la documentation sur les relations conditionnelles .
+
+
+Collections de ressources
+Alors que les ressources transforment un modèle unique en tableau, les collections de ressources transforment une collection de modèles en tableau. Cependant, il n'est pas absolument nécessaire de définir une classe de collection de ressources pour chacun de vos modèles puisque toutes les ressources fournissent une collectionméthode pour générer une collection de ressources "ad-hoc" à la volée :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return UserResource::collection(User::all());
+});
+
+Cependant, si vous avez besoin de personnaliser les métadonnées renvoyées avec la collection, il est nécessaire de définir votre propre collection de ressources :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\ResourceCollection;
+ 
+class UserCollection extends ResourceCollection
+{
+    /**
+     * Transform the resource collection into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'data' => $this->collection,
+            'links' => [
+                'self' => 'link-value',
+            ],
+        ];
+    }
+}
+
+Comme les ressources singulières, les collections de ressources peuvent être renvoyées directement à partir des routes ou des contrôleurs :
+
+use App\Http\Resources\UserCollection;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return new UserCollection(User::all());
+});
+
+Emballage de données
+Par défaut, votre ressource la plus externe est encapsulée dans une dataclé lorsque la réponse de la ressource est convertie en JSON. Ainsi, par exemple, une réponse typique de collecte de ressources ressemble à ceci :
+
+{
+    "data": [
+        {
+            "id": 1,
+            "name": "Eladio Schroeder Sr.",
+            "email": "therese28@example.com",
+        },
+        {
+            "id": 2,
+            "name": "Liliana Mayert",
+            "email": "evandervort@example.com",
+        }
+    ]
+}
+
+Si vous souhaitez utiliser une clé personnalisée au lieu de data, vous pouvez définir un $wrapattribut sur la classe de ressources :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+ 
+class UserResource extends JsonResource
+{
+    /**
+     * The "data" wrapper that should be applied.
+     *
+     * @var string|null
+     */
+    public static $wrap = 'user';
+}
+
+Si vous souhaitez désactiver l'encapsulation de la ressource la plus externe, vous devez invoquer la withoutWrappingméthode sur la Illuminate\Http\Resources\Json\JsonResourceclasse de base. En règle générale, vous devez appeler cette méthode à partir de votre fournisseur de servicesAppServiceProvider ou d'un autre qui est chargé à chaque requête adressée à votre application :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        JsonResource::withoutWrapping();
+    }
+}
+
+
+La withoutWrappingméthode affecte uniquement la réponse la plus externe et ne supprimera pas les dataclés que vous ajoutez manuellement à vos propres collections de ressources.
+
+
+Emballage des ressources imbriquées
+Vous avez une liberté totale pour déterminer comment les relations de votre ressource sont enveloppées. Si vous souhaitez que toutes les collections de ressources soient encapsulées dans une dataclé, quelle que soit leur imbrication, vous devez définir une classe de collection de ressources pour chaque ressource et renvoyer la collection dans une dataclé.
+
+Vous vous demandez peut-être si cela entraînera l'encapsulation de votre ressource la plus externe dans deux dataclés. Ne vous inquiétez pas, Laravel ne laissera jamais vos ressources se doubler accidentellement, vous n'avez donc pas à vous soucier du niveau d'imbrication de la collection de ressources que vous transformez :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\ResourceCollection;
+ 
+class CommentsCollection extends ResourceCollection
+{
+    /**
+     * Transform the resource collection into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return ['data' => $this->collection];
+    }
+}
+
+Emballage de données et pagination
+Lors du retour de collections paginées via une réponse de 
+
+ressource, Laravel enveloppera vos données de ressource dans 
+
+une dataclé même si la withoutWrappingméthode a été appelée. 
+
+En effet, les réponses paginées contiennent toujours des clés 
+
+metaet des informations sur l'état du paginateur :links
+
+{
+    "data": [
+        {
+            "id": 1,
+            "name": "Eladio Schroeder Sr.",
+            "email": "therese28@example.com",
+        },
+        {
+            "id": 2,
+            "name": "Liliana Mayert",
+            "email": "evandervort@example.com",
+        }
+    ],
+    "links":{
+        "first": "http://example.com/pagination?page=1",
+        "last": "http://example.com/pagination?page=1",
+        "prev": null,
+        "next": null
+    },
+    "meta":{
+        "current_page": 1,
+        "from": 1,
+        "last_page": 1,
+        "path": "http://example.com/pagination",
+        "per_page": 15,
+        "to": 10,
+        "total": 10
+    }
+}
+
+Pagination
+Vous pouvez passer une instance de paginateur Laravel à 
+
+la collectionméthode d'une ressource ou à une collection de 
+
+ressources personnalisée :
+
+use App\Http\Resources\UserCollection;
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return new UserCollection(User::paginate());
+});
+
+Les réponses paginées contiennent toujours des clés metaet 
+
+des informations sur l'état du paginateur :links
+
+{
+    "data": [
+        {
+            "id": 1,
+            "name": "Eladio Schroeder Sr.",
+            "email": "therese28@example.com",
+        },
+        {
+            "id": 2,
+            "name": "Liliana Mayert",
+            "email": "evandervort@example.com",
+        }
+    ],
+    "links":{
+        "first": "http://example.com/pagination?page=1",
+        "last": "http://example.com/pagination?page=1",
+        "prev": null,
+        "next": null
+    },
+    "meta":{
+        "current_page": 1,
+        "from": 1,
+        "last_page": 1,
+        "path": "http://example.com/pagination",
+        "per_page": 15,
+        "to": 10,
+        "total": 10
+    }
+}
+
+Attributs conditionnels
+Parfois, vous souhaiterez peut-être inclure un attribut dans 
+
+une réponse de ressource uniquement si une condition donnée 
+
+est remplie. Par exemple, vous pouvez souhaiter n'inclure 
+
+une valeur que si l'utilisateur actuel est un "administrateur". 
+
+Laravel fournit une variété de méthodes d'assistance pour 
+
+vous aider dans cette situation. La whenméthode peut être 
+
+utilisée pour ajouter conditionnellement un attribut à une 
+
+réponse de ressource :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'email' => $this->email,
+        'secret' => $this->when($request->user()->isAdmin(), 'secret-value'),
+        'created_at' => $this->created_at,
+        'updated_at' => $this->updated_at,
+    ];
+}
+
+Dans cet exemple, la secretclé ne sera renvoyée dans la réponse 
+
+finale de la ressource que si la isAdminméthode de l'utilisateur authentifié renvoie true. Si la méthode renvoie false, la secretclé sera supprimée de la réponse de la ressource avant d'être envoyée au client. La whenméthode vous permet de définir de manière expressive vos ressources sans recourir à des instructions conditionnelles lors de la construction du tableau.
+
+La whenméthode accepte également une fermeture comme deuxième argument, vous permettant de calculer la valeur résultante uniquement si la condition donnée esttrue :
+
+'secret' => $this->when($request->user()->isAdmin(), function () {
+    return 'secret-value';
+}),
+
+De plus, la whenNotNullméthode peut être utilisée pour inclure un attribut dans la réponse de la ressource si l'attribut n'est pas nul :
+
+'name' => $this->whenNotNull($this->name),
+
+Fusion d'attributs conditionnels
+Parfois, vous pouvez avoir plusieurs attributs qui ne doivent être inclus que dans la réponse de la ressource en fonction de la même condition. Dans ce cas, vous pouvez utiliser la mergeWhenméthode pour inclure les attributs dans la réponse uniquement lorsque la condition donnée esttrue :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'email' => $this->email,
+        $this->mergeWhen($request->user()->isAdmin(), [
+            'first-secret' => 'value',
+            'second-secret' => 'value',
+        ]),
+        'created_at' => $this->created_at,
+        'updated_at' => $this->updated_at,
+    ];
+}
+
+Encore une fois, si la condition donnée est false, ces attributs seront supprimés de la réponse de la ressource avant qu'elle ne soit envoyée au client.
+
+
+La mergeWhenméthode ne doit pas être utilisée dans des tableaux qui mélangent des clés de chaîne et des clés numériques. De plus, il ne doit pas être utilisé dans des tableaux avec des touches numériques qui ne sont pas ordonnées de manière séquentielle.
+
+
+Relations conditionnelles
+Outre le chargement conditionnel des attributs, vous pouvez inclure conditionnellement des relations dans vos réponses de ressource en fonction du fait que la relation a déjà été chargée sur le modèle. Cela permet à votre contrôleur de décider quelles relations doivent être chargées sur le modèle et votre ressource peut facilement les inclure uniquement lorsqu'elles ont effectivement été chargées. Au final, cela permet d'éviter plus facilement les problèmes de requête "N+1" au sein de vos ressources.
+
+Le whenLoadedprocédé peut être utilisé pour charger conditionnellement une relation. Afin d'éviter de charger inutilement des relations, cette méthode accepte le nom de la relation au lieu de la relation elle-même :
+
+use App\Http\Resources\PostResource;
+ 
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'email' => $this->email,
+        'posts' => PostResource::collection($this->whenLoaded('posts')),
+        'created_at' => $this->created_at,
+        'updated_at' => $this->updated_at,
+    ];
+}
+
+Dans cet exemple, si la relation n'a pas été chargée, la postsclé sera supprimée de la réponse de la ressource avant d'être envoyée au client.
+
+Nombre de relations conditionnelles
+En plus d'inclure conditionnellement des relations, vous pouvez inclure conditionnellement des "comptes" de relation dans vos réponses de ressource en fonction du fait que le compte de la relation a été chargé sur le modèle :
+
+new UserResource($user->loadCount('posts'));
+
+La whenCountedméthode peut être utilisée pour inclure conditionnellement le nombre d'une relation dans votre réponse de ressource. Cette méthode évite d'inclure inutilement l'attribut si le nombre de relations n'est pas présent :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'email' => $this->email,
+        'posts_count' => $this->whenCounted('posts'),
+        'created_at' => $this->created_at,
+        'updated_at' => $this->updated_at,
+    ];
+}
+
+Dans cet exemple, si le postscompte de la relation n'a pas été chargé, la posts_countclé sera supprimée de la réponse de la ressource avant d'être envoyée au client.
+
+Informations sur le pivot conditionnel
+Outre l'inclusion conditionnelle d'informations sur les relations dans vos réponses de ressource, vous pouvez inclure de manière conditionnelle des données provenant des tables intermédiaires de relations plusieurs-à-plusieurs à l'aide de la whenPivotLoadedméthode. La whenPivotLoadedméthode accepte le nom du tableau croisé dynamique comme premier argument. Le deuxième argument doit être une fermeture qui renvoie la valeur à renvoyer si les informations pivot sont disponibles sur le modèle :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'expires_at' => $this->whenPivotLoaded('role_user', function () {
+            return $this->pivot->expires_at;
+        }),
+    ];
+}
+
+Si votre relation utilise un modèle de table intermédiaire personnalisé , vous pouvez transmettre une instance du modèle de table intermédiaire comme premier argument à la whenPivotLoadedméthode :
+
+'expires_at' => $this->whenPivotLoaded(new Membership, function () {
+    return $this->pivot->expires_at;
+}),
+
+Si votre table intermédiaire utilise un accesseur autre que pivot, vous pouvez utiliser la whenPivotLoadedAsméthode :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'id' => $this->id,
+        'name' => $this->name,
+        'expires_at' => $this->whenPivotLoadedAs('subscription', 'role_user', function () {
+            return $this->subscription->expires_at;
+        }),
+    ];
+}
+
+Ajout de métadonnées
+Certaines normes d'API JSON nécessitent l'ajout de métadonnées à vos réponses de ressources et de collections de ressources. Cela inclut souvent des éléments tels linksque la ressource ou des ressources associées, ou des métadonnées sur la ressource elle-même. Si vous devez renvoyer des métadonnées supplémentaires sur une ressource, incluez-les dans votre toArrayméthode. Par exemple, vous pouvez inclure des linkinformations lors de la transformation d'une collection de ressources :
+
+/**
+ * Transform the resource into an array.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return array
+ */
+public function toArray($request)
+{
+    return [
+        'data' => $this->collection,
+        'links' => [
+            'self' => 'link-value',
+        ],
+    ];
+}
+
+Lorsque vous renvoyez des métadonnées supplémentaires à partir de vos ressources, vous n'avez jamais à vous soucier de remplacer accidentellement les clés linksou metaqui sont automatiquement ajoutées par Laravel lors du renvoi de réponses paginées. Tout élément supplémentaire linksque vous définissez sera fusionné avec les liens fournis par le paginateur.
+
+Métadonnées de niveau supérieur
+Parfois, vous souhaiterez peut-être inclure uniquement certaines métadonnées avec une réponse de ressource si la ressource est la ressource la plus externe renvoyée. En règle générale, cela inclut des méta-informations sur la réponse dans son ensemble. Pour définir ces métadonnées, ajoutez une withméthode à votre classe de ressources. Cette méthode doit renvoyer un tableau de métadonnées à inclure dans la réponse de la ressource uniquement lorsque la ressource est la ressource la plus externe en cours de transformation :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\ResourceCollection;
+ 
+class UserCollection extends ResourceCollection
+{
+    /**
+     * Transform the resource collection into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return parent::toArray($request);
+    }
+ 
+    /**
+     * Get additional data that should be returned with the resource array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function with($request)
+    {
+        return [
+            'meta' => [
+                'key' => 'value',
+            ],
+        ];
+    }
+}
+
+Ajout de métadonnées lors de la création de ressources
+Vous pouvez également ajouter des données de niveau supérieur lors de la construction d'instances de ressources dans votre route ou votre contrôleur. La additionalméthode, qui est disponible sur toutes les ressources, accepte un tableau de données qui doivent être ajoutées à la réponse de la ressource :
+
+return (new UserCollection(User::all()->load('roles')))
+                ->additional(['meta' => [
+                    'key' => 'value',
+                ]]);
+
+Réponses des ressources
+Comme vous l'avez déjà lu, les ressources peuvent être renvoyées directement depuis les routes et les contrôleurs :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/user/{id}', function ($id) {
+    return new UserResource(User::findOrFail($id));
+});
+
+Cependant, vous devrez parfois personnaliser la réponse HTTP sortante avant de l'envoyer au client. Il existe deux façons d'y parvenir. Tout d'abord, vous pouvez enchaîner la responseméthode sur la ressource. Cette méthode renverra une Illuminate\Http\JsonResponseinstance, vous donnant un contrôle total sur les en-têtes de la réponse :
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+ 
+Route::get('/user', function () {
+    return (new UserResource(User::find(1)))
+                ->response()
+                ->header('X-Value', 'True');
+});
+
+Alternativement, vous pouvez définir une withResponseméthode dans la ressource elle-même. Cette méthode sera appelée lorsque la ressource est renvoyée en tant que ressource la plus externe dans une réponse :
+
+<?php
+ 
+namespace App\Http\Resources;
+ 
+use Illuminate\Http\Resources\Json\JsonResource;
+ 
+class UserResource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+        ];
+    }
+ 
+    /**
+     * Customize the outgoing response for the resource.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Illuminate\Http\Response  $response
+     * @return void
+     */
+    public function withResponse($request, $response)
+    {
+        $response->header('X-Value', 'True');
+    }
+}

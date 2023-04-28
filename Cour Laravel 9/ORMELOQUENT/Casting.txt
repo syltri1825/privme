@@ -1,0 +1,737 @@
+Éloquent : mutateurs et casting
+Introduction
+Accesseurs et mutateurs
+Définir un accesseur
+Définir un mutateur
+Distribution d'attributs
+Array & JSON Casting
+Date de coulée
+Casting d'énumération
+Casting crypté
+Interrogation du temps de diffusion
+Moulages personnalisés
+Casting d'objets de valeur
+Tableau / Sérialisation JSON
+Casting entrant
+Paramètres de diffusion
+Béton
+Introduction
+Les accesseurs, les mutateurs et la conversion d'attributs vous permettent de transformer les valeurs d'attribut Eloquent lorsque vous les récupérez ou les définissez sur des instances de modèle. Par exemple, vous pouvez utiliser le chiffreur Laravel pour chiffrer une valeur pendant qu'elle est stockée dans la base de données, puis déchiffrer automatiquement l'attribut lorsque vous y accédez sur un modèle Eloquent. Ou, vous souhaiterez peut-être convertir une chaîne JSON stockée dans votre base de données en un tableau lorsqu'elle est accessible via votre modèle Eloquent.
+
+Accesseurs et mutateurs
+Définir un accesseur
+Un accesseur transforme une valeur d'attribut Eloquent lorsqu'il y accède. Pour définir un accesseur, créez une méthode protégée sur votre modèle pour représenter l'attribut accessible. Ce nom de méthode doit correspondre à la représentation "camel case" du véritable attribut de modèle sous-jacent / colonne de base de données, le cas échéant.
+
+Dans cet exemple, nous allons définir un accesseur pour l' first_nameattribut. L'accesseur sera automatiquement appelé par Eloquent lors de la tentative de récupération de la valeur de l' first_nameattribut. Toutes les méthodes d'accesseur/mutateur d'attribut doivent déclarer un indice de type de retour deIlluminate\Database\Eloquent\Casts\Attribute :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * Get the user's first name.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function firstName(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => ucfirst($value),
+        );
+    }
+}
+
+Toutes les méthodes d'accès renvoient une Attributeinstance qui définit la façon dont l'attribut sera accédé et, éventuellement, muté. Dans cet exemple, nous ne définissons que la façon dont l'attribut sera accessible. Pour ce faire, nous fournissons l' getargument au Attributeconstructeur de la classe.
+
+Comme vous pouvez le voir, la valeur d'origine de la colonne est transmise à l'accesseur, ce qui vous permet de manipuler et de renvoyer la valeur. Pour accéder à la valeur de l'accesseur, vous pouvez simplement accéder à l' first_nameattribut sur une instance de modèle :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+$firstName = $user->first_name;
+
+
+Si vous souhaitez que ces valeurs calculées soient ajoutées aux représentations tableau/JSON de votre modèle, vous devrez les ajouter .
+
+
+Construire des objets de valeur à partir de plusieurs attributs
+Parfois, votre accesseur peut avoir besoin de transformer plusieurs attributs de modèle en un seul "objet de valeur". Pour ce faire, votre getfermeture peut accepter un deuxième argument de $attributes, qui sera automatiquement fourni à la fermeture et contiendra un tableau de tous les attributs actuels du modèle :
+
+use App\Support\Address;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+ 
+/**
+ * Interact with the user's address.
+ *
+ * @return  \Illuminate\Database\Eloquent\Casts\Attribute
+ */
+protected function address(): Attribute
+{
+    return Attribute::make(
+        get: fn ($value, $attributes) => new Address(
+            $attributes['address_line_one'],
+            $attributes['address_line_two'],
+        ),
+    );
+}
+
+Mise en cache des accesseurs
+Lors du retour d'objets de valeur à partir d'accesseurs, toutes les modifications apportées à l'objet de valeur seront automatiquement synchronisées avec le modèle avant que le modèle ne soit enregistré. Cela est possible car Eloquent conserve les instances renvoyées par les accesseurs afin de pouvoir renvoyer la même instance à chaque fois que l'accesseur est appelé :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+$user->address->lineOne = 'Updated Address Line 1 Value';
+$user->address->lineTwo = 'Updated Address Line 2 Value';
+ 
+$user->save();
+
+Cependant, vous souhaiterez peut-être parfois activer la mise en cache pour les valeurs primitives telles que les chaînes et les booléens, en particulier si elles nécessitent beaucoup de calculs. Pour ce faire, vous pouvez invoquer la shouldCacheméthode lors de la définition de votre accesseur :
+
+protected function hash(): Attribute
+{
+    return Attribute::make(
+        get: fn ($value) => bcrypt(gzuncompress($value)),
+    )->shouldCache();
+}
+
+Si vous souhaitez désactiver le comportement de mise en cache des objets des attributs, vous pouvez invoquer la withoutObjectCachingméthode lors de la définition de l'attribut :
+
+/**
+ * Interact with the user's address.
+ *
+ * @return  \Illuminate\Database\Eloquent\Casts\Attribute
+ */
+protected function address(): Attribute
+{
+    return Attribute::make(
+        get: fn ($value, $attributes) => new Address(
+            $attributes['address_line_one'],
+            $attributes['address_line_two'],
+        ),
+    )->withoutObjectCaching();
+}
+
+Définir un mutateur
+Un mutateur transforme une valeur d'attribut Eloquent lorsqu'elle est définie. Pour définir un mutateur, vous pouvez fournir l' setargument lors de la définition de votre attribut. Définissons un mutateur pour l' first_nameattribut. Ce mutateur sera automatiquement appelé lorsque nous tenterons de définir la valeur de l' first_nameattribut sur le modèle :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * Interact with the user's first name.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function firstName(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => ucfirst($value),
+            set: fn ($value) => strtolower($value),
+        );
+    }
+}
+
+La fermeture du mutateur recevra la valeur définie sur l'attribut, vous permettant de manipuler la valeur et de renvoyer la valeur manipulée. Pour utiliser notre mutator, il suffit de définir l' first_nameattribut sur un modèle Eloquent :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+$user->first_name = 'Sally';
+
+Dans cet exemple, le setrappel sera appelé avec la valeur Sally. Le mutateur appliquera ensuite la fonction au nom et définira sa valeur résultante dans le tableau strtolowerinterne du modèle .$attributes
+
+Mutation de plusieurs attributs
+Parfois, votre mutateur peut avoir besoin de définir plusieurs attributs sur le modèle sous-jacent. Pour ce faire, vous pouvez renvoyer un tableau à partir de la setfermeture. Chaque clé du tableau doit correspondre à un attribut/colonne de base de données sous-jacent associé au modèle :
+
+use App\Support\Address;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+ 
+/**
+ * Interact with the user's address.
+ *
+ * @return  \Illuminate\Database\Eloquent\Casts\Attribute
+ */
+protected function address(): Attribute
+{
+    return Attribute::make(
+        get: fn ($value, $attributes) => new Address(
+            $attributes['address_line_one'],
+            $attributes['address_line_two'],
+        ),
+        set: fn (Address $value) => [
+            'address_line_one' => $value->lineOne,
+            'address_line_two' => $value->lineTwo,
+        ],
+    );
+}
+
+Distribution d'attributs
+La conversion d'attributs fournit des fonctionnalités similaires aux accesseurs et aux mutateurs sans vous obliger à définir des méthodes supplémentaires sur votre modèle. Au lieu de cela, la propriété de votre modèle $castsfournit une méthode pratique de conversion des attributs en types de données courants.
+
+La $castspropriété doit être un tableau où la clé est le nom de l'attribut en cours de conversion et la valeur est le type vers lequel vous souhaitez convertir la colonne. Les types de diffusion pris en charge sont :
+
+array
+AsStringable::class
+boolean
+collection
+date
+datetime
+immutable_date
+immutable_datetime
+decimal:<digits>
+double
+encrypted
+encrypted:array
+encrypted:collection
+encrypted:object
+float
+integer
+object
+real
+string
+timestamp
+Pour illustrer la conversion d'attribut, convertissons l' is_adminattribut, qui est stocké dans notre base de données sous la forme d'un entier ( 0ou 1), en une valeur booléenne :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'is_admin' => 'boolean',
+    ];
+}
+
+Après avoir défini le transtypage, l' is_adminattribut sera toujours transtypé en booléen lorsque vous y accéderez, même si la valeur sous-jacente est stockée dans la base de données sous forme d'entier :
+
+$user = App\Models\User::find(1);
+ 
+if ($user->is_admin) {
+    //
+}
+
+Si vous avez besoin d'ajouter un nouveau cast temporaire au moment de l'exécution, vous pouvez utiliser la mergeCastsméthode . Ces définitions de moulage seront ajoutées à tous les moulages déjà définis sur le modèle :
+
+$user->mergeCasts([
+    'is_admin' => 'integer',
+    'options' => 'object',
+]);
+
+
+Les attributs qui sont nullne seront pas castés. De plus, vous ne devez jamais définir un cast (ou un attribut) qui porte le même nom qu'une relation.
+
+
+Moulage à cordes
+Vous pouvez utiliser la Illuminate\Database\Eloquent\Casts\AsStringableclasse cast pour convertir un attribut de modèle en un objet fluideIlluminate\Support\Stringable :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Casts\AsStringable;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'directory' => AsStringable::class,
+    ];
+}
+
+Array & JSON Casting
+Le arraycast est particulièrement utile lorsque vous travaillez avec des colonnes stockées en tant que JSON sérialisé. Par exemple, si votre base de données a un type de champ JSONou TEXTqui contient du JSON sérialisé, l'ajout du arraycast à cet attribut désérialisera automatiquement l'attribut dans un tableau PHP lorsque vous y accéderez sur votre modèle Eloquent :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'options' => 'array',
+    ];
+}
+
+Une fois le cast défini, vous pouvez accéder à l' optionsattribut et il sera automatiquement désérialisé de JSON dans un tableau PHP. Lorsque vous définissez la valeur de l' optionsattribut, le tableau donné sera automatiquement sérialisé dans JSON pour le stockage :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+$options = $user->options;
+ 
+$options['key'] = 'value';
+ 
+$user->options = $options;
+ 
+$user->save();
+
+Pour mettre à jour un seul champ d'un attribut JSON avec une syntaxe plus concise, vous pouvez utiliser l' ->opérateur lors de l'appel de la updateméthode :
+
+$user = User::find(1);
+ 
+$user->update(['options->key' => 'value']);
+
+Casting d'objets et de collections de tableaux
+Bien que la arrayfonte standard soit suffisante pour de nombreuses applications, elle présente certains inconvénients. Étant donné que le arraytranstypage renvoie un type primitif, il n'est pas possible de muter directement un décalage du tableau. Par exemple, le code suivant déclenchera une erreur PHP :
+
+$user = User::find(1);
+ 
+$user->options['key'] = $value;
+
+Pour résoudre ce problème, Laravel propose un AsArrayObjectcast qui convertit votre attribut JSON en une classe ArrayObject . Cette fonctionnalité est implémentée à l'aide de l' implémentation de cast personnalisé de Laravel , qui permet à Laravel de mettre en cache et de transformer intelligemment l'objet muté de sorte que les décalages individuels puissent être modifiés sans déclencher d'erreur PHP. Pour utiliser le AsArrayObjectcast, affectez-le simplement à un attribut :
+
+use Illuminate\Database\Eloquent\Casts\AsArrayObject;
+ 
+/**
+ * The attributes that should be cast.
+ *
+ * @var array
+ */
+protected $casts = [
+    'options' => AsArrayObject::class,
+];
+
+De même, Laravel propose un AsCollectioncast qui convertit votre attribut JSON en une instance de Laravel Collection :
+
+use Illuminate\Database\Eloquent\Casts\AsCollection;
+ 
+/**
+ * The attributes that should be cast.
+ *
+ * @var array
+ */
+protected $casts = [
+    'options' => AsCollection::class,
+];
+
+Date de coulée
+Par défaut, Eloquent convertira les colonnes created_atet updated_aten instances de Carbon , ce qui étend la classe PHP DateTimeet fournit un assortiment de méthodes utiles. Vous pouvez convertir des attributs de date supplémentaires en définissant des conversions de date supplémentaires dans le $caststableau de propriétés de votre modèle. En règle générale, les dates doivent être converties à l'aide des types de conversion datetimeou .immutable_datetime
+
+Lors de la définition d'un dateou d'un datetimecast, vous pouvez également spécifier le format de la date. Ce format sera utilisé lorsque le modèle est sérialisé dans un tableau ou JSON :
+
+/**
+ * The attributes that should be cast.
+ *
+ * @var array
+ */
+protected $casts = [
+    'created_at' => 'datetime:Y-m-d',
+];
+
+Lorsqu'une colonne est convertie en date, vous pouvez définir la valeur d'attribut de modèle correspondante sur un horodatage UNIX, une chaîne de date ( Y-m-d), une chaîne date-heure ou une instance DateTime/ . CarbonLa valeur de la date sera correctement convertie et stockée dans votre base de données.
+
+Vous pouvez personnaliser le format de sérialisation par défaut pour toutes les dates de votre modèle en définissant une serializeDateméthode sur votre modèle. Cette méthode n'affecte pas la façon dont vos dates sont formatées pour le stockage dans la base de données :
+
+/**
+ * Prepare a date for array / JSON serialization.
+ *
+ * @param  \DateTimeInterface  $date
+ * @return string
+ */
+protected function serializeDate(DateTimeInterface $date)
+{
+    return $date->format('Y-m-d');
+}
+
+Pour spécifier le format à utiliser lors du stockage des dates d'un modèle dans votre base de données, vous devez définir une $dateFormatpropriété sur votre modèle :
+
+/**
+ * The storage format of the model's date columns.
+ *
+ * @var string
+ */
+protected $dateFormat = 'U';
+
+Distribution de date, sérialisation et fuseaux horaires
+Par défaut, les transtypages dateet datetimesérialiseront les dates dans une chaîne de date UTC ISO-8601 ( 1986-05-28T21:05:54.000000Z), quel que soit le fuseau horaire spécifié dans l' timezoneoption de configuration de votre application. Vous êtes fortement encouragé à toujours utiliser ce format de sérialisation, ainsi qu'à stocker les dates de votre application dans le fuseau horaire UTC en ne modifiant pas l' timezoneoption de configuration de votre application à partir de sa UTCvaleur par défaut. L'utilisation cohérente du fuseau horaire UTC dans votre application fournira le niveau maximal d'interopérabilité avec d'autres bibliothèques de manipulation de date écrites en PHP et JavaScript.
+
+Si un format personnalisé est appliqué au cast dateou datetime, tel que datetime:Y-m-d H:i:s, le fuseau horaire interne de l'instance Carbon sera utilisé lors de la sérialisation de la date. En règle générale, il s'agira du fuseau horaire spécifié dans l' timezoneoption de configuration de votre application.
+
+Casting d'énumération
+
+Le casting enum est uniquement disponible pour PHP 8.1+.
+
+
+Eloquent vous permet également de convertir vos valeurs d'attribut en Enums "soutenues" par PHP . Pour ce faire, vous pouvez spécifier l'attribut et l'énumération que vous souhaitez convertir dans le $caststableau de propriétés de votre modèle :
+
+use App\Enums\ServerStatus;
+ 
+/**
+ * The attributes that should be cast.
+ *
+ * @var array
+ */
+protected $casts = [
+    'status' => ServerStatus::class,
+];
+
+Une fois que vous avez défini la distribution sur votre modèle, l'attribut spécifié sera automatiquement converti vers et depuis une énumération lorsque vous interagissez avec l'attribut :
+
+if ($server->status == ServerStatus::provisioned) {
+    $server->status = ServerStatus::ready;
+ 
+    $server->save();
+}
+
+Casting crypté
+Le encryptedcasting chiffrera la valeur d'attribut d'un modèle à l'aide des fonctionnalités de chiffrement intégrées de Laravel. De plus, les casts encrypted:array, encrypted:collection, encrypted:object, AsEncryptedArrayObjectet AsEncryptedCollectionfonctionnent comme leurs homologues non chiffrés ; cependant, comme vous pouvez vous y attendre, la valeur sous-jacente est chiffrée lorsqu'elle est stockée dans votre base de données.
+
+Comme la longueur finale du texte crypté n'est pas prévisible et est plus longue que son équivalent en texte brut, assurez-vous que la colonne de base de données associée est de TEXTtype ou plus grande. De plus, étant donné que les valeurs sont cryptées dans la base de données, vous ne pourrez pas interroger ou rechercher des valeurs d'attribut cryptées.
+
+Rotation des clés
+Comme vous le savez peut-être, Laravel chiffre les chaînes en utilisant la keyvaleur de configuration spécifiée dans le appfichier de configuration de votre application. Typiquement, cette valeur correspond à la valeur de la APP_KEYvariable d'environnement. Si vous devez faire pivoter la clé de chiffrement de votre application, vous devrez rechiffrer manuellement vos attributs chiffrés à l'aide de la nouvelle clé.
+
+Interrogation du temps de diffusion
+Parfois, vous devrez peut-être appliquer des conversions lors de l'exécution d'une requête, par exemple lors de la sélection d'une valeur brute dans une table. Par exemple, considérez la requête suivante :
+
+use App\Models\Post;
+use App\Models\User;
+ 
+$users = User::select([
+    'users.*',
+    'last_posted_at' => Post::selectRaw('MAX(created_at)')
+            ->whereColumn('user_id', 'users.id')
+])->get();
+
+L' last_posted_atattribut sur les résultats de cette requête sera une simple chaîne. Ce serait merveilleux si nous pouvions appliquer un datetimecast à cet attribut lors de l'exécution de la requête. Heureusement, nous pouvons accomplir cela en utilisant la withCastsméthode :
+
+$users = User::select([
+    'users.*',
+    'last_posted_at' => Post::selectRaw('MAX(created_at)')
+            ->whereColumn('user_id', 'users.id')
+])->withCasts([
+    'last_posted_at' => 'datetime'
+])->get();
+
+Moulages personnalisés
+Laravel a une variété de types de distribution intégrés et utiles; cependant, vous devrez peut-être parfois définir vos propres types de diffusion. Vous pouvez accomplir cela en définissant une classe qui implémente l' CastsAttributesinterface.
+
+Les classes qui implémentent cette interface doivent définir une méthode getet set. La getméthode est chargée de transformer une valeur brute de la base de données en une valeur cast, tandis que la setméthode doit transformer une valeur cast en une valeur brute pouvant être stockée dans la base de données. À titre d'exemple, nous allons réimplémenter le jsontype de distribution intégré en tant que type de distribution personnalisé :
+
+<?php
+ 
+namespace App\Casts;
+ 
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+ 
+class Json implements CastsAttributes
+{
+    /**
+     * Cast the given value.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @param  mixed  $value
+     * @param  array  $attributes
+     * @return array
+     */
+    public function get($model, $key, $value, $attributes)
+    {
+        return json_decode($value, true);
+    }
+ 
+    /**
+     * Prepare the given value for storage.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @param  array  $value
+     * @param  array  $attributes
+     * @return string
+     */
+    public function set($model, $key, $value, $attributes)
+    {
+        return json_encode($value);
+    }
+}
+
+Une fois que vous avez défini un type de distribution personnalisé, vous pouvez l'attacher à un attribut de modèle en utilisant son nom de classe :
+
+<?php
+ 
+namespace App\Models;
+ 
+use App\Casts\Json;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'options' => Json::class,
+    ];
+}
+
+Casting d'objets de valeur
+Vous n'êtes pas limité à convertir des valeurs en types primitifs. 
+
+Vous pouvez également convertir des valeurs en objets. Définir des 
+
+conversions personnalisées qui convertissent des valeurs en objets est très similaire à la conversion en types primitifs ; cependant, la setméthode doit renvoyer un tableau de paires clé/valeur qui seront utilisées pour définir des valeurs brutes et stockables sur le modèle.
+
+À titre d'exemple, nous allons définir une classe de conversion 
+
+personnalisée qui convertit plusieurs valeurs de modèle en un seul Addressobjet de valeur. Nous supposerons que la Addressvaleur a deux propriétés publiques : lineOneet lineTwo:
+
+<?php
+ 
+namespace App\Casts;
+ 
+use App\Models\Address as AddressModel;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use InvalidArgumentException;
+ 
+class Address implements CastsAttributes
+{
+    /**
+     * Cast the given value.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @param  mixed  $value
+     * @param  array  $attributes
+     * @return \App\Models\Address
+     */
+    public function get($model, $key, $value, $attributes)
+    {
+        return new AddressModel(
+            $attributes['address_line_one'],
+            $attributes['address_line_two']
+        );
+    }
+ 
+    /**
+     * Prepare the given value for storage.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @param  \App\Models\Address  $value
+     * @param  array  $attributes
+     * @return array
+     */
+    public function set($model, $key, $value, $attributes)
+    {
+        if (! $value instanceof AddressModel) {
+            throw new InvalidArgumentException('The given value is not an Address instance.');
+        }
+ 
+        return [
+            'address_line_one' => $value->lineOne,
+            'address_line_two' => $value->lineTwo,
+        ];
+    }
+}
+
+Lors de la conversion en objets de valeur, toutes les modifications apportées à l'objet de valeur seront automatiquement synchronisées avec le modèle avant que le modèle ne soit enregistré :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+$user->address->lineOne = 'Updated Address Value';
+ 
+$user->save();
+
+
+Si vous envisagez de sérialiser vos modèles Eloquent contenant des objets de valeur vers JSON ou des tableaux, vous devez implémenter les interfaces Illuminate\Contracts\Support\Arrayableet sur l'objet de valeur.JsonSerializable
+
+
+Tableau / Sérialisation JSON
+Lorsqu'un modèle Eloquent est converti en un tableau ou JSON à l'aide des méthodes toArrayet toJson, vos objets de valeur de cast personnalisés seront généralement sérialisés aussi longtemps qu'ils implémentent les interfaces Illuminate\Contracts\Support\Arrayableet . JsonSerializableToutefois, lors de l'utilisation d'objets de valeur fournis par des bibliothèques tierces, vous n'aurez peut-être pas la possibilité d'ajouter ces interfaces à l'objet.
+
+Par conséquent, vous pouvez spécifier que votre classe de conversion personnalisée sera responsable de la sérialisation de l'objet de valeur. Pour ce faire, votre classe de distribution personnalisée doit implémenter l' Illuminate\Contracts\Database\Eloquent\SerializesCastableAttributesinterface. Cette interface indique que votre classe doit contenir une serializeméthode qui doit renvoyer la forme sérialisée de votre objet de valeur :
+
+/**
+ * Get the serialized representation of the value.
+ *
+ * @param  \Illuminate\Database\Eloquent\Model  $model
+ * @param  string  $key
+ * @param  mixed  $value
+ * @param  array  $attributes
+ * @return mixed
+ */
+public function serialize($model, string $key, $value, array $attributes)
+{
+    return (string) $value;
+}
+
+Casting entrant
+Parfois, vous devrez peut-être écrire un cast personnalisé qui ne transforme que les valeurs définies sur le modèle et n'effectue aucune opération lorsque les attributs sont extraits du modèle. Un exemple classique d'un cast entrant uniquement est un cast de "hachage". Seuls les casts personnalisés entrants doivent implémenter l' CastsInboundAttributesinterface, ce qui nécessite uniquement setla définition d'une méthode.
+
+<?php
+ 
+namespace App\Casts;
+ 
+use Illuminate\Contracts\Database\Eloquent\CastsInboundAttributes;
+ 
+class Hash implements CastsInboundAttributes
+{
+    /**
+     * The hashing algorithm.
+     *
+     * @var string
+     */
+    protected $algorithm;
+ 
+    /**
+     * Create a new cast class instance.
+     *
+     * @param  string|null  $algorithm
+     * @return void
+     */
+    public function __construct($algorithm = null)
+    {
+        $this->algorithm = $algorithm;
+    }
+ 
+    /**
+     * Prepare the given value for storage.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @param  array  $value
+     * @param  array  $attributes
+     * @return string
+     */
+    public function set($model, $key, $value, $attributes)
+    {
+        return is_null($this->algorithm)
+                    ? bcrypt($value)
+                    : hash($this->algorithm, $value);
+    }
+}
+
+Paramètres de diffusion
+Lors de l'attachement d'un moulage personnalisé à un modèle, les paramètres de moulage peuvent être spécifiés en les séparant du nom de la classe à l'aide d'un :caractère et en délimitant plusieurs paramètres par des virgules. Les paramètres seront passés au constructeur de la classe cast :
+
+/**
+ * The attributes that should be cast.
+ *
+ * @var array
+ */
+protected $casts = [
+    'secret' => Hash::class.':sha256',
+];
+
+Béton
+Vous pouvez autoriser les objets de valeur de votre application à définir leurs propres classes de distribution personnalisées. Au lieu d'attacher la classe de distribution personnalisée à votre modèle, vous pouvez également attacher une classe d'objet de valeur qui implémente l' Illuminate\Contracts\Database\Eloquent\Castableinterface :
+
+use App\Models\Address;
+ 
+protected $casts = [
+    'address' => Address::class,
+];
+
+Les objets qui implémentent l' Castableinterface doivent définir une castUsingméthode qui renvoie le nom de classe de la classe de caster personnalisée responsable de la diffusion vers et depuis la Castableclasse :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Contracts\Database\Eloquent\Castable;
+use App\Casts\Address as AddressCast;
+ 
+class Address implements Castable
+{
+    /**
+     * Get the name of the caster class to use when casting from / to this cast target.
+     *
+     * @param  array  $arguments
+     * @return string
+     */
+    public static function castUsing(array $arguments)
+    {
+        return AddressCast::class;
+    }
+}
+
+Lorsque vous utilisez des Castableclasses, vous pouvez toujours fournir des arguments dans la $castsdéfinition. Les arguments seront passés à la castUsingméthode :
+
+use App\Models\Address;
+ 
+protected $casts = [
+    'address' => Address::class.':argument',
+];
+
+Castables et classes de casting anonymes
+En combinant "castables" avec les classes anonymes de PHP , vous pouvez définir un objet de valeur et sa logique de casting comme un seul objet castable. Pour ce faire, renvoyez une classe anonyme à partir de la castUsingméthode de votre objet de valeur. La classe anonyme doit implémenter l' CastsAttributesinterface :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Contracts\Database\Eloquent\Castable;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+ 
+class Address implements Castable
+{
+    // ...
+ 
+    /**
+     * Get the caster class to use when casting from / to this cast target.
+     *
+     * @param  array  $arguments
+     * @return object|string
+     */
+    public static function castUsing(array $arguments)
+    {
+        return new class implements CastsAttributes
+        {
+            public function get($model, $key, $value, $attributes)
+            {
+                return new Address(
+                    $attributes['address_line_one'],
+                    $attributes['address_line_two']
+                );
+            }
+ 
+            public function set($model, $key, $value, $attributes)
+            {
+                return [
+                    'address_line_one' => $value->lineOne,
+                    'address_line_two' => $value->lineTwo,
+                ];
+            }
+        };
+    }
+}

@@ -1,0 +1,1611 @@
+Crépuscule de Laravel
+Introduction
+Installation
+Gestion des installations de ChromeDriver
+Utilisation d'autres navigateurs
+Commencer
+Génération de tests
+Migrations de bases de données
+Tests en cours
+Gestion de l'environnement
+Principes de base du navigateur
+Création de navigateurs
+La navigation
+Redimensionner les fenêtres du navigateur
+Macros du navigateur
+Authentification
+Biscuits
+Exécuter JavaScript
+Prendre une capture d'écran
+Stockage de la sortie de la console sur le disque
+Stockage de la source de la page sur le disque
+Interagir avec les éléments
+Sélecteurs de crépuscule
+Texte, valeurs et attributs
+Interagir avec les formulaires
+Joindre des fichiers
+Appuyer sur les boutons
+Cliquer sur les liens
+Utilisation du clavier
+Utilisation de la souris
+Dialogues JavaScript
+Sélecteurs de portée
+En attente d'éléments
+Faire défiler un élément dans la vue
+Assertions disponibles
+pages
+Génération de pages
+Configuration des pages
+Navigation vers les pages
+Sélecteurs abrégés
+Méthodes de page
+Composants
+Génération de composants
+Utilisation de composants
+Intégration continue
+Heroku CI
+Travis CI
+Actions GitHub
+Introduction
+Laravel Dusk fournit une API d'automatisation et de test de navigateur expressive et facile à utiliser. Par défaut, Dusk ne vous oblige pas à installer JDK ou Selenium sur votre ordinateur local. Au lieu de cela, Dusk utilise une installation autonome de ChromeDriver . Cependant, vous êtes libre d'utiliser tout autre pilote compatible Selenium que vous souhaitez.
+
+Installation
+Pour commencer, vous devez installer Google Chrome et ajouter la laravel/duskdépendance Composer à votre projet :
+
+composer require --dev laravel/dusk
+
+
+Si vous enregistrez manuellement le fournisseur de services de Dusk, vous ne devez jamais l'enregistrer dans votre environnement de production, car cela pourrait permettre à des utilisateurs arbitraires de s'authentifier auprès de votre application.
+
+
+Après avoir installé le package Dusk, exécutez la dusk:installcommande Artisan. La dusk:installcommande créera un tests/Browserrépertoire et un exemple de test Dusk :
+
+php artisan dusk:install
+
+Ensuite, définissez la APP_URLvariable d'environnement dans le .envfichier de votre application. Cette valeur doit correspondre à l'URL que vous utilisez pour accéder à votre application dans un navigateur.
+
+
+Si vous utilisez Laravel Sail pour gérer votre environnement de développement local, veuillez également consulter la documentation Sail sur la configuration et l'exécution des tests Dusk .
+
+
+Gestion des installations de ChromeDriver
+Si vous souhaitez installer une version de ChromeDriver différente de celle incluse avec Laravel Dusk, vous pouvez utiliser la dusk:chrome-drivercommande :
+
+# Install the latest version of ChromeDriver for your OS...
+php artisan dusk:chrome-driver
+ 
+# Install a given version of ChromeDriver for your OS...
+php artisan dusk:chrome-driver 86
+ 
+# Install a given version of ChromeDriver for all supported OSs...
+php artisan dusk:chrome-driver --all
+ 
+# Install the version of ChromeDriver that matches the detected version of Chrome / Chromium for your OS...
+php artisan dusk:chrome-driver --detect
+
+
+Dusk exige que les chromedriverbinaires soient exécutables. Si vous rencontrez des problèmes lors de l'exécution de Dusk, vous devez vous assurer que les fichiers binaires sont exécutables à l'aide de la commande suivante : chmod -R 0755 vendor/laravel/dusk/bin/.
+
+
+Utilisation d'autres navigateurs
+Par défaut, Dusk utilise Google Chrome et une installation autonome de ChromeDriver pour exécuter les tests de votre navigateur. Cependant, vous pouvez démarrer votre propre serveur Selenium et exécuter vos tests sur n'importe quel navigateur de votre choix.
+
+Pour commencer, ouvrez votre tests/DuskTestCase.phpfichier, qui est le cas de test Dusk de base pour votre application. Dans ce fichier, vous pouvez supprimer l'appel à la startChromeDriverméthode. Cela empêchera Dusk de démarrer automatiquement ChromeDriver :
+
+/**
+ * Prepare for Dusk test execution.
+ *
+ * @beforeClass
+ * @return void
+ */
+public static function prepare()
+{
+    // static::startChromeDriver();
+}
+
+Ensuite, vous pouvez modifier la driverméthode pour vous connecter à l'URL et au port de votre choix. De plus, vous pouvez modifier les "capacités souhaitées" qui doivent être transmises au WebDriver :
+
+/**
+ * Create the RemoteWebDriver instance.
+ *
+ * @return \Facebook\WebDriver\Remote\RemoteWebDriver
+ */
+protected function driver()
+{
+    return RemoteWebDriver::create(
+        'http://localhost:4444/wd/hub', DesiredCapabilities::phantomjs()
+    );
+}
+
+Commencer
+Génération de tests
+Pour générer un test Crépuscule, utilisez la dusk:makecommande Artisan. Le test généré sera placé dans le tests/Browserrépertoire :
+
+php artisan dusk:make LoginTest
+
+Migrations de bases de données
+La plupart des tests que vous écrivez interagiront avec les pages qui récupèrent les données de la base de données de votre application ; cependant, vos tests Dusk ne doivent jamais utiliser le RefreshDatabase trait. Le RefreshDatabasetrait exploite les transactions de base de données qui ne seront pas applicables ou disponibles dans les requêtes HTTP. Utilisez plutôt le DatabaseMigrationstrait, qui re-migre la base de données pour chaque test :
+
+<?php
+ 
+namespace Tests\Browser;
+ 
+use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Laravel\Dusk\Chrome;
+use Tests\DuskTestCase;
+ 
+class ExampleTest extends DuskTestCase
+{
+    use DatabaseMigrations;
+}
+
+
+Les bases de données en mémoire SQLite ne peuvent pas être utilisées lors de l'exécution des tests Dusk. Étant donné que le navigateur s'exécute dans son propre processus, il ne pourra pas accéder aux bases de données en mémoire des autres processus.
+
+
+Tests en cours
+Pour exécuter les tests de votre navigateur, exécutez la duskcommande Artisan :
+
+php artisan dusk
+
+Si vous avez eu des échecs de test la dernière fois que vous avez exécuté la duskcommande, vous pouvez gagner du temps en réexécutant d'abord les tests qui ont échoué à l'aide de la dusk:failscommande :
+
+php artisan dusk:fails
+
+La duskcommande accepte n'importe quel argument normalement accepté par le lanceur de tests PHPUnit, comme vous permettre de n'exécuter les tests que pour un groupe donné :
+
+php artisan dusk --group=foo
+
+
+Si vous utilisez Laravel Sail pour gérer votre environnement de développement local, veuillez consulter la documentation Sail sur la configuration et l'exécution des tests Dusk .
+
+
+Démarrage manuel de ChromeDriver
+Par défaut, Dusk tentera automatiquement de démarrer ChromeDriver. Si cela ne fonctionne pas pour votre système particulier, vous pouvez démarrer manuellement ChromeDriver avant d'exécuter la duskcommande. Si vous choisissez de démarrer ChromeDriver manuellement, vous devez commenter la ligne suivante de votre tests/DuskTestCase.phpfichier :
+
+/**
+ * Prepare for Dusk test execution.
+ *
+ * @beforeClass
+ * @return void
+ */
+public static function prepare()
+{
+    // static::startChromeDriver();
+}
+
+De plus, si vous démarrez ChromeDriver sur un port autre que 9515, vous devez modifier la driverméthode de la même classe pour refléter le bon port :
+
+/**
+ * Create the RemoteWebDriver instance.
+ *
+ * @return \Facebook\WebDriver\Remote\RemoteWebDriver
+ */
+protected function driver()
+{
+    return RemoteWebDriver::create(
+        'http://localhost:9515', DesiredCapabilities::chrome()
+    );
+}
+
+Gestion de l'environnement
+Pour forcer Dusk à utiliser son propre fichier d'environnement lors de l'exécution de tests, créez un .env.dusk.{environment}fichier à la racine de votre projet. Par exemple, si vous lancez la duskcommande depuis votre localenvironnement, vous devez créer un .env.dusk.localfichier.
+
+Lors de l'exécution des tests, Dusk sauvegardera votre .envfichier et renommera votre environnement Dusk en .env. Une fois les tests terminés, votre .envfichier sera restauré.
+
+Principes de base du navigateur
+Création de navigateurs
+Pour commencer, écrivons un test qui vérifie que nous pouvons nous connecter à notre application. Après avoir généré un test, nous pouvons le modifier pour accéder à la page de connexion, entrer des informations d'identification et cliquer sur le bouton "Connexion". Pour créer une instance de navigateur, vous pouvez appeler la browseméthode depuis votre test Dusk :
+
+<?php
+ 
+namespace Tests\Browser;
+ 
+use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Laravel\Dusk\Chrome;
+use Tests\DuskTestCase;
+ 
+class ExampleTest extends DuskTestCase
+{
+    use DatabaseMigrations;
+ 
+    /**
+     * A basic browser test example.
+     *
+     * @return void
+     */
+    public function test_basic_example()
+    {
+        $user = User::factory()->create([
+            'email' => 'taylor@laravel.com',
+        ]);
+ 
+        $this->browse(function ($browser) use ($user) {
+            $browser->visit('/login')
+                    ->type('email', $user->email)
+                    ->type('password', 'password')
+                    ->press('Login')
+                    ->assertPathIs('/home');
+        });
+    }
+}
+
+Comme vous pouvez le voir dans l'exemple ci-dessus, la browseméthode accepte une fermeture. Une instance de navigateur sera automatiquement transmise à cette fermeture par Dusk et est l'objet principal utilisé pour interagir avec et faire des assertions contre votre application.
+
+Création de plusieurs navigateurs
+Parfois, vous pouvez avoir besoin de plusieurs navigateurs pour effectuer correctement un test. Par exemple, plusieurs navigateurs peuvent être nécessaires pour tester un écran de chat qui interagit avec les websockets. Pour créer plusieurs navigateurs, ajoutez simplement plus d'arguments de navigateur à la signature de la fermeture donnée à la browseméthode :
+
+$this->browse(function ($first, $second) {
+    $first->loginAs(User::find(1))
+          ->visit('/home')
+          ->waitForText('Message');
+ 
+    $second->loginAs(User::find(2))
+           ->visit('/home')
+           ->waitForText('Message')
+           ->type('message', 'Hey Taylor')
+           ->press('Send');
+ 
+    $first->waitForText('Hey Taylor')
+          ->assertSee('Jeffrey Way');
+});
+
+La navigation
+La visitméthode peut être utilisée pour naviguer vers un URI donné dans votre application :
+
+$browser->visit('/login');
+
+Vous pouvez utiliser la visitRouteméthode pour naviguer vers une route nommée :
+
+$browser->visitRoute('login');
+
+Vous pouvez naviguer "en arrière" et "en avant" en utilisant les méthodes backet :forward
+
+$browser->back();
+ 
+$browser->forward();
+
+Vous pouvez utiliser la refreshméthode pour actualiser la page :
+
+$browser->refresh();
+
+Redimensionner les fenêtres du navigateur
+Vous pouvez utiliser la resizeméthode pour ajuster la taille de la fenêtre du navigateur :
+
+$browser->resize(1920, 1080);
+
+La maximizeméthode peut être utilisée pour maximiser la fenêtre du navigateur :
+
+$browser->maximize();
+
+La fitContentméthode redimensionnera la fenêtre du navigateur pour correspondre à la taille de son contenu :
+
+$browser->fitContent();
+
+Lorsqu'un test échoue, Dusk redimensionne automatiquement le navigateur pour s'adapter au contenu avant de prendre une capture d'écran. Vous pouvez désactiver cette fonctionnalité en appelant la disableFitOnFailureméthode dans votre test :
+
+$browser->disableFitOnFailure();
+
+Vous pouvez utiliser la moveméthode pour déplacer la fenêtre du navigateur vers une position différente sur votre écran :
+
+$browser->move($x = 100, $y = 100);
+
+Macros du navigateur
+Si vous souhaitez définir une méthode de navigateur personnalisée que vous pouvez réutiliser dans une variété de vos tests, vous pouvez utiliser la macrométhode sur la Browserclasse. En règle générale, vous devez appeler cette méthode à partir de la méthode d'un fournisseur de services boot :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\ServiceProvider;
+use Laravel\Dusk\Browser;
+ 
+class DuskServiceProvider extends ServiceProvider
+{
+    /**
+     * Register Dusk's browser macros.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Browser::macro('scrollToElement', function ($element = null) {
+            $this->script("$('html, body').animate({ scrollTop: $('$element').offset().top }, 0);");
+ 
+            return $this;
+        });
+    }
+}
+
+La macrofonction accepte un nom comme premier argument et une fermeture comme second. La fermeture de la macro sera exécutée lors de l'appel de la macro en tant que méthode sur une Browserinstance :
+
+$this->browse(function ($browser) use ($user) {
+    $browser->visit('/pay')
+            ->scrollToElement('#credit-card-details')
+            ->assertSee('Enter Credit Card Details');
+});
+
+Authentification
+Souvent, vous testerez des pages qui nécessitent une authentification. Vous pouvez utiliser la méthode de Dusk loginAsafin d'éviter d'interagir avec l'écran de connexion de votre application lors de chaque test. La loginAsméthode accepte une clé primaire associée à votre modèle authentifiable ou à une instance de modèle authentifiable :
+
+use App\Models\User;
+ 
+$this->browse(function ($browser) {
+    $browser->loginAs(User::find(1))
+          ->visit('/home');
+});
+
+
+Après avoir utilisé la loginAsméthode, la session utilisateur sera maintenue pour tous les tests du fichier.
+
+
+Biscuits
+Vous pouvez utiliser la cookieméthode pour obtenir ou définir la valeur d'un cookie crypté. Par défaut, tous les cookies créés par Laravel sont cryptés :
+
+$browser->cookie('name');
+ 
+$browser->cookie('name', 'Taylor');
+
+Vous pouvez utiliser la plainCookieméthode pour obtenir ou définir la valeur d'un cookie non chiffré :
+
+$browser->plainCookie('name');
+ 
+$browser->plainCookie('name', 'Taylor');
+
+Vous pouvez utiliser la deleteCookieméthode pour supprimer le cookie donné :
+
+$browser->deleteCookie('name');
+
+Exécuter JavaScript
+Vous pouvez utiliser la scriptméthode pour exécuter des instructions JavaScript arbitraires dans le navigateur :
+
+$browser->script('document.documentElement.scrollTop = 0');
+ 
+$browser->script([
+    'document.body.scrollTop = 0',
+    'document.documentElement.scrollTop = 0',
+]);
+ 
+$output = $browser->script('return window.location.pathname');
+
+Prendre une capture d'écran
+Vous pouvez utiliser la screenshotméthode pour prendre une capture d'écran et la stocker avec le nom de fichier donné. Toutes les captures d'écran seront stockées dans le tests/Browser/screenshotsrépertoire :
+
+$browser->screenshot('filename');
+
+La responsiveScreenshotsméthode peut être utilisée pour prendre une série de captures d'écran à différents points d'arrêt :
+
+$browser->responsiveScreenshots('filename');
+
+Stockage de la sortie de la console sur le disque
+Vous pouvez utiliser la storeConsoleLogméthode pour écrire la sortie de la console du navigateur actuel sur le disque avec le nom de fichier donné. La sortie de la console sera stockée dans le tests/Browser/consolerépertoire :
+
+$browser->storeConsoleLog('filename');
+
+Stockage de la source de la page sur le disque
+Vous pouvez utiliser la storeSourceméthode pour écrire la source de la page actuelle sur le disque avec le nom de fichier donné. La source de la page sera stockée dans le tests/Browser/sourcerépertoire :
+
+$browser->storeSource('filename');
+
+Interagir avec les éléments
+Sélecteurs de crépuscule
+Choisir de bons sélecteurs CSS pour interagir avec les éléments est l'une des parties les plus difficiles de l'écriture de tests Dusk. Au fil du temps, les modifications de l'interface peuvent entraîner la rupture de vos tests avec des sélecteurs CSS comme ceux-ci :
+
+// HTML...
+ 
+<button>Login</button>
+ 
+// Test...
+ 
+$browser->click('.login-page .container div > button');
+
+Les sélecteurs Dusk vous permettent de vous concentrer sur l'écriture de tests efficaces plutôt que sur la mémorisation des sélecteurs CSS. Pour définir un sélecteur, ajoutez un duskattribut à votre élément HTML. Ensuite, lorsque vous interagissez avec un navigateur Dusk, préfixez le sélecteur avec @pour manipuler l'élément attaché dans votre test :
+
+// HTML...
+ 
+<button dusk="login-button">Login</button>
+ 
+// Test...
+ 
+$browser->click('@login-button');
+
+Texte, valeurs et attributs
+Récupération et définition des valeurs
+Dusk fournit plusieurs méthodes pour interagir avec la valeur actuelle, le texte d'affichage et les attributs des éléments de la page. Par exemple, pour obtenir la "valeur" d'un élément qui correspond à un sélecteur CSS ou Dusk donné, utilisez la valueméthode :
+
+// Retrieve the value...
+$value = $browser->value('selector');
+ 
+// Set the value...
+$browser->value('selector', 'value');
+
+Vous pouvez utiliser la inputValueméthode pour obtenir la "valeur" d'un élément d'entrée qui a un nom de champ donné :
+
+$value = $browser->inputValue('field');
+
+Récupération de texte
+La textméthode peut être utilisée pour récupérer le texte d'affichage d'un élément qui correspond au sélecteur donné :
+
+$text = $browser->text('selector');
+
+Récupération des attributs
+Enfin, la attributeméthode peut être utilisée pour récupérer la valeur d'un attribut d'un élément correspondant au sélecteur donné :
+
+$attribute = $browser->attribute('selector', 'value');
+
+Interagir avec les formulaires
+Saisir des valeurs
+Dusk fournit une variété de méthodes pour interagir avec les formulaires et les éléments d'entrée. Examinons d'abord un exemple de saisie de texte dans un champ de saisie :
+
+$browser->type('email', 'taylor@laravel.com');
+
+Notez que, bien que la méthode en accepte un si nécessaire, nous ne sommes pas obligés de passer un sélecteur CSS dans la typeméthode. Si un sélecteur CSS n'est pas fourni, Dusk recherchera un champ inputou textareaavec l' nameattribut donné.
+
+Pour ajouter du texte à un champ sans effacer son contenu, vous pouvez utiliser la appendméthode :
+
+$browser->type('tags', 'foo')
+        ->append('tags', ', bar, baz');
+
+Vous pouvez effacer la valeur d'une entrée en utilisant la clearméthode :
+
+$browser->clear('email');
+
+Vous pouvez demander à Dusk de taper lentement en utilisant la typeSlowlyméthode. Par défaut, Dusk fera une pause de 100 millisecondes entre les pressions sur les touches. Pour personnaliser la durée entre les pressions sur les touches, vous pouvez passer le nombre approprié de millisecondes comme troisième argument à la méthode :
+
+$browser->typeSlowly('mobile', '+1 (202) 555-5555');
+ 
+$browser->typeSlowly('mobile', '+1 (202) 555-5555', 300);
+
+Vous pouvez utiliser la appendSlowlyméthode pour ajouter du texte lentement :
+
+$browser->type('tags', 'foo')
+        ->appendSlowly('tags', ', bar, baz');
+
+Listes déroulantes
+Pour sélectionner une valeur disponible sur un selectélément, vous pouvez utiliser la selectméthode . Comme la typeméthode, la selectméthode ne nécessite pas de sélecteur CSS complet. Lorsque vous passez une valeur à la selectméthode, vous devez passer la valeur de l'option sous-jacente au lieu du texte affiché :
+
+$browser->select('size', 'Large');
+
+Vous pouvez sélectionner une option aléatoire en omettant le deuxième argument :
+
+$browser->select('size');
+
+En fournissant un tableau comme deuxième argument à la selectméthode, vous pouvez demander à la méthode de sélectionner plusieurs options :
+
+$browser->select('categories', ['Art', 'Music']);
+
+Cases à cocher
+Pour "vérifier" une entrée de case à cocher, vous pouvez utiliser la checkméthode. Comme beaucoup d'autres méthodes liées à l'entrée, un sélecteur CSS complet n'est pas requis. Si aucune correspondance de sélecteur CSS ne peut être trouvée, Dusk recherchera une case à cocher avec un nameattribut correspondant :
+
+$browser->check('terms');
+
+La uncheckméthode peut être utilisée pour "décocher" une entrée de case à cocher :
+
+$browser->uncheck('terms');
+
+Boutons radio
+Pour "sélectionner" une radiooption d'entrée, vous pouvez utiliser la radiométhode. Comme beaucoup d'autres méthodes liées à l'entrée, un sélecteur CSS complet n'est pas nécessaire. Si aucune correspondance de sélecteur CSS ne peut être trouvée, Dusk recherchera une radioentrée avec la correspondance nameet les valueattributs :
+
+$browser->radio('size', 'large');
+
+Joindre des fichiers
+Le attachprocédé peut être utilisé pour joindre un fichier à un fileélément d'entrée. Comme beaucoup d'autres méthodes liées à l'entrée, un sélecteur CSS complet n'est pas nécessaire. Si aucune correspondance de sélecteur CSS ne peut être trouvée, Dusk recherchera une fileentrée avec un nameattribut correspondant :
+
+$browser->attach('photo', __DIR__.'/photos/mountains.png');
+
+
+La fonction d'attachement nécessite l' Zipinstallation et l'activation de l'extension PHP sur votre serveur.
+
+
+Appuyer sur les boutons
+La pressméthode peut être utilisée pour cliquer sur un élément de bouton sur la page. L'argument donné à la pressméthode peut être soit le texte d'affichage du bouton soit un sélecteur CSS / Crépuscule :
+
+$browser->press('Login');
+
+Lors de la soumission de formulaires, de nombreuses applications désactivent le bouton de soumission du formulaire après avoir appuyé dessus, puis réactivent le bouton lorsque la demande HTTP de soumission du formulaire est terminée. Pour appuyer sur un bouton et attendre que le bouton soit réactivé, vous pouvez utiliser la pressAndWaitForméthode :
+
+// Press the button and wait a maximum of 5 seconds for it to be enabled...
+$browser->pressAndWaitFor('Save');
+ 
+// Press the button and wait a maximum of 1 second for it to be enabled...
+$browser->pressAndWaitFor('Save', 1);
+
+Cliquer sur les liens
+Pour cliquer sur un lien, vous pouvez utiliser la clickLinkméthode sur l'instance du navigateur. La clickLinkméthode cliquera sur le lien contenant le texte affiché :
+
+$browser->clickLink($linkText);
+
+Vous pouvez utiliser la seeLinkméthode pour déterminer si un lien avec le texte d'affichage donné est visible sur la page :
+
+if ($browser->seeLink($linkText)) {
+    // ...
+}
+
+
+Ces méthodes interagissent avec jQuery. Si jQuery n'est pas disponible sur la page, Dusk l'injectera automatiquement dans la page afin qu'il soit disponible pour la durée du test.
+
+
+Utilisation du clavier
+La keysméthode vous permet de fournir des séquences d'entrée plus complexes à un élément donné que celles normalement autorisées par la typeméthode. Par exemple, vous pouvez demander à Dusk de maintenir les touches de modification enfoncées lors de la saisie de valeurs. Dans cet exemple, la shifttouche sera maintenue pendant que taylorest entré dans l'élément correspondant au sélecteur donné. Après taylorest tapé, swiftsera tapé sans aucune touche de modification :
+
+$browser->keys('selector', ['{shift}', 'taylor'], 'swift');
+
+Un autre cas d'utilisation intéressant de la keysméthode consiste à envoyer une combinaison "raccourci clavier" au sélecteur CSS principal de votre application :
+
+$browser->keys('.app', ['{command}', 'j']);
+
+
+Toutes les touches de modification telles que {command}sont entourées de {}caractères et correspondent aux constantes définies dans la Facebook\WebDriver\WebDriverKeysclasse, qui peuvent être trouvées sur GitHub .
+
+
+Utilisation de la souris
+Cliquer sur les éléments
+La clickméthode peut être utilisée pour cliquer sur un élément correspondant au sélecteur CSS ou Dusk donné :
+
+$browser->click('.selector');
+
+La clickAtXPathméthode peut être utilisée pour cliquer sur un élément correspondant à l'expression XPath donnée :
+
+$browser->clickAtXPath('//div[@class = "selector"]');
+
+La clickAtPointméthode peut être utilisée pour cliquer sur l'élément le plus haut à une paire donnée de coordonnées par rapport à la zone visible du navigateur :
+
+$browser->clickAtPoint($x = 0, $y = 0);
+
+La doubleClickméthode peut être utilisée pour simuler le double clic d'une souris :
+
+$browser->doubleClick();
+
+La rightClickméthode peut être utilisée pour simuler le clic droit d'une souris :
+
+$browser->rightClick();
+ 
+$browser->rightClick('.selector');
+
+Le clickAndHoldprocédé peut être utilisé pour simuler un bouton de souris cliqué et maintenu enfoncé. Un appel ultérieur à la releaseMouseméthode annulera ce comportement et relâchera le bouton de la souris :
+
+$browser->clickAndHold()
+        ->pause(1000)
+        ->releaseMouse();
+
+survol de la souris
+La mouseoverméthode peut être utilisée lorsque vous devez déplacer la souris sur un élément correspondant au sélecteur CSS ou Dusk donné :
+
+$browser->mouseover('.selector');
+
+Glisser-déposer
+La dragméthode peut être utilisée pour faire glisser un élément correspondant au sélecteur donné vers un autre élément :
+
+$browser->drag('.from-selector', '.to-selector');
+
+Ou, vous pouvez faire glisser un élément dans une seule direction :
+
+$browser->dragLeft('.selector', $pixels = 10);
+$browser->dragRight('.selector', $pixels = 10);
+$browser->dragUp('.selector', $pixels = 10);
+$browser->dragDown('.selector', $pixels = 10);
+
+Enfin, vous pouvez faire glisser un élément d'un décalage donné :
+
+$browser->dragOffset('.selector', $x = 10, $y = 10);
+
+Dialogues JavaScript
+Dusk fournit diverses méthodes pour interagir avec les dialogues JavaScript. Par exemple, vous pouvez utiliser la waitForDialogméthode pour attendre qu'une boîte de dialogue JavaScript apparaisse. Cette méthode accepte un argument facultatif indiquant le nombre de secondes à attendre pour que la boîte de dialogue apparaisse :
+
+$browser->waitForDialog($seconds = null);
+
+La assertDialogOpenedméthode peut être utilisée pour affirmer qu'une boîte de dialogue a été affichée et contient le message donné :
+
+$browser->assertDialogOpened('Dialog message');
+
+Si la boîte de dialogue JavaScript contient une invite, vous pouvez utiliser la typeInDialogméthode pour saisir une valeur dans l'invite :
+
+$browser->typeInDialog('Hello World');
+
+Pour fermer une boîte de dialogue JavaScript ouverte en cliquant sur le bouton "OK", vous pouvez invoquer la acceptDialogméthode :
+
+$browser->acceptDialog();
+
+Pour fermer une boîte de dialogue JavaScript ouverte en cliquant sur le bouton "Annuler", vous pouvez invoquer la dismissDialogméthode :
+
+$browser->dismissDialog();
+
+Sélecteurs de portée
+Parfois, vous souhaiterez peut-être effectuer plusieurs opérations tout en délimitant toutes les opérations dans un sélecteur donné. Par exemple, vous souhaiterez peut-être affirmer qu'un texte n'existe que dans un tableau, puis cliquer sur un bouton dans ce tableau. Vous pouvez utiliser la withméthode pour y parvenir. Toutes les opérations effectuées dans la fermeture donnée à la withméthode seront étendues au sélecteur d'origine :
+
+$browser->with('.table', function ($table) {
+    $table->assertSee('Hello World')
+          ->clickLink('Delete');
+});
+
+Vous devrez peut-être parfois exécuter des assertions en dehors de la portée actuelle. Vous pouvez utiliser les méthodes elsewhereet elsewhereWhenAvailablepour accomplir ceci :
+
+$browser->with('.table', function ($table) {
+   // Current scope is `body .table`...
+ 
+   $browser->elsewhere('.page-title', function ($title) {
+       // Current scope is `body .page-title`...
+       $title->assertSee('Hello World');
+   });
+ 
+   $browser->elsewhereWhenAvailable('.page-title', function ($title) {
+       // Current scope is `body .page-title`...
+       $title->assertSee('Hello World');
+   });
+});
+
+En attente d'éléments
+Lors du test d'applications qui utilisent intensivement JavaScript, il devient souvent nécessaire "d'attendre" que certains éléments ou données soient disponibles avant de procéder à un test. Le crépuscule en fait un jeu d'enfant. En utilisant diverses méthodes, vous pouvez attendre que les éléments deviennent visibles sur la page ou même attendre qu'une expression JavaScript donnée soit évaluée à true.
+
+Attendre
+Si vous avez juste besoin de mettre le test en pause pendant un certain nombre de millisecondes, utilisez la pauseméthode :
+
+$browser->pause(1000);
+
+En attente de sélecteurs
+La waitForméthode peut être utilisée pour suspendre l'exécution du test jusqu'à ce que l'élément correspondant au sélecteur CSS ou Dusk donné soit affiché sur la page. Par défaut, cela mettra le test en pause pendant un maximum de cinq secondes avant de lever une exception. Si nécessaire, vous pouvez passer un seuil de délai d'attente personnalisé comme deuxième argument de la méthode :
+
+// Wait a maximum of five seconds for the selector...
+$browser->waitFor('.selector');
+ 
+// Wait a maximum of one second for the selector...
+$browser->waitFor('.selector', 1);
+
+Vous pouvez également attendre que l'élément correspondant au sélecteur donné contienne le texte donné :
+
+// Wait a maximum of five seconds for the selector to contain the given text...
+$browser->waitForTextIn('.selector', 'Hello World');
+ 
+// Wait a maximum of one second for the selector to contain the given text...
+$browser->waitForTextIn('.selector', 'Hello World', 1);
+
+Vous pouvez également attendre que l'élément correspondant au sélecteur donné soit absent de la page :
+
+// Wait a maximum of five seconds until the selector is missing...
+$browser->waitUntilMissing('.selector');
+ 
+// Wait a maximum of one second until the selector is missing...
+$browser->waitUntilMissing('.selector', 1);
+
+Ou, vous pouvez attendre que l'élément correspondant au sélecteur donné soit activé ou désactivé :
+
+// Wait a maximum of five seconds until the selector is enabled...
+$browser->waitUntilEnabled('.selector');
+ 
+// Wait a maximum of one second until the selector is enabled...
+$browser->waitUntilEnabled('.selector', 1);
+ 
+// Wait a maximum of five seconds until the selector is disabled...
+$browser->waitUntilDisabled('.selector');
+ 
+// Wait a maximum of one second until the selector is disabled...
+$browser->waitUntilDisabled('.selector', 1);
+
+Sélecteurs de portée lorsqu'ils sont disponibles
+Parfois, vous souhaiterez peut-être attendre l'apparition d'un élément correspondant à un sélecteur donné, puis interagir avec l'élément. Par exemple, vous souhaiterez peut-être attendre qu'une fenêtre modale soit disponible, puis appuyer sur le bouton "OK" dans le modal. Le whenAvailableprocédé peut être utilisé pour accomplir ceci. Toutes les opérations d'élément effectuées dans la fermeture donnée seront limitées au sélecteur d'origine :
+
+$browser->whenAvailable('.modal', function ($modal) {
+    $modal->assertSee('Hello World')
+          ->press('OK');
+});
+
+En attente de texte
+La waitForTextméthode peut être utilisée pour attendre que le texte donné soit affiché sur la page :
+
+// Wait a maximum of five seconds for the text...
+$browser->waitForText('Hello World');
+ 
+// Wait a maximum of one second for the text...
+$browser->waitForText('Hello World', 1);
+
+Vous pouvez utiliser la waitUntilMissingTextméthode pour attendre que le texte affiché ait été supprimé de la page :
+
+// Wait a maximum of five seconds for the text to be removed...
+$browser->waitUntilMissingText('Hello World');
+ 
+// Wait a maximum of one second for the text to be removed...
+$browser->waitUntilMissingText('Hello World', 1);
+
+En attente de liens
+La waitForLinkméthode peut être utilisée pour attendre que le texte du lien donné s'affiche sur la page :
+
+// Wait a maximum of five seconds for the link...
+$browser->waitForLink('Create');
+ 
+// Wait a maximum of one second for the link...
+$browser->waitForLink('Create', 1);
+
+En attente de l'emplacement de la page
+Lorsque vous effectuez une assertion de chemin telle que $browser->assertPathIs('/home'), l'assertion peut échouer si window.location.pathnameest mise à jour de manière asynchrone. Vous pouvez utiliser la waitForLocationméthode pour attendre que l'emplacement soit une valeur donnée :
+
+$browser->waitForLocation('/secret');
+
+La waitForLocationméthode peut également être utilisée pour attendre que l'emplacement de la fenêtre actuelle soit une URL complète :
+
+$browser->waitForLocation('https://example.com/path');
+
+Vous pouvez également attendre l'emplacement d'un itinéraire nommé :
+
+$browser->waitForRoute($routeName, $parameters);
+
+En attente de rechargement de page
+Si vous devez attendre qu'une page se recharge après avoir effectué une action, utilisez la waitForReloadméthode :
+
+use Laravel\Dusk\Browser;
+ 
+$browser->waitForReload(function (Browser $browser) {
+    $browser->press('Submit');
+})
+->assertSee('Success!');
+
+Étant donné que la nécessité d'attendre que la page se recharge se produit généralement après avoir cliqué sur un bouton, vous pouvez utiliser la clickAndWaitForReloadméthode pour plus de commodité :
+
+$browser->clickAndWaitForReload('.selector')
+        ->assertSee('something');
+
+Attente d'expressions JavaScript
+Parfois, vous souhaiterez peut-être suspendre l'exécution d'un test jusqu'à ce qu'une expression JavaScript donnée soit évaluée à true. Vous pouvez facilement accomplir cela en utilisant la waitUntilméthode. Lorsque vous passez une expression à cette méthode, vous n'avez pas besoin d'inclure le mot- returnclé ou un point-virgule de fin :
+
+// Wait a maximum of five seconds for the expression to be true...
+$browser->waitUntil('App.data.servers.length > 0');
+ 
+// Wait a maximum of one second for the expression to be true...
+$browser->waitUntil('App.data.servers.length > 0', 1);
+
+Attente des expressions Vue
+Les méthodes waitUntilVueet waitUntilVueIsNotpeuvent être utilisées pour attendre qu'un attribut de composant Vue ait une valeur donnée :
+
+// Wait until the component attribute contains the given value...
+$browser->waitUntilVue('user.name', 'Taylor', '@user');
+ 
+// Wait until the component attribute doesn't contain the given value...
+$browser->waitUntilVueIsNot('user.name', null, '@user');
+
+En attente d'événements JavaScript
+La waitForEventméthode peut être utilisée pour suspendre l'exécution d'un test jusqu'à ce qu'un événement JavaScript se produise :
+
+$browser->waitForEvent('load');
+
+L'écouteur d'événement est attaché à la portée actuelle, qui est l' bodyélément par défaut. Lors de l'utilisation d'un sélecteur étendu, l'écouteur d'événement sera attaché à l'élément correspondant :
+
+$browser->with('iframe', function ($iframe) {
+    // Wait for the iframe's load event...
+    $iframe->waitForEvent('load');
+});
+
+Vous pouvez également fournir un sélecteur comme deuxième argument de la waitForEventméthode pour attacher l'écouteur d'événement à un élément spécifique :
+
+$browser->waitForEvent('load', '.selector');
+
+Vous pouvez également attendre des événements sur les objets documentet :window
+
+// Wait until the document is scrolled...
+$browser->waitForEvent('scroll', 'document');
+ 
+// Wait a maximum of five seconds until the window is resized...
+$browser->waitForEvent('resize', 'window', 5);
+
+Attente avec un rappel
+De nombreuses méthodes « d'attente » dans Dusk reposent sur la waitUsingméthode sous-jacente. Vous pouvez utiliser cette méthode directement pour attendre le retour d'une fermeture donnée true. La waitUsingméthode accepte le nombre maximal de secondes à attendre, l'intervalle auquel la fermeture doit être évaluée, la fermeture et un message d'échec facultatif :
+
+$browser->waitUsing(10, 1, function () use ($something) {
+    return $something->isReady();
+}, "Something wasn't ready in time.");
+
+Faire défiler un élément dans la vue
+Parfois, vous ne pourrez peut-être pas cliquer sur un élément car il se trouve en dehors de la zone visible du navigateur. La scrollIntoViewméthode fera défiler la fenêtre du navigateur jusqu'à ce que l'élément du sélecteur donné soit dans la vue :
+
+$browser->scrollIntoView('.selector')
+        ->click('.selector');
+
+Assertions disponibles
+Dusk fournit une variété d'affirmations que vous pouvez faire contre votre application. Toutes les assertions disponibles sont documentées dans la liste ci-dessous :
+
+assertTitle
+assertTitleContains
+assertUrlIs
+assertSchemeIs
+assertSchemeIsNot
+assertHostIs
+assertHostIsNot
+assertPortIs
+assertPortIsNot
+assertPathBeginsWith
+assertPathIs
+assertPathIsNot
+assertRouteIs
+assertQueryStringHas
+assertQueryStringMissing
+assertFragmentIs
+assertFragmentBeginsWith
+assertFragmentIsNot
+assertHasCookie
+assertHasPlainCookie
+assertCookieMissing
+assertPlainCookieMissing
+assertCookieValue
+assertPlainCookieValue
+assertVoir
+assertDontSee
+assertSeeIn
+assertDontSeeIn
+assertSeeAnythingIn
+assertSeeNothingIn
+assertScript
+assertSourceHas
+assertSourceMissing
+assertSeeLink
+assertDontSeeLink
+assertInputValue
+assertInputValueIsNot
+assertChecked
+assertNotChecked
+assertRadioSelected
+assertRadioNotSelected
+assertSelected
+assertNotSelected
+assertSelectHasOptions
+assertSelectMissingOptions
+assertSelectHasOption
+assertSelectMissingOption
+assertValue
+assertValueIsNot
+assertAttribute
+assertAttributeContains
+assertAriaAttribute
+assertDataAttribute
+assertVisible
+assertPrésent
+assertNotPresent
+assertMissing
+assertInputPresent
+assertInputMissing
+assertDialogOpened
+assertEnabled
+assertDisabled
+assertButtonEnabled
+assertButtonDisabled
+assertFocus
+assertNotFocused
+assertAuthenticated
+assertGuest
+assertAuthenticatedAs
+assertVue
+assertVueIsNot
+assertVueContains
+assertVueDoesNotContain
+
+assertTitle
+Confirmez que le titre de la page correspond au texte donné :
+
+$browser->assertTitle($title);
+
+assertTitleContains
+Affirmer que le titre de la page contient le texte donné :
+
+$browser->assertTitleContains($title);
+
+assertUrlIs
+Confirmez que l'URL actuelle (sans la chaîne de requête) correspond à la chaîne donnée :
+
+$browser->assertUrlIs($url);
+
+assertSchemeIs
+Confirmez que le schéma d'URL actuel correspond au schéma donné :
+
+$browser->assertSchemeIs($scheme);
+
+assertSchemeIsNot
+Confirmez que le schéma d'URL actuel ne correspond pas au schéma donné :
+
+$browser->assertSchemeIsNot($scheme);
+
+assertHostIs
+Confirmez que l'hôte d'URL actuel correspond à l'hôte donné :
+
+$browser->assertHostIs($host);
+
+assertHostIsNot
+Confirmez que l'hôte d'URL actuel ne correspond pas à l'hôte donné :
+
+$browser->assertHostIsNot($host);
+
+assertPortIs
+Confirmez que le port d'URL actuel correspond au port donné :
+
+$browser->assertPortIs($port);
+
+assertPortIsNot
+Confirmez que le port d'URL actuel ne correspond pas au port indiqué :
+
+$browser->assertPortIsNot($port);
+
+assertPathBeginsWith
+Confirmez que le chemin de l'URL actuel commence par le chemin indiqué :
+
+$browser->assertPathBeginsWith('/home');
+
+assertPathIs
+Confirmez que le chemin actuel correspond au chemin donné :
+
+$browser->assertPathIs('/home');
+
+assertPathIsNot
+Confirmez que le chemin actuel ne correspond pas au chemin donné :
+
+$browser->assertPathIsNot('/home');
+
+assertRouteIs
+Confirmez que l'URL actuelle correspond à l'URL de la route nommée :
+
+$browser->assertRouteIs($name, $parameters);
+
+assertQueryStringHas
+Confirmez que le paramètre de chaîne de requête donné est présent :
+
+$browser->assertQueryStringHas($name);
+
+Confirmez que le paramètre de chaîne de requête donné est présent et a une valeur donnée :
+
+$browser->assertQueryStringHas($name, $value);
+
+assertQueryStringMissing
+Confirmez que le paramètre de chaîne de requête indiqué est manquant :
+
+$browser->assertQueryStringMissing($name);
+
+assertFragmentIs
+Confirmez que le fragment de hachage actuel de l'URL correspond au fragment donné :
+
+$browser->assertFragmentIs('anchor');
+
+assertFragmentBeginsWith
+Confirmez que le fragment de hachage actuel de l'URL commence par le fragment donné :
+
+$browser->assertFragmentBeginsWith('anchor');
+
+assertFragmentIsNot
+Confirmez que le fragment de hachage actuel de l'URL ne correspond pas au fragment donné :
+
+$browser->assertFragmentIsNot('anchor');
+
+assertHasCookie
+Confirmez que le cookie crypté donné est présent :
+
+$browser->assertHasCookie($name);
+
+assertHasPlainCookie
+Confirmez que le cookie non chiffré donné est présent :
+
+$browser->assertHasPlainCookie($name);
+
+assertCookieMissing
+Affirmer que le cookie crypté donné n'est pas présent :
+
+$browser->assertCookieMissing($name);
+
+assertPlainCookieMissing
+Affirmer que le cookie non chiffré donné n'est pas présent :
+
+$browser->assertPlainCookieMissing($name);
+
+assertCookieValue
+Affirmer qu'un cookie chiffré a une valeur donnée :
+
+$browser->assertCookieValue($name, $value);
+
+assertPlainCookieValue
+Affirmer qu'un cookie non chiffré a une valeur donnée :
+
+$browser->assertPlainCookieValue($name, $value);
+
+assertVoir
+Affirmer que le texte donné est présent sur la page :
+
+$browser->assertSee($text);
+
+assertDontSee
+Affirmer que le texte donné n'est pas présent sur la page :
+
+$browser->assertDontSee($text);
+
+assertSeeIn
+Affirmer que le texte donné est présent dans le sélecteur :
+
+$browser->assertSeeIn($selector, $text);
+
+assertDontSeeIn
+Affirmer que le texte donné n'est pas présent dans le sélecteur :
+
+$browser->assertDontSeeIn($selector, $text);
+
+assertSeeAnythingIn
+Affirmer que n'importe quel texte est présent dans le sélecteur :
+
+$browser->assertSeeAnythingIn($selector);
+
+assertSeeNothingIn
+Affirmer qu'aucun texte n'est présent dans le sélecteur :
+
+$browser->assertSeeNothingIn($selector);
+
+assertScript
+Affirmer que l'expression JavaScript donnée est évaluée à la valeur donnée :
+
+$browser->assertScript('window.isLoaded')
+        ->assertScript('document.readyState', 'complete');
+
+assertSourceHas
+Confirmez que le code source donné est présent sur la page :
+
+$browser->assertSourceHas($code);
+
+assertSourceMissing
+Affirmer que le code source donné n'est pas présent sur la page :
+
+$browser->assertSourceMissing($code);
+
+assertSeeLink
+Affirmer que le lien donné est présent sur la page :
+
+$browser->assertSeeLink($linkText);
+
+assertDontSeeLink
+Affirmer que le lien donné n'est pas présent sur la page :
+
+$browser->assertDontSeeLink($linkText);
+
+assertInputValue
+Affirmer que le champ d'entrée donné a la valeur donnée :
+
+$browser->assertInputValue($field, $value);
+
+assertInputValueIsNot
+Affirmer que le champ d'entrée donné n'a pas la valeur donnée :
+
+$browser->assertInputValueIsNot($field, $value);
+
+assertChecked
+Confirmez que la case à cocher donnée est cochée :
+
+$browser->assertChecked($field);
+
+assertNotChecked
+Affirmer que la case à cocher donnée n'est pas cochée :
+
+$browser->assertNotChecked($field);
+
+assertRadioSelected
+Confirmez que le champ radio donné est sélectionné :
+
+$browser->assertRadioSelected($field, $value);
+
+assertRadioNotSelected
+Confirmer que le champ radio donné n'est pas sélectionné :
+
+$browser->assertRadioNotSelected($field, $value);
+
+assertSelected
+Affirmer que la liste déroulante donnée a la valeur donnée sélectionnée :
+
+$browser->assertSelected($field, $value);
+
+assertNotSelected
+Affirmer que la liste déroulante donnée n'a pas la valeur donnée sélectionnée :
+
+$browser->assertNotSelected($field, $value);
+
+assertSelectHasOptions
+Affirmer que le tableau de valeurs donné est disponible pour être sélectionné :
+
+$browser->assertSelectHasOptions($field, $values);
+
+assertSelectMissingOptions
+Affirmer que le tableau de valeurs donné n'est pas disponible pour être sélectionné :
+
+$browser->assertSelectMissingOptions($field, $values);
+
+assertSelectHasOption
+Affirmer que la valeur donnée est disponible pour être sélectionnée dans le champ donné :
+
+$browser->assertSelectHasOption($field, $value);
+
+assertSelectMissingOption
+Affirmer que la valeur donnée n'est pas disponible pour être sélectionnée :
+
+$browser->assertSelectMissingOption($field, $value);
+
+assertValue
+Affirmer que l'élément correspondant au sélecteur donné a la valeur donnée :
+
+$browser->assertValue($selector, $value);
+
+assertValueIsNot
+Affirmer que l'élément correspondant au sélecteur donné n'a pas la valeur donnée :
+
+$browser->assertValueIsNot($selector, $value);
+
+assertAttribute
+Affirmer que l'élément correspondant au sélecteur donné a la valeur donnée dans l'attribut fourni :
+
+$browser->assertAttribute($selector, $attribute, $value);
+
+assertAttributeContains
+Affirmer que l'élément correspondant au sélecteur donné contient la valeur donnée dans l'attribut fourni :
+
+$browser->assertAttributeContains($selector, $attribute, $value);
+
+assertAriaAttribute
+Confirmez que l'élément correspondant au sélecteur donné a la valeur donnée dans l'attribut aria fourni :
+
+$browser->assertAriaAttribute($selector, $attribute, $value);
+
+Par exemple, étant donné le balisage <button aria-label="Add"></button>, vous pouvez affirmer contre l' aria-labelattribut comme ceci :
+
+$browser->assertAriaAttribute('button', 'label', 'Add')
+
+assertDataAttribute
+Confirmez que l'élément correspondant au sélecteur donné a la valeur donnée dans l'attribut de données fourni :
+
+$browser->assertDataAttribute($selector, $attribute, $value);
+
+Par exemple, étant donné le balisage <tr id="row-1" data-content="attendees"></tr>, vous pouvez affirmer contre l' data-labelattribut comme ceci :
+
+$browser->assertDataAttribute('#row-1', 'content', 'attendees')
+
+assertVisible
+Affirmer que l'élément correspondant au sélecteur donné est visible :
+
+$browser->assertVisible($selector);
+
+assertPrésent
+Confirmez que l'élément correspondant au sélecteur donné est présent dans la source :
+
+$browser->assertPresent($selector);
+
+assertNotPresent
+Affirmer que l'élément correspondant au sélecteur donné n'est pas présent dans la source :
+
+$browser->assertNotPresent($selector);
+
+assertMissing
+Affirmer que l'élément correspondant au sélecteur donné n'est pas visible :
+
+$browser->assertMissing($selector);
+
+assertInputPresent
+Confirmez qu'une entrée avec le nom donné est présente :
+
+$browser->assertInputPresent($name);
+
+assertInputMissing
+Affirmer qu'une entrée avec le nom donné n'est pas présente dans la source :
+
+$browser->assertInputMissing($name);
+
+assertDialogOpened
+Confirmez qu'une boîte de dialogue JavaScript avec le message donné a été ouverte :
+
+$browser->assertDialogOpened($message);
+
+assertEnabled
+Confirmez que le champ donné est activé :
+
+$browser->assertEnabled($field);
+
+assertDisabled
+Confirmez que le champ donné est désactivé :
+
+$browser->assertDisabled($field);
+
+assertButtonEnabled
+Confirmez que le bouton donné est activé :
+
+$browser->assertButtonEnabled($button);
+
+assertButtonDisabled
+Confirmez que le bouton donné est désactivé :
+
+$browser->assertButtonDisabled($button);
+
+assertFocus
+Affirmer que le champ donné est ciblé :
+
+$browser->assertFocused($field);
+
+assertNotFocused
+Affirmer que le champ donné n'est pas ciblé :
+
+$browser->assertNotFocused($field);
+
+assertAuthenticated
+Confirmez que l'utilisateur est authentifié :
+
+$browser->assertAuthenticated();
+
+assertGuest
+Confirmez que l'utilisateur n'est pas authentifié :
+
+$browser->assertGuest();
+
+assertAuthenticatedAs
+Confirmez que l'utilisateur est authentifié en tant qu'utilisateur donné :
+
+$browser->assertAuthenticatedAs($user);
+
+assertVue
+Dusk vous permet même de faire des affirmations sur l'état des données des composants Vue . Par exemple, imaginez que votre application contient le composant Vue suivant :
+
+// HTML...
+ 
+<profile dusk="profile-component"></profile>
+ 
+// Component Definition...
+ 
+Vue.component('profile', {
+    template: '<div>{{ user.name }}</div>',
+ 
+    data: function () {
+        return {
+            user: {
+                name: 'Taylor'
+            }
+        };
+    }
+});
+
+Vous pouvez affirmer sur l'état du composant Vue comme ceci :
+
+/**
+ * A basic Vue test example.
+ *
+ * @return void
+ */
+public function testVue()
+{
+    $this->browse(function (Browser $browser) {
+        $browser->visit('/')
+                ->assertVue('user.name', 'Taylor', '@profile-component');
+    });
+}
+
+assertVueIsNot
+Affirmer qu'une propriété de données de composant Vue donnée ne correspond pas à la valeur donnée :
+
+$browser->assertVueIsNot($property, $value, $componentSelector = null);
+
+assertVueContains
+Affirmer qu'une propriété de données de composant Vue donnée est un tableau et contient la valeur donnée :
+
+$browser->assertVueContains($property, $value, $componentSelector = null);
+
+assertVueDoesNotContain
+Affirmer qu'une propriété de données de composant Vue donnée est un tableau et ne contient pas la valeur donnée :
+
+$browser->assertVueDoesNotContain($property, $value, $componentSelector = null);
+
+pages
+Parfois, les tests nécessitent plusieurs actions compliquées à effectuer en séquence. Cela peut rendre vos tests plus difficiles à lire et à comprendre. Les pages Dusk vous permettent de définir des actions expressives qui peuvent ensuite être effectuées sur une page donnée via une seule méthode. Les pages vous permettent également de définir des raccourcis vers des sélecteurs communs pour votre application ou pour une seule page.
+
+Génération de pages
+Pour générer un objet page, exécutez la dusk:pagecommande Artisan. Tous les objets de la page seront placés dans le tests/Browser/Pagesrépertoire de votre application :
+
+php artisan dusk:page Login
+
+Configuration des pages
+Par défaut, les pages ont trois méthodes : url, assertet elements. Nous allons discuter des méthodes urlet maintenant. assertLa elementsméthode sera discutée plus en détail ci-dessous .
+
+La urlméthode
+La urlméthode doit renvoyer le chemin de l'URL qui représente la page. Dusk utilisera cette URL lors de la navigation vers la page dans le navigateur :
+
+/**
+ * Get the URL for the page.
+ *
+ * @return string
+ */
+public function url()
+{
+    return '/login';
+}
+
+La assertméthode
+La assertméthode peut faire toutes les assertions nécessaires pour vérifier que le navigateur se trouve réellement sur la page donnée. Il n'est en fait pas nécessaire de placer quoi que ce soit dans cette méthode ; cependant, vous êtes libre de faire ces affirmations si vous le souhaitez. Ces assertions seront exécutées automatiquement lors de la navigation vers la page :
+
+/**
+ * Assert that the browser is on the page.
+ *
+ * @return void
+ */
+public function assert(Browser $browser)
+{
+    $browser->assertPathIs($this->url());
+}
+
+Navigation vers les pages
+Une fois qu'une page a été définie, vous pouvez y accéder en utilisant la visitméthode :
+
+use Tests\Browser\Pages\Login;
+ 
+$browser->visit(new Login);
+
+Parfois, vous pouvez déjà être sur une page donnée et avoir besoin de "charger" les sélecteurs et les méthodes de la page dans le contexte de test actuel. Ceci est courant lorsque vous appuyez sur un bouton et que vous êtes redirigé vers une page donnée sans y accéder explicitement. Dans cette situation, vous pouvez utiliser la onméthode pour charger la page :
+
+use Tests\Browser\Pages\CreatePlaylist;
+ 
+$browser->visit('/dashboard')
+        ->clickLink('Create Playlist')
+        ->on(new CreatePlaylist)
+        ->assertSee('@create');
+
+Sélecteurs abrégés
+La elementsméthode dans les classes de page vous permet de définir des raccourcis rapides et faciles à mémoriser pour n'importe quel sélecteur CSS sur votre page. Par exemple, définissons un raccourci pour le champ de saisie "email" de la page de connexion de l'application :
+
+/**
+ * Get the element shortcuts for the page.
+ *
+ * @return array
+ */
+public function elements()
+{
+    return [
+        '@email' => 'input[name=email]',
+    ];
+}
+
+Une fois le raccourci défini, vous pouvez utiliser le sélecteur abrégé partout où vous utiliseriez généralement un sélecteur CSS complet :
+
+$browser->type('@email', 'taylor@laravel.com');
+
+Sélecteurs raccourcis globaux
+Après avoir installé Dusk, une Pageclasse de base sera placée dans votre tests/Browser/Pagesrépertoire. Cette classe contient une siteElementsméthode qui peut être utilisée pour définir des sélecteurs raccourcis globaux qui devraient être disponibles sur chaque page de votre application :
+
+/**
+ * Get the global element shortcuts for the site.
+ *
+ * @return array
+ */
+public static function siteElements()
+{
+    return [
+        '@element' => '#selector',
+    ];
+}
+
+Méthodes de page
+En plus des méthodes par défaut définies sur les pages, vous pouvez définir des méthodes supplémentaires qui pourront être utilisées tout au long de vos tests. Par exemple, imaginons que nous construisons une application de gestion musicale. Une action courante pour une page de l'application peut être de créer une liste de lecture. Au lieu de réécrire la logique pour créer une playlist dans chaque test, vous pouvez définir une createPlaylistméthode sur une classe de page :
+
+<?php
+ 
+namespace Tests\Browser\Pages;
+ 
+use Laravel\Dusk\Browser;
+ 
+class Dashboard extends Page
+{
+    // Other page methods...
+ 
+    /**
+     * Create a new playlist.
+     *
+     * @param  \Laravel\Dusk\Browser  $browser
+     * @param  string  $name
+     * @return void
+     */
+    public function createPlaylist(Browser $browser, $name)
+    {
+        $browser->type('name', $name)
+                ->check('share')
+                ->press('Create Playlist');
+    }
+}
+
+Une fois la méthode définie, vous pouvez l'utiliser dans n'importe quel test utilisant la page. L'instance du navigateur sera automatiquement transmise comme premier argument aux méthodes de page personnalisées :
+
+use Tests\Browser\Pages\Dashboard;
+ 
+$browser->visit(new Dashboard)
+        ->createPlaylist('My Playlist')
+        ->assertSee('My Playlist');
+
+Composants
+Les composants sont similaires aux « objets de page » de Dusk, mais sont destinés à des éléments d'interface utilisateur et de fonctionnalités qui sont réutilisés dans votre application, comme une barre de navigation ou une fenêtre de notification. En tant que tels, les composants ne sont pas liés à des URL spécifiques.
+
+Génération de composants
+Pour générer un composant, exécutez la dusk:componentcommande Artisan. Les nouveaux composants sont placés dans le tests/Browser/Componentsrépertoire :
+
+php artisan dusk:component DatePicker
+
+Comme indiqué ci-dessus, un "sélecteur de date" est un exemple de composant qui peut exister dans votre application sur diverses pages. Il peut devenir fastidieux d'écrire manuellement la logique d'automatisation du navigateur pour sélectionner une date dans des dizaines de tests dans votre suite de tests. Au lieu de cela, nous pouvons définir un composant Dusk pour représenter le sélecteur de date, ce qui nous permet d'encapsuler cette logique dans le composant :
+
+<?php
+ 
+namespace Tests\Browser\Components;
+ 
+use Laravel\Dusk\Browser;
+use Laravel\Dusk\Component as BaseComponent;
+ 
+class DatePicker extends BaseComponent
+{
+    /**
+     * Get the root selector for the component.
+     *
+     * @return string
+     */
+    public function selector()
+    {
+        return '.date-picker';
+    }
+ 
+    /**
+     * Assert that the browser page contains the component.
+     *
+     * @param  Browser  $browser
+     * @return void
+     */
+    public function assert(Browser $browser)
+    {
+        $browser->assertVisible($this->selector());
+    }
+ 
+    /**
+     * Get the element shortcuts for the component.
+     *
+     * @return array
+     */
+    public function elements()
+    {
+        return [
+            '@date-field' => 'input.datepicker-input',
+            '@year-list' => 'div > div.datepicker-years',
+            '@month-list' => 'div > div.datepicker-months',
+            '@day-list' => 'div > div.datepicker-days',
+        ];
+    }
+ 
+    /**
+     * Select the given date.
+     *
+     * @param  \Laravel\Dusk\Browser  $browser
+     * @param  int  $year
+     * @param  int  $month
+     * @param  int  $day
+     * @return void
+     */
+    public function selectDate(Browser $browser, $year, $month, $day)
+    {
+        $browser->click('@date-field')
+                ->within('@year-list', function ($browser) use ($year) {
+                    $browser->click($year);
+                })
+                ->within('@month-list', function ($browser) use ($month) {
+                    $browser->click($month);
+                })
+                ->within('@day-list', function ($browser) use ($day) {
+                    $browser->click($day);
+                });
+    }
+}
+
+Utilisation de composants
+Une fois le composant défini, nous pouvons facilement sélectionner une date dans le sélecteur de date à partir de n'importe quel test. Et, si la logique nécessaire pour sélectionner une date change, il suffit de mettre à jour le composant :
+
+<?php
+ 
+namespace Tests\Browser;
+ 
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Laravel\Dusk\Browser;
+use Tests\Browser\Components\DatePicker;
+use Tests\DuskTestCase;
+ 
+class ExampleTest extends DuskTestCase
+{
+    /**
+     * A basic component test example.
+     *
+     * @return void
+     */
+    public function testBasicExample()
+    {
+        $this->browse(function (Browser $browser) {
+            $browser->visit('/')
+                    ->within(new DatePicker, function ($browser) {
+                        $browser->selectDate(2019, 1, 30);
+                    })
+                    ->assertSee('January');
+        });
+    }
+}
+
+Intégration continue
+
+La plupart des configurations d'intégration continue de Dusk s'attendent à ce que votre application Laravel soit servie à l'aide du serveur de développement PHP intégré sur le port 8000. Par conséquent, avant de continuer, vous devez vous assurer que votre environnement d'intégration continue a une APP_URLvaleur de variable d'environnement de http://127.0.0.1:8000.
+
+
+Heroku CI
+Pour exécuter des tests Dusk sur Heroku CI , ajoutez le buildpack et les scripts Google Chrome suivants à votre app.jsonfichier Heroku :
+
+{
+  "environments": {
+    "test": {
+      "buildpacks": [
+        { "url": "heroku/php" },
+        { "url": "https://github.com/heroku/heroku-buildpack-google-chrome" }
+      ],
+      "scripts": {
+        "test-setup": "cp .env.testing .env",
+        "test": "nohup bash -c './vendor/laravel/dusk/bin/chromedriver-linux > /dev/null 2>&1 &' && nohup bash -c 'php artisan serve --no-reload > /dev/null 2>&1 &' && php artisan dusk"
+      }
+    }
+  }
+}
+
+Travis CI
+Pour exécuter vos tests Dusk sur Travis CI , utilisez la .travis.ymlconfiguration suivante. Étant donné que Travis CI n'est pas un environnement graphique, nous devrons prendre quelques mesures supplémentaires pour lancer un navigateur Chrome. De plus, nous utiliserons php artisan servepour lancer le serveur Web intégré de PHP :
+
+language: php
+ 
+php:
+  - 7.3
+ 
+addons:
+  chrome: stable
+ 
+install:
+  - cp .env.testing .env
+  - travis_retry composer install --no-interaction --prefer-dist
+  - php artisan key:generate
+  - php artisan dusk:chrome-driver
+ 
+before_script:
+  - google-chrome-stable --headless --disable-gpu --remote-debugging-port=9222 http://localhost &
+  - php artisan serve --no-reload &
+ 
+script:
+  - php artisan dusk
+
+Actions GitHub
+Si vous utilisez Github Actions pour exécuter vos tests Dusk, vous pouvez utiliser le fichier de configuration suivant comme point de départ. Comme TravisCI, nous utiliserons la php artisan servecommande pour lancer le serveur Web intégré de PHP :
+
+name: CI
+on: [push]
+jobs:
+ 
+  dusk-php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare The Environment
+        run: cp .env.example .env
+      - name: Create Database
+        run: |
+          sudo systemctl start mysql
+          mysql --user="root" --password="root" -e "CREATE DATABASE 'my-database' character set UTF8mb4 collate utf8mb4_bin;"
+      - name: Install Composer Dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+      - name: Generate Application Key
+        run: php artisan key:generate
+      - name: Upgrade Chrome Driver
+        run: php artisan dusk:chrome-driver `/opt/google/chrome/chrome --version | cut -d " " -f3 | cut -d "." -f1`
+      - name: Start Chrome Driver
+        run: ./vendor/laravel/dusk/bin/chromedriver-linux &
+      - name: Run Laravel Server
+        run: php artisan serve --no-reload &
+      - name: Run Dusk Tests
+        env:
+          APP_URL: "http://127.0.0.1:8000"
+        run: php artisan dusk
+      - name: Upload Screenshots
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: screenshots
+          path: tests/Browser/screenshots
+      - name: Upload Console Logs
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: console
+          path: tests/Browser/console

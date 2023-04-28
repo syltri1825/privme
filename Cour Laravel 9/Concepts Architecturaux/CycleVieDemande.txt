@@ -1,0 +1,56 @@
+Cycle de vie de la demande
+Introduction
+Présentation du cycle de vie
+Premiers pas
+HTTP / Noyaux de console
+Les fournisseurs de services
+Routage
+Finir
+Focus sur les fournisseurs de services
+Introduction
+Lorsque vous utilisez un outil dans le "monde réel", vous vous sentez plus confiant si vous comprenez comment cet outil fonctionne. Le développement d'applications n'est pas différent. Lorsque vous comprenez le fonctionnement de vos outils de développement, vous vous sentez plus à l'aise et en confiance pour les utiliser.
+
+L'objectif de ce document est de vous donner un bon aperçu de haut niveau du fonctionnement du framework Laravel. En apprenant à mieux connaître le cadre général, tout semble moins "magique" et vous serez plus confiant dans la construction de vos applications. Si vous ne comprenez pas tout de suite tous les termes, ne vous découragez pas ! Essayez simplement d'avoir une compréhension de base de ce qui se passe, et vos connaissances augmenteront au fur et à mesure que vous explorerez d'autres sections de la documentation.
+
+Présentation du cycle de vie
+Premiers pas
+Le point d'entrée de toutes les requêtes vers une application Laravel est le public/index.phpfichier. Toutes les requêtes sont dirigées vers ce fichier par la configuration de votre serveur web (Apache/Nginx). Le index.phpfichier ne contient pas beaucoup de code. C'est plutôt un point de départ pour charger le reste du framework.
+
+Le index.phpfichier charge la définition de chargeur automatique générée par Composer, puis récupère une instance de l'application Laravel à partir de bootstrap/app.php. La première action entreprise par Laravel lui-même est de créer une instance du conteneur application/service .
+
+HTTP / Noyaux de console
+Ensuite, la demande entrante est envoyée au noyau HTTP ou au noyau de la console, selon le type de demande qui entre dans l'application. Ces deux noyaux servent d'emplacement central par lequel transitent toutes les requêtes. Pour l'instant, concentrons-nous sur le noyau HTTP, qui se trouve dans app/Http/Kernel.php.
+
+Le noyau HTTP étend la Illuminate\Foundation\Http\Kernelclasse, qui définit un tableau bootstrappersqui sera exécuté avant l'exécution de la requête. Ces programmes d'amorçage configurent la gestion des erreurs, configurent la journalisation, détectent l'environnement de l'application et effectuent d'autres tâches qui doivent être effectuées avant que la demande ne soit réellement traitée. En règle générale, ces classes gèrent la configuration interne de Laravel dont vous n'avez pas à vous soucier.
+
+Le noyau HTTP définit également une liste d' intergiciels HTTP par lesquels toutes les requêtes doivent passer avant d'être traitées par l'application. Ces intergiciels gèrent la lecture et l'écriture de la session HTTP , déterminent si l'application est en mode maintenance, vérifient le jeton CSRF , etc. Nous en reparlerons bientôt.
+
+La signature de méthode pour la méthode du noyau HTTP handleest assez simple : elle reçoit un Requestet renvoie un Response. Considérez le noyau comme une grande boîte noire qui représente l'ensemble de votre application. Envoyez-lui des requêtes HTTP et il renverra des réponses HTTP.
+
+Les fournisseurs de services
+L'une des actions d'amorçage du noyau les plus importantes consiste à charger les fournisseurs de services pour votre application. Les fournisseurs de services sont responsables de l'amorçage de tous les différents composants du framework, tels que la base de données, la file d'attente, la validation et les composants de routage. Tous les fournisseurs de services de l'application sont configurés dans le tableau config/app.phpdu fichier de configuration .providers
+
+Laravel parcourra cette liste de fournisseurs et instanciera chacun d'eux. Après avoir instancié les fournisseurs, la registerméthode sera appelée sur tous les fournisseurs. Ensuite, une fois tous les fournisseurs enregistrés, la bootméthode sera appelée sur chaque fournisseur. Ainsi, les fournisseurs de services peuvent dépendre de chaque liaison de conteneur enregistrée et disponible au moment où leur bootméthode est exécutée.
+
+Essentiellement, chaque fonctionnalité majeure offerte par Laravel est amorcée et configurée par un fournisseur de services. Puisqu'ils démarrent et configurent autant de fonctionnalités offertes par le framework, les fournisseurs de services sont l'aspect le plus important de l'ensemble du processus d'amorçage de Laravel.
+
+Routage
+L'un des fournisseurs de services les plus importants de votre application est le App\Providers\RouteServiceProvider. Ce fournisseur de services charge les fichiers de route contenus dans le routesrépertoire de votre application. Allez-y, déchiffrez le RouteServiceProvidercode et regardez comment cela fonctionne !
+
+Une fois que l'application a été démarrée et que tous les fournisseurs de services ont été enregistrés, le Requestsera remis au routeur pour expédition. Le routeur enverra la demande à une route ou à un contrôleur, et exécutera tout middleware spécifique à la route.
+
+Le middleware fournit un mécanisme pratique pour filtrer ou examiner les requêtes HTTP entrant dans votre application. Par exemple, Laravel inclut un middleware qui vérifie si l'utilisateur de votre application est authentifié. Si l'utilisateur n'est pas authentifié, le middleware redirigera l'utilisateur vers l'écran de connexion. Cependant, si l'utilisateur est authentifié, le middleware permettra à la demande de continuer plus loin dans l'application. Certains intergiciels sont affectés à toutes les routes de l'application, comme celles définies dans la $middlewarepropriété de votre noyau HTTP, tandis que d'autres ne sont affectés qu'à des routes ou à des groupes de routes spécifiques. Vous pouvez en savoir plus sur le middleware en lisant la documentation complète du middleware .
+
+Si la requête passe par tous les middleware attribués à la route correspondante, la méthode de route ou de contrôleur sera exécutée et la réponse renvoyée par la méthode de route ou de contrôleur sera renvoyée via la chaîne de middleware de la route.
+
+Finir
+Une fois que la route ou la méthode du contrôleur renvoie une réponse, la réponse reviendra vers l'extérieur via le middleware de la route, donnant à l'application une chance de modifier ou d'examiner la réponse sortante.
+
+Enfin, une fois que la réponse revient dans le middleware, la handleméthode du noyau HTTP renvoie l'objet de réponse et le index.phpfichier appelle la sendméthode sur la réponse renvoyée. La sendméthode envoie le contenu de la réponse au navigateur Web de l'utilisateur. Nous avons terminé notre voyage à travers l'ensemble du cycle de vie des requêtes Laravel !
+
+Focus sur les fournisseurs de services
+Les fournisseurs de services sont vraiment la clé pour démarrer une application Laravel. L'instance d'application est créée, les fournisseurs de services sont enregistrés et la demande est transmise à l'application amorcée. C'est vraiment aussi simple que ça !
+
+Avoir une bonne compréhension de la façon dont une application Laravel est construite et démarrée via des fournisseurs de services est très précieux. Les fournisseurs de services par défaut de votre application sont stockés dans le app/Providersrépertoire.
+
+Par défaut, le AppServiceProviderest assez vide. Ce fournisseur est un endroit idéal pour ajouter les propres liaisons d'amorçage et de conteneur de services de votre application. Pour les applications volumineuses, vous souhaiterez peut-être créer plusieurs fournisseurs de services, chacun avec un amorçage plus granulaire pour des services spécifiques utilisés par votre application.

@@ -1,0 +1,287 @@
+Façades
+Introduction
+Quand utiliser les façades
+Façades Vs. Injection de dépendance
+Façades Vs. Fonctions d'assistance
+Comment fonctionnent les façades
+Façades en temps réel
+Référence de classe de façade
+Introduction
+Tout au long de la documentation de Laravel, vous verrez des exemples de code qui interagissent avec les fonctionnalités de Laravel via des "façades". Les façades fournissent une interface "statique" aux classes disponibles dans le conteneur de services de l'application . Laravel est livré avec de nombreuses façades qui donnent accès à presque toutes les fonctionnalités de Laravel.
+
+Les façades Laravel servent de "proxies statiques" aux classes sous-jacentes dans le conteneur de services, offrant l'avantage d'une syntaxe concise et expressive tout en conservant plus de testabilité et de flexibilité que les méthodes statiques traditionnelles. C'est parfaitement bien si vous ne comprenez pas totalement comment les façades fonctionnent sous le capot - suivez simplement le courant et continuez à apprendre sur Laravel.
+
+Toutes les façades de Laravel sont définies dans l' espace de Illuminate\Support\Facadesnoms. Ainsi, on accède facilement à une façade comme celle-ci :
+
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Route;
+ 
+Route::get('/cache', function () {
+    return Cache::get('key');
+});
+
+Tout au long de la documentation de Laravel, de nombreux exemples utiliseront des façades pour démontrer diverses fonctionnalités du framework.
+
+Fonctions d'assistance
+Pour compléter les façades, Laravel propose une variété de "fonctions d'assistance" globales qui facilitent encore plus l'interaction avec les fonctionnalités communes de Laravel. Certaines des fonctions d'assistance courantes avec lesquelles vous pouvez interagir sont view, response, url, config, etc. Chaque fonction d'assistance offerte par Laravel est documentée avec sa fonctionnalité correspondante ; cependant, une liste complète est disponible dans la documentation d'aide dédiée .
+
+Par exemple, au lieu d'utiliser la Illuminate\Support\Facades\Responsefaçade pour générer une réponse JSON, nous pouvons simplement utiliser la responsefonction. Étant donné que les fonctions d'assistance sont disponibles dans le monde entier, vous n'avez pas besoin d'importer de classes pour les utiliser :
+
+use Illuminate\Support\Facades\Response;
+ 
+Route::get('/users', function () {
+    return Response::json([
+        // ...
+    ]);
+});
+ 
+Route::get('/users', function () {
+    return response()->json([
+        // ...
+    ]);
+});
+
+Quand utiliser les façades
+Les façades présentent de nombreux avantages. Ils fournissent une syntaxe concise et mémorable qui vous permet d'utiliser les fonctionnalités de Laravel sans vous souvenir des noms de classe longs qui doivent être injectés ou configurés manuellement. De plus, en raison de leur utilisation unique des méthodes dynamiques de PHP, ils sont faciles à tester.
+
+Cependant, certaines précautions doivent être prises lors de l'utilisation des façades. Le principal danger des façades est la classe "fluage de portée". Étant donné que les façades sont si faciles à utiliser et ne nécessitent pas d'injection, il peut être facile de laisser vos classes continuer à se développer et d'utiliser de nombreuses façades dans une seule classe. En utilisant l'injection de dépendances, ce potentiel est atténué par le retour visuel qu'un grand constructeur vous donne que votre classe devient trop grande. Ainsi, lorsque vous utilisez des façades, faites particulièrement attention à la taille de votre classe afin que son périmètre de responsabilité reste étroit. Si votre classe devient trop grande, envisagez de la diviser en plusieurs classes plus petites.
+
+Façades Vs. Injection de dépendance
+L'un des principaux avantages de l'injection de dépendances est la possibilité d'échanger les implémentations de la classe injectée. Ceci est utile pendant les tests car vous pouvez injecter une simulation ou un stub et affirmer que diverses méthodes ont été appelées sur le stub.
+
+En règle générale, il ne serait pas possible de simuler ou de remplacer une méthode de classe véritablement statique. Cependant, étant donné que les façades utilisent des méthodes dynamiques pour proxy les appels de méthode aux objets résolus à partir du conteneur de service, nous pouvons en fait tester les façades comme nous testerions une instance de classe injectée. Par exemple, étant donné l'itinéraire suivant :
+
+use Illuminate\Support\Facades\Cache;
+ 
+Route::get('/cache', function () {
+    return Cache::get('key');
+});
+
+En utilisant les méthodes de test de façade de Laravel, nous pouvons écrire le test suivant pour vérifier que la Cache::getméthode a été appelée avec l'argument attendu :
+
+use Illuminate\Support\Facades\Cache;
+ 
+/**
+ * A basic functional test example.
+ *
+ * @return void
+ */
+public function testBasicExample()
+{
+    Cache::shouldReceive('get')
+         ->with('key')
+         ->andReturn('value');
+ 
+    $response = $this->get('/cache');
+ 
+    $response->assertSee('value');
+}
+
+Façades Vs. Fonctions d'assistance
+En plus des façades, Laravel inclut une variété de fonctions "d'assistance" qui peuvent effectuer des tâches courantes telles que la génération de vues, le déclenchement d'événements, la distribution de tâches ou l'envoi de réponses HTTP. Beaucoup de ces fonctions d'assistance remplissent la même fonction qu'une façade correspondante. Par exemple, cet appel de façade et cet appel d'assistance sont équivalents :
+
+return Illuminate\Support\Facades\View::make('profile');
+ 
+return view('profile');
+
+Il n'y a absolument aucune différence pratique entre les façades et les fonctions auxiliaires. Lorsque vous utilisez des fonctions d'assistance, vous pouvez toujours les tester exactement comme vous le feriez avec la façade correspondante. Par exemple, étant donné l'itinéraire suivant :
+
+Route::get('/cache', function () {
+    return cache('key');
+});
+
+Sous le capot, l' cacheassistant va appeler la getméthode sur la classe sous-jacente à la Cachefaçade. Ainsi, même si nous utilisons la fonction d'assistance, nous pouvons écrire le test suivant pour vérifier que la méthode a été appelée avec l'argument attendu :
+
+use Illuminate\Support\Facades\Cache;
+ 
+/**
+ * A basic functional test example.
+ *
+ * @return void
+ */
+public function testBasicExample()
+{
+    Cache::shouldReceive('get')
+         ->with('key')
+         ->andReturn('value');
+ 
+    $response = $this->get('/cache');
+ 
+    $response->assertSee('value');
+}
+
+Comment fonctionnent les façades
+Dans une application Laravel, une façade est une classe qui permet d'accéder à un objet depuis le conteneur. La machinerie qui fait ce travail est dans la Facadeclasse. Les façades de Laravel et toutes les façades personnalisées que vous créez étendront la Illuminate\Support\Facades\Facadeclasse de base.
+
+La Facadeclasse de base utilise la __callStatic()méthode magique pour différer les appels de votre façade vers un objet résolu à partir du conteneur. Dans l'exemple ci-dessous, un appel est effectué vers le système de cache Laravel. En jetant un coup d'œil à ce code, on pourrait supposer que la getméthode statique est appelée sur la Cacheclasse :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show the profile for the given user.
+     *
+     * @param  int  $id
+     * @return Response
+     */
+    public function showProfile($id)
+    {
+        $user = Cache::get('user:'.$id);
+ 
+        return view('profile', ['user' => $user]);
+    }
+}
+
+Notez que vers le haut du fichier, nous "importons" la Cachefaçade. Cette façade sert de proxy pour accéder à l'implémentation sous-jacente de l' Illuminate\Contracts\Cache\Factoryinterface. Tous les appels que nous effectuons à l'aide de la façade seront transmis à l'instance sous-jacente du service de cache de Laravel.
+
+Si nous regardons cette Illuminate\Support\Facades\Cacheclasse, vous verrez qu'il n'y a pas de méthode statique get:
+
+class Cache extends Facade
+{
+    /**
+     * Get the registered name of the component.
+     *
+     * @return string
+     */
+    protected static function getFacadeAccessor() { return 'cache'; }
+}
+
+Au lieu de cela, la Cachefaçade étend la Facadeclasse de base et définit la méthode getFacadeAccessor(). Le travail de cette méthode consiste à renvoyer le nom d'une liaison de conteneur de service. Lorsqu'un utilisateur fait référence à une méthode statique sur la Cachefaçade, Laravel résout la cacheliaison à partir du conteneur de service et exécute la méthode demandée (dans ce cas, get) sur cet objet.
+
+Façades en temps réel
+En utilisant les façades en temps réel, vous pouvez traiter n'importe quelle classe de votre application comme s'il s'agissait d'une façade. Pour illustrer comment cela peut être utilisé, examinons d'abord un code qui n'utilise pas de façades en temps réel. Par exemple, supposons que notre Podcastmodèle a une publishméthode. Cependant, pour publier le podcast, nous devons injecter une Publisherinstance :
+
+<?php
+ 
+namespace App\Models;
+ 
+use App\Contracts\Publisher;
+use Illuminate\Database\Eloquent\Model;
+ 
+class Podcast extends Model
+{
+    /**
+     * Publish the podcast.
+     *
+     * @param  Publisher  $publisher
+     * @return void
+     */
+    public function publish(Publisher $publisher)
+    {
+        $this->update(['publishing' => now()]);
+ 
+        $publisher->publish($this);
+    }
+}
+
+L'injection d'une implémentation d'éditeur dans la méthode nous permet de tester facilement la méthode de manière isolée puisque nous pouvons nous moquer de l'éditeur injecté. Cependant, cela nous oblige à toujours passer une instance d'éditeur chaque fois que nous appelons la publishméthode. En utilisant des façades en temps réel, nous pouvons maintenir la même testabilité sans avoir à passer explicitement une Publisherinstance. Pour générer une façade temps réel, préfixez le namespace de la classe importée avec Facades:
+
+<?php
+ 
+namespace App\Models;
+ 
+use Facades\App\Contracts\Publisher;
+use Illuminate\Database\Eloquent\Model;
+ 
+class Podcast extends Model
+{
+    /**
+     * Publish the podcast.
+     *
+     * @return void
+     */
+    public function publish()
+    {
+        $this->update(['publishing' => now()]);
+ 
+        Publisher::publish($this);
+    }
+}
+
+Lorsque la façade en temps réel est utilisée, l'implémentation de l'éditeur sera résolue hors du conteneur de services à l'aide de la partie de l'interface ou du nom de classe qui apparaît après le Facadespréfixe. Lors des tests, nous pouvons utiliser les assistants de test de façade intégrés de Laravel pour simuler cet appel de méthode :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use App\Models\Podcast;
+use Facades\App\Contracts\Publisher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+ 
+class PodcastTest extends TestCase
+{
+    use RefreshDatabase;
+ 
+    /**
+     * A test example.
+     *
+     * @return void
+     */
+    public function test_podcast_can_be_published()
+    {
+        $podcast = Podcast::factory()->create();
+ 
+        Publisher::shouldReceive('publish')->once()->with($podcast);
+ 
+        $podcast->publish();
+    }
+}
+
+Référence de classe de façade
+Vous trouverez ci-dessous chaque façade et sa classe sous-jacente. C'est un outil utile pour creuser rapidement dans la documentation de l'API pour une racine de façade donnée. La clé de liaison du conteneur de services est également incluse, le cas échéant.
+
+Façade	Classer	Liaison du conteneur de services
+Application	Illuminate\Fondation\Application	app
+Artisan	Illuminate\Contrats\Console\Noyau	artisan
+Authentification	Illuminate\Auth\AuthManager	auth
+Authentification (instance)	Illuminate\Contrats\Auth\Guard	auth.driver
+Lame	Illuminate\View\Compilers\BladeCompiler	blade.compiler
+Diffuser	Illuminate\Contrats\Diffusion\Usine	 
+Diffusion (instance)	Illuminate\Contrats\Diffusion\Diffuseur	 
+Bus	Illuminate\Contrats\Bus\Dispatcher	 
+Cache	Illuminate\Cache\CacheManager	cache
+Cache (instance)	Illuminate\Cache\Repository	cache.store
+Configuration	Illuminate\Config\Repository	config
+Biscuit	Illuminate\Cookie\CookieJar	cookie
+Crypte	Illuminate\Encryption\Encrypter	encrypter
+Date	Illuminate\Support\DateFactory	date
+BD	Illuminate\Database\DatabaseManager	db
+BD (instance)	Illuminate\Base de données\Connexion	db.connection
+Événement	Illuminate\Events\Dispatcher	events
+Dossier	Illuminate\Système de fichiers\Système de fichiers	files
+Porte	Illuminate\Contracts\Auth\Access\Gate	 
+Hacher	Illuminate\Contracts\Hashing\Hasher	hash
+HTTP	Illuminate\Http\Client\Usine	 
+Langue	Illuminate\Traduction\Traducteur	translator
+Enregistrer	Illuminate\Log\LogManager	log
+Courrier	Illuminate\Mail\Mailer	mailer
+Notification	Illuminate\Notifications\ChannelManager	 
+Mot de passe	Illuminate\Auth\Passwords\PasswordBrokerManager	auth.password
+Mot de passe (instance)	Illuminate\Auth\Passwords\PasswordBroker	auth.password.broker
+File d'attente	Illuminate\Queue\QueueManager	queue
+File d'attente (instance)	Illuminate\Contrats\File d'attente\File d'attente	queue.connection
+File d'attente (classe de base)	Illuminez \ File d'attente \ File d'attente	 
+Réorienter	Illuminate\Routage\Redirecteur	redirect
+Redis	Illuminate\Redis\RedisManager	redis
+Redis (instance)	Illuminate\Redis\Connexions\Connexion	redis.connection
+Demande	Illuminate\Http\Requête	request
+Réponse	Illuminate\Contracts\Routing\ResponseFactory	 
+Réponse (instance)	Illuminate\Http\Réponse	 
+Itinéraire	Illuminate\Routage\Routeur	router
+Schéma	Illuminate\Database\Schema\Builder	 
+Session	Illuminate\Session\SessionManager	session
+Session (instance)	Illuminate\Session\Store	session.store
+Stockage	Illuminate\Filesystem\FilesystemManager	filesystem
+Stockage (instance)	Illuminate\Contracts\Filesystem\Filesystem	filesystem.disk
+URL	Illuminate\Routing\UrlGenerator	url
+Validateur	Illuminate\Validation\Usine	validator
+Validateur (instance)	Illuminate\Validation\Validateur	 
+Voir	Illuminate\View\Factory	view
+Afficher (instance)	Illuminer\Afficher\Afficher	 

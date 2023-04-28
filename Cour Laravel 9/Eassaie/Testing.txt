@@ -1,0 +1,164 @@
+Test : mise en route
+Introduction
+Environnement
+Créer des tests
+Tests en cours
+Exécution de tests en parallèle
+Rapport sur la couverture des tests
+Introduction
+Laravel est construit avec des tests à l'esprit. En fait, la prise en charge des tests avec PHPUnit est incluse et un phpunit.xmlfichier est déjà configuré pour votre application. Le framework est également livré avec des méthodes d'assistance pratiques qui vous permettent de tester de manière expressive vos applications.
+
+Par défaut, le répertoire de votre application testscontient deux répertoires : Featureet Unit. Les tests unitaires sont des tests qui se concentrent sur une très petite partie isolée de votre code. En fait, la plupart des tests unitaires se concentrent probablement sur une seule méthode. Les tests dans votre répertoire de test "Unit" ne démarrent pas votre application Laravel et ne peuvent donc pas accéder à la base de données de votre application ou à d'autres services de framework.
+
+Les tests de fonctionnalités peuvent tester une plus grande partie de votre code, y compris la façon dont plusieurs objets interagissent entre eux ou même une requête HTTP complète à un point de terminaison JSON. Généralement, la plupart de vos tests doivent être des tests de fonctionnalités. Ces types de tests offrent la plus grande confiance dans le fait que votre système dans son ensemble fonctionne comme prévu.
+
+Un ExampleTest.phpfichier est fourni dans les répertoires Featureet Unittest. Après avoir installé une nouvelle application Laravel, exécutez les commandes vendor/bin/phpunitou php artisan testpour exécuter vos tests.
+
+Environnement
+Lors de l'exécution des tests, Laravel définira automatiquement l' environnement de configuration sur en testingraison des variables d'environnement définies dans le phpunit.xmlfichier. Laravel configure également automatiquement la session et le cache du arraypilote lors des tests, ce qui signifie qu'aucune donnée de session ou de cache ne sera conservée pendant les tests.
+
+Vous êtes libre de définir d'autres valeurs de configuration de l'environnement de test si nécessaire. Les testingvariables d'environnement peuvent être configurées dans le phpunit.xmlfichier de votre application, mais assurez-vous de vider votre cache de configuration à l'aide de la config:clearcommande Artisan avant de lancer vos tests !
+
+Le .env.testingdossier environnement
+De plus, vous pouvez créer un .env.testingfichier à la racine de votre projet. Ce fichier sera utilisé à la place du .envfichier lors de l'exécution de tests PHPUnit ou de l'exécution de commandes Artisan avec l' --env=testingoption.
+
+The CreatesApplication Trait
+Laravel inclut un CreatesApplicationtrait qui est appliqué à la TestCaseclasse de base de votre application. Ce trait contient une createApplicationméthode qui démarre l'application Laravel avant d'exécuter vos tests. Il est important que vous laissiez ce trait à son emplacement d'origine, car certaines fonctionnalités, telles que la fonction de test parallèle de Laravel, en dépendent.
+
+Créer des tests
+Pour créer un nouveau scénario de test, utilisez la make:testcommande Artisan. Par défaut, les tests seront placés dans le tests/Featurerépertoire :
+
+php artisan make:test UserTest
+
+Si vous souhaitez créer un test dans le tests/Unitrépertoire, vous pouvez utiliser l' --unitoption lors de l'exécution de la make:testcommande :
+
+php artisan make:test UserTest --unit
+
+Si vous souhaitez créer un test PHP Pest , vous pouvez fournir l' --pestoption à la make:testcommande :
+
+php artisan make:test UserTest --pest
+php artisan make:test UserTest --unit --pest
+
+
+Les talons de test peuvent être personnalisés à l'aide de la publication de talons .
+
+
+Une fois le test généré, vous pouvez définir des méthodes de test comme vous le feriez normalement avec PHPUnit . Pour lancer vos tests, exécutez la commande vendor/bin/phpunitou php artisan testdepuis votre terminal :
+
+<?php
+ 
+namespace Tests\Unit;
+ 
+use PHPUnit\Framework\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    /**
+     * A basic test example.
+     *
+     * @return void
+     */
+    public function test_basic_test()
+    {
+        $this->assertTrue(true);
+    }
+}
+
+
+Si vous définissez vos propres méthodes setUp/ tearDowndans une classe de test, assurez-vous d'appeler les méthodes parent::setUp()/ respectives parent::tearDown()sur la classe parent.
+
+
+Tests en cours
+Comme mentionné précédemment, une fois que vous avez écrit des tests, vous pouvez les exécuter en utilisant phpunit:
+
+./vendor/bin/phpunit
+
+En plus de la phpunitcommande, vous pouvez utiliser la testcommande Artisan pour exécuter vos tests. L'exécuteur de test Artisan fournit des rapports de test détaillés afin de faciliter le développement et le débogage :
+
+php artisan test
+
+Tous les arguments pouvant être passés à la phpunitcommande peuvent également être passés à la commande Artisantest :
+
+php artisan test --testsuite=Feature --stop-on-failure
+
+Exécution de tests en parallèle
+Par défaut, Laravel et PHPUnit exécutent vos tests séquentiellement au sein d'un même processus. Cependant, vous pouvez réduire considérablement le temps nécessaire à l'exécution de vos tests en exécutant des tests simultanément sur plusieurs processus. Pour commencer, assurez-vous que votre application dépend de la version ^5.3ou d'une version supérieure du nunomaduro/collisionpackage. Ensuite, incluez l' --paralleloption lors de l'exécution de la testcommande Artisan :
+
+php artisan test --parallel
+
+Par défaut, Laravel créera autant de processus qu'il y a de cœurs de processeur disponibles sur votre machine. Cependant, vous pouvez ajuster le nombre de processus en utilisant l' --processesoption :
+
+php artisan test --parallel --processes=4
+
+
+Lors de l'exécution de tests en parallèle, certaines options de PHPUnit (telles que --do-not-cache-result) peuvent ne pas être disponibles.
+
+
+Tests parallèles et bases de données
+Laravel gère automatiquement la création et la migration d'une base de données de test pour chaque processus parallèle qui exécute vos tests. Les bases de données de test seront suffixées avec un jeton de processus unique par processus. Par exemple, si vous avez deux processus de test parallèles, Laravel créera, utilisera your_db_test_1et your_db_test_2testera des bases de données.
+
+Par défaut, les bases de données de test persistent entre les appels à la testcommande Artisan afin qu'elles puissent être réutilisées par des appels ultérieurs test. Cependant, vous pouvez les recréer en utilisant l' --recreate-databasesoption :
+
+php artisan test --parallel --recreate-databases
+
+Crochets de test parallèles
+Parfois, vous devrez peut-être préparer certaines ressources utilisées par les tests de votre application afin qu'elles puissent être utilisées en toute sécurité par plusieurs processus de test.
+
+En utilisant la ParallelTestingfaçade, vous pouvez spécifier le code à exécuter sur le setUpet tearDownd'un processus ou d'un cas de test. Les fermetures données reçoivent les variables $tokenet $testCasequi contiennent respectivement le jeton de processus et le cas de test actuel :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\ParallelTesting;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        ParallelTesting::setUpProcess(function ($token) {
+            // ...
+        });
+ 
+        ParallelTesting::setUpTestCase(function ($token, $testCase) {
+            // ...
+        });
+ 
+        // Executed when a test database is created...
+        ParallelTesting::setUpTestDatabase(function ($database, $token) {
+            Artisan::call('db:seed');
+        });
+ 
+        ParallelTesting::tearDownTestCase(function ($token, $testCase) {
+            // ...
+        });
+ 
+        ParallelTesting::tearDownProcess(function ($token) {
+            // ...
+        });
+    }
+}
+
+Accéder au jeton de test parallèle
+Si vous souhaitez accéder au "jeton" de processus parallèle actuel à partir de n'importe quel autre emplacement dans le code de test de votre application, vous pouvez utiliser la tokenméthode. Ce jeton est un identifiant de chaîne unique pour un processus de test individuel et peut être utilisé pour segmenter les ressources entre des processus de test parallèles. Par exemple, Laravel ajoute automatiquement ce jeton à la fin des bases de données de test créées par chaque processus de test parallèle :
+
+$token = ParallelTesting::token();
+
+Rapport sur la couverture des tests
+
+Cette fonctionnalité nécessite Xdebug ou PCOV .
+
+
+Lors de l'exécution de vos tests d'application, vous souhaiterez peut-être déterminer si vos scénarios de test couvrent réellement le code de l'application et la quantité de code d'application utilisée lors de l'exécution de vos tests. Pour ce faire, vous pouvez fournir l' --coverageoption lors de l'appel de la testcommande :
+
+php artisan test --coverage
+
+Appliquer un seuil de couverture minimum
+Vous pouvez utiliser l' --minoption pour définir un seuil de couverture de test minimum pour votre application. La suite de tests échouera si ce seuil n'est pas atteint :

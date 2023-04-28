@@ -1,0 +1,606 @@
+Test de base de données
+Introduction
+Réinitialisation de la base de données après chaque test
+Définition des usines modèles
+Présentation du concept
+Génération d'usines
+États d'usine
+Rappels d'usine
+Création de modèles à l'aide d'usines
+Modèles d'instanciation
+Modèles persistants
+Séquences
+Relations d'usine
+A de nombreuses relations
+Appartient aux relations
+Relations plusieurs à plusieurs
+Relations polymorphes
+Définir les relations au sein des usines
+Courir les semoirs
+Assertions disponibles
+Introduction
+Laravel fournit une variété d'outils et d'assertions utiles pour faciliter le test de vos applications basées sur une base de données. De plus, les fabriques de modèles et les semences Laravel facilitent la création d'enregistrements de base de données de test à l'aide des modèles et des relations Eloquent de votre application. Nous aborderons toutes ces fonctionnalités puissantes dans la documentation suivante.
+
+Réinitialisation de la base de données après chaque test
+Avant d'aller plus loin, voyons comment réinitialiser votre base de données après chacun de vos tests afin que les données d'un test précédent n'interfèrent pas avec les tests suivants. Le trait inclus de Laravel Illuminate\Foundation\Testing\RefreshDatabases'en chargera pour vous. Utilisez simplement le trait sur votre classe de test :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    use RefreshDatabase;
+ 
+    /**
+     * A basic functional test example.
+     *
+     * @return void
+     */
+    public function test_basic_example()
+    {
+        $response = $this->get('/');
+ 
+        // ...
+    }
+}
+
+Le Illuminate\Foundation\Testing\RefreshDatabasetrait ne migre pas votre base de données si votre schéma est à jour. Au lieu de cela, il n'exécutera le test que dans une transaction de base de données. Par conséquent, tous les enregistrements ajoutés à la base de données par des cas de test qui n'utilisent pas cette caractéristique peuvent toujours exister dans la base de données.
+
+Si vous souhaitez réinitialiser totalement la base de données à l'aide de migrations, vous pouvez utiliser le Illuminate\Foundation\Testing\DatabaseMigrationstrait à la place. Cependant, le DatabaseMigrationstrait est nettement plus lent que le RefreshDatabasetrait.
+
+Définition des usines modèles
+Présentation du concept
+Parlons d'abord des usines modèles Eloquent. Lors du test, vous devrez peut-être insérer quelques enregistrements dans votre base de données avant d'exécuter votre test. Au lieu de spécifier manuellement la valeur de chaque colonne lorsque vous créez ces données de test, Laravel vous permet de définir un ensemble d'attributs par défaut pour chacun de vos modèles Eloquent à l'aide de fabriques de modèles.
+
+Pour voir un exemple d'écriture d'une usine, jetez un œil au database/factories/UserFactory.phpfichier dans votre application. Cette usine est incluse avec toutes les nouvelles applications Laravel et contient la définition d'usine suivante :
+
+namespace Database\Factories;
+ 
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+ 
+class UserFactory extends Factory
+{
+    /**
+     * Define the model's default state.
+     *
+     * @return array
+     */
+    public function definition()
+    {
+        return [
+            'name' => fake()->name(),
+            'email' => fake()->unique()->safeEmail(),
+            'email_verified_at' => now(),
+            'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+            'remember_token' => Str::random(10),
+        ];
+    }
+}
+
+Comme vous pouvez le voir, dans leur forme la plus élémentaire, les usines sont des classes qui étendent la classe d'usine de base de Laravel et définissent une definitionméthode. La definitionméthode renvoie l'ensemble par défaut des valeurs d'attribut qui doivent être appliquées lors de la création d'un modèle à l'aide de la fabrique.
+
+Via l' fakeassistant, les usines ont accès à la bibliothèque PHP Faker , qui vous permet de générer facilement différents types de données aléatoires pour les tests.
+
+
+Vous pouvez définir les paramètres régionaux Faker de votre application en ajoutant une faker_localeoption à votre config/app.phpfichier de configuration.
+
+
+Génération d'usines
+Pour créer une fabrique, exécutez la make:factory commande Artisan :
+
+php artisan make:factory PostFactory
+
+La nouvelle classe d'usine sera placée dans votre database/factoriesrépertoire.
+
+Conventions de découverte de modèles et d'usines
+Une fois que vous avez défini vos usines, vous pouvez utiliser la factoryméthode statique fournie à vos modèles par le Illuminate\Database\Eloquent\Factories\HasFactorytrait afin d'instancier une instance d'usine pour ce modèle.
+
+La méthode HasFactorydu trait factoryutilisera des conventions pour déterminer l'usine appropriée pour le modèle auquel le trait est attribué. Plus précisément, la méthode recherchera une fabrique dans l' espace de Database\Factoriesnoms dont le nom de classe correspond au nom du modèle et dont le suffixe est Factory. Si ces conventions ne s'appliquent pas à votre application ou fabrique particulière, vous pouvez écraser la newFactoryméthode sur votre modèle pour renvoyer directement une instance de la fabrique correspondante du modèle :
+
+use Database\Factories\Administration\FlightFactory;
+ 
+/**
+ * Create a new factory instance for the model.
+ *
+ * @return \Illuminate\Database\Eloquent\Factories\Factory
+ */
+protected static function newFactory()
+{
+    return FlightFactory::new();
+}
+
+Ensuite, définissez une modelpropriété sur la fabrique correspondante :
+
+use App\Administration\Flight;
+use Illuminate\Database\Eloquent\Factories\Factory;
+ 
+class FlightFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var string
+     */
+    protected $model = Flight::class;
+}
+
+États d'usine
+Les méthodes de manipulation d'état vous permettent de définir des modifications discrètes qui peuvent être appliquées à vos fabriques de modèles dans n'importe quelle combinaison. Par exemple, votre Database\Factories\UserFactoryfabrique peut contenir une suspendedméthode d'état qui modifie l'une de ses valeurs d'attribut par défaut.
+
+Les méthodes de transformation d'état appellent généralement la stateméthode fournie par la classe d'usine de base de Laravel. La stateméthode accepte une fermeture qui recevra le tableau des attributs bruts définis pour la fabrique et devra retourner un tableau des attributs à modifier :
+
+/**
+ * Indicate that the user is suspended.
+ *
+ * @return \Illuminate\Database\Eloquent\Factories\Factory
+ */
+public function suspended()
+{
+    return $this->state(function (array $attributes) {
+        return [
+            'account_status' => 'suspended',
+        ];
+    });
+}
+
+État "Supprimé"
+Si votre modèle Eloquent peut être supprimé en douceur , vous pouvez invoquer la trashedméthode d'état intégrée pour indiquer que le modèle créé doit déjà être "supprimé en douceur". Vous n'avez pas besoin de définir manuellement l' trashedétat car il est automatiquement disponible pour toutes les usines :
+
+use App\Models\User;
+ 
+$user = User::factory()->trashed()->create();
+
+Rappels d'usine
+Les rappels d'usine sont enregistrés à l'aide des méthodes afterMakinget afterCreatinget vous permettent d'effectuer des tâches supplémentaires après avoir créé ou créé un modèle. Vous devez enregistrer ces rappels en définissant une configureméthode sur votre classe de fabrique. Cette méthode sera automatiquement appelée par Laravel lors de l'instanciation de la fabrique :
+
+namespace Database\Factories;
+ 
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+ 
+class UserFactory extends Factory
+{
+    /**
+     * Configure the model factory.
+     *
+     * @return $this
+     */
+    public function configure()
+    {
+        return $this->afterMaking(function (User $user) {
+            //
+        })->afterCreating(function (User $user) {
+            //
+        });
+    }
+ 
+    // ...
+}
+
+Création de modèles à l'aide d'usines
+Modèles d'instanciation
+Une fois que vous avez défini vos usines, vous pouvez utiliser la factoryméthode statique fournie à vos modèles par le Illuminate\Database\Eloquent\Factories\HasFactorytrait afin d'instancier une instance d'usine pour ce modèle. Examinons quelques exemples de création de modèles. Tout d'abord, nous allons utiliser la makeméthode pour créer des modèles sans les conserver dans la base de données :
+
+use App\Models\User;
+ 
+public function test_models_can_be_instantiated()
+{
+    $user = User::factory()->make();
+ 
+    // Use model in tests...
+}
+
+Vous pouvez créer une collection de plusieurs modèles en utilisant la countméthode :
+
+$users = User::factory()->count(3)->make();
+
+États candidats
+Vous pouvez également appliquer n'importe lequel de vos états aux modèles. Si vous souhaitez appliquer plusieurs transformations d'état aux modèles, vous pouvez simplement appeler directement les méthodes de transformation d'état :
+
+$users = User::factory()->count(5)->suspended()->make();
+
+Remplacer les attributs
+Si vous souhaitez remplacer certaines des valeurs par défaut de vos modèles, vous pouvez transmettre un tableau de valeurs à la makeméthode. Seuls les attributs spécifiés seront remplacés tandis que les autres attributs resteront définis sur leurs valeurs par défaut, comme spécifié par l'usine :
+
+$user = User::factory()->make([
+    'name' => 'Abigail Otwell',
+]);
+
+Alternativement, la stateméthode peut être appelée directement sur l'instance de fabrique pour effectuer une transformation d'état en ligne :
+
+$user = User::factory()->state([
+    'name' => 'Abigail Otwell',
+])->make();
+
+
+La protection des affectations en masse est automatiquement désactivée lors de la création de modèles à l'aide de fabriques.
+
+
+Modèles persistants
+La createméthode instancie les instances de modèle et les conserve dans la base de données à l'aide de la saveméthode d'Eloquent :
+
+use App\Models\User;
+ 
+public function test_models_can_be_persisted()
+{
+    // Create a single App\Models\User instance...
+    $user = User::factory()->create();
+ 
+    // Create three App\Models\User instances...
+    $users = User::factory()->count(3)->create();
+ 
+    // Use model in tests...
+}
+
+Vous pouvez remplacer les attributs de modèle par défaut de la fabrique en passant un tableau d'attributs à la createméthode :
+
+$user = User::factory()->create([
+    'name' => 'Abigail',
+]);
+
+Séquences
+Parfois, vous souhaiterez peut-être alterner la valeur d'un attribut de modèle donné pour chaque modèle créé. Vous pouvez accomplir cela en définissant une transformation d'état en tant que séquence. Par exemple, vous pouvez alterner la valeur d'une admincolonne entre Yet Npour chaque utilisateur créé :
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Sequence;
+ 
+$users = User::factory()
+                ->count(10)
+                ->state(new Sequence(
+                    ['admin' => 'Y'],
+                    ['admin' => 'N'],
+                ))
+                ->create();
+
+Dans cet exemple, cinq utilisateurs seront créés avec une adminvaleur de Yet cinq utilisateurs seront créés avec une adminvaleur de N.
+
+Si nécessaire, vous pouvez inclure une fermeture comme valeur de séquence. La fermeture sera invoquée chaque fois que la séquence aura besoin d'une nouvelle valeur :
+
+$users = User::factory()
+                ->count(10)
+                ->state(new Sequence(
+                    fn ($sequence) => ['role' => UserRoles::all()->random()],
+                ))
+                ->create();
+
+Dans une fermeture de séquence, vous pouvez accéder aux propriétés $indexou $countsur l'instance de séquence qui est injectée dans la fermeture. La $indexpropriété contient le nombre d'itérations dans la séquence qui se sont produites jusqu'à présent, tandis que la $countpropriété contient le nombre total de fois où la séquence sera invoquée :
+
+$users = User::factory()
+                ->count(10)
+                ->sequence(fn ($sequence) => ['name' => 'Name '.$sequence->index])
+                ->create();
+
+Relations d'usine
+A de nombreuses relations
+Ensuite, explorons la création de relations de modèle Eloquent à l'aide des méthodes d'usine fluides de Laravel. Supposons d'abord que notre application a un App\Models\Usermodèle et un App\Models\Postmodèle. Supposons également que le Usermodèle définit une hasManyrelation avec Post. Nous pouvons créer un utilisateur qui a trois postes en utilisant la hasméthode fournie par les usines de Laravel. La hasméthode accepte une instance de fabrique :
+
+use App\Models\Post;
+use App\Models\User;
+ 
+$user = User::factory()
+            ->has(Post::factory()->count(3))
+            ->create();
+
+Par convention, lors du passage d'un Postmodèle à la hasméthode, Laravel supposera que le Usermodèle doit avoir une postsméthode qui définit la relation. Si nécessaire, vous pouvez spécifier explicitement le nom de la relation que vous souhaitez manipuler :
+
+$user = User::factory()
+            ->has(Post::factory()->count(3), 'posts')
+            ->create();
+
+Bien sûr, vous pouvez effectuer des manipulations d'état sur les modèles associés. De plus, vous pouvez passer une transformation d'état basée sur la fermeture si votre changement d'état nécessite l'accès au modèle parent :
+
+$user = User::factory()
+            ->has(
+                Post::factory()
+                        ->count(3)
+                        ->state(function (array $attributes, User $user) {
+                            return ['user_type' => $user->type];
+                        })
+            )
+            ->create();
+
+Utiliser des méthodes magiques
+Pour plus de commodité, vous pouvez utiliser les méthodes de relation de l'usine magique de Laravel pour établir des relations. Par exemple, l'exemple suivant utilisera la convention pour déterminer que les modèles associés doivent être créés via une postsméthode de relation sur le Usermodèle :
+
+$user = User::factory()
+            ->hasPosts(3)
+            ->create();
+
+Lorsque vous utilisez des méthodes magiques pour créer des relations d'usine, vous pouvez transmettre un tableau d'attributs à remplacer sur les modèles associés :
+
+$user = User::factory()
+            ->hasPosts(3, [
+                'published' => false,
+            ])
+            ->create();
+
+Vous pouvez fournir une transformation d'état basée sur la fermeture si votre changement d'état nécessite l'accès au modèle parent :
+
+$user = User::factory()
+            ->hasPosts(3, function (array $attributes, User $user) {
+                return ['user_type' => $user->type];
+            })
+            ->create();
+
+Appartient aux relations
+Maintenant que nous avons exploré comment construire des relations "a plusieurs" à l'aide de fabriques, explorons l'inverse de la relation. Le forprocédé peut être utilisé pour définir le modèle parent auquel appartiennent les modèles créés en usine. Par exemple, nous pouvons créer trois App\Models\Postinstances de modèle qui appartiennent à un seul utilisateur :
+
+use App\Models\Post;
+use App\Models\User;
+ 
+$posts = Post::factory()
+            ->count(3)
+            ->for(User::factory()->state([
+                'name' => 'Jessica Archer',
+            ]))
+            ->create();
+
+Si vous avez déjà une instance de modèle parent qui doit être associée aux modèles que vous créez, vous pouvez passer l'instance de modèle à la forméthode :
+
+$user = User::factory()->create();
+ 
+$posts = Post::factory()
+            ->count(3)
+            ->for($user)
+            ->create();
+
+Utiliser des méthodes magiques
+Pour plus de commodité, vous pouvez utiliser les méthodes de relation de l'usine magique de Laravel pour définir les relations "appartient à". Par exemple, l'exemple suivant utilisera la convention pour déterminer que les trois messages doivent appartenir à la userrelation sur le Postmodèle :
+
+$posts = Post::factory()
+            ->count(3)
+            ->forUser([
+                'name' => 'Jessica Archer',
+            ])
+            ->create();
+
+Relations plusieurs à plusieurs
+Comme a de nombreuses relations , des relations "plusieurs à plusieurs" peuvent être créées à l'aide de la hasméthode :
+
+use App\Models\Role;
+use App\Models\User;
+ 
+$user = User::factory()
+            ->has(Role::factory()->count(3))
+            ->create();
+
+Attributs du tableau croisé dynamique
+Si vous avez besoin de définir des attributs à positionner sur le tableau croisé dynamique / intermédiaire reliant les modèles, vous pouvez utiliser la hasAttachedméthode . Cette méthode accepte un tableau de noms et de valeurs d'attributs de tableau croisé dynamique comme deuxième argument :
+
+use App\Models\Role;
+use App\Models\User;
+ 
+$user = User::factory()
+            ->hasAttached(
+                Role::factory()->count(3),
+                ['active' => true]
+            )
+            ->create();
+
+Vous pouvez fournir une transformation d'état basée sur la fermeture si votre changement d'état nécessite l'accès au modèle associé :
+
+$user = User::factory()
+            ->hasAttached(
+                Role::factory()
+                    ->count(3)
+                    ->state(function (array $attributes, User $user) {
+                        return ['name' => $user->name.' Role'];
+                    }),
+                ['active' => true]
+            )
+            ->create();
+
+Si vous avez déjà des instances de modèle que vous souhaitez attacher aux modèles que vous créez, vous pouvez transmettre les instances de modèle à la hasAttachedméthode. Dans cet exemple, les trois mêmes rôles seront attachés aux trois utilisateurs :
+
+$roles = Role::factory()->count(3)->create();
+ 
+$user = User::factory()
+            ->count(3)
+            ->hasAttached($roles, ['active' => true])
+            ->create();
+
+Utiliser des méthodes magiques
+Pour plus de commodité, vous pouvez utiliser les méthodes de relation d'usine magique de Laravel pour définir des relations plusieurs à plusieurs. Par exemple, l'exemple suivant utilisera la convention pour déterminer que les modèles associés doivent être créés via une rolesméthode de relation sur le Usermodèle :
+
+$user = User::factory()
+            ->hasRoles(1, [
+                'name' => 'Editor'
+            ])
+            ->create();
+
+Relations polymorphes
+Des relations polymorphes peuvent également être créées à l'aide de fabriques. Les relations polymorphes « morph many » sont créées de la même manière que les relations typiques « has many ». Par exemple, si un App\Models\Postmodèle a une morphManyrelation avec un App\Models\Commentmodèle :
+
+use App\Models\Post;
+ 
+$post = Post::factory()->hasComments(3)->create();
+
+Transformer en relations
+Les méthodes magiques ne peuvent pas être utilisées pour créer des morphTorelations. Au lieu de cela, la forméthode doit être utilisée directement et le nom de la relation doit être explicitement fourni. Par exemple, imaginez que le Commentmodèle possède une commentableméthode qui définit une morphTorelation. Dans cette situation, nous pouvons créer trois commentaires qui appartiennent à un seul article en utilisant fordirectement la méthode :
+
+$comments = Comment::factory()->count(3)->for(
+    Post::factory(), 'commentable'
+)->create();
+
+Relations polymorphes plusieurs à plusieurs
+Les relations polymorphes "plusieurs à plusieurs" ( morphToMany/ morphedByMany) peuvent être créées tout comme les relations non polymorphes "plusieurs à plusieurs":
+
+use App\Models\Tag;
+use App\Models\Video;
+ 
+$videos = Video::factory()
+            ->hasAttached(
+                Tag::factory()->count(3),
+                ['public' => true]
+            )
+            ->create();
+
+Bien sûr, la hasméthode magique peut également être utilisée pour créer des relations polymorphes "plusieurs à plusieurs":
+
+$videos = Video::factory()
+            ->hasTags(3, ['public' => true])
+            ->create();
+
+Définir les relations au sein des usines
+Pour définir une relation au sein de votre fabrique de modèles, vous attribuerez généralement une nouvelle instance de fabrique à la clé étrangère de la relation. Ceci est normalement fait pour les relations "inverses" telles que les relations belongsToet morphTo. Par exemple, si vous souhaitez créer un nouvel utilisateur lors de la création d'un message, vous pouvez procéder comme suit :
+
+use App\Models\User;
+ 
+/**
+ * Define the model's default state.
+ *
+ * @return array
+ */
+public function definition()
+{
+    return [
+        'user_id' => User::factory(),
+        'title' => fake()->title(),
+        'content' => fake()->paragraph(),
+    ];
+}
+
+Si les colonnes de la relation dépendent de la fabrique qui la définit, vous pouvez affecter une fermeture à un attribut. La fermeture recevra le tableau d'attributs évalué de la fabrique :
+
+/**
+ * Define the model's default state.
+ *
+ * @return array
+ */
+public function definition()
+{
+    return [
+        'user_id' => User::factory(),
+        'user_type' => function (array $attributes) {
+            return User::find($attributes['user_id'])->type;
+        },
+        'title' => fake()->title(),
+        'content' => fake()->paragraph(),
+    ];
+}
+
+Courir les semoirs
+Si vous souhaitez utiliser des semences de base de données pour remplir votre base de données lors d'un test de fonctionnalité, vous pouvez appeler la seedméthode. Par défaut, la seedméthode exécutera le DatabaseSeeder, qui devrait exécuter tous vos autres seeders. Vous pouvez également transmettre un nom de classe de semoir spécifique à la seedméthode :
+
+<?php
+ 
+namespace Tests\Feature;
+ 
+use Database\Seeders\OrderStatusSeeder;
+use Database\Seeders\TransactionStatusSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithoutMiddleware;
+use Tests\TestCase;
+ 
+class ExampleTest extends TestCase
+{
+    use RefreshDatabase;
+ 
+    /**
+     * Test creating a new order.
+     *
+     * @return void
+     */
+    public function test_orders_can_be_created()
+    {
+        // Run the DatabaseSeeder...
+        $this->seed();
+ 
+        // Run a specific seeder...
+        $this->seed(OrderStatusSeeder::class);
+ 
+        // ...
+ 
+        // Run an array of specific seeders...
+        $this->seed([
+            OrderStatusSeeder::class,
+            TransactionStatusSeeder::class,
+            // ...
+        ]);
+    }
+}
+
+Alternativement, vous pouvez demander à Laravel d'ensemencer automatiquement la base de données avant chaque test utilisant le RefreshDatabasetrait. Vous pouvez y parvenir en définissant une $seedpropriété sur votre classe de test de base :
+
+<?php
+ 
+namespace Tests;
+ 
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+ 
+abstract class TestCase extends BaseTestCase
+{
+    use CreatesApplication;
+ 
+    /**
+     * Indicates whether the default seeder should run before each test.
+     *
+     * @var bool
+     */
+    protected $seed = true;
+}
+
+Lorsque la $seedpropriété est true, le test exécutera la Database\Seeders\DatabaseSeederclasse avant chaque test utilisant le RefreshDatabasetrait. Cependant, vous pouvez spécifier un seeder spécifique qui doit être exécuté en définissant une $seederpropriété sur votre classe de test :
+
+use Database\Seeders\OrderStatusSeeder;
+ 
+/**
+ * Run a specific seeder before each test.
+ *
+ * @var string
+ */
+protected $seeder = OrderStatusSeeder::class;
+
+Assertions disponibles
+Laravel fournit plusieurs assertions de base de données pour vos tests de fonctionnalités PHPUnit . Nous discuterons de chacune de ces affirmations ci-dessous.
+
+assertDatabaseCount
+Affirmer qu'une table de la base de données contient le nombre d'enregistrements donné :
+
+$this->assertDatabaseCount('users', 5);
+
+assertDatabaseHas
+Affirmer qu'une table de la base de données contient des enregistrements correspondant aux contraintes de requête clé/valeur données :
+
+$this->assertDatabaseHas('users', [
+    'email' => 'sally@example.com',
+]);
+
+assertDatabaseMissing
+Affirmer qu'une table de la base de données ne contient pas d'enregistrements correspondant aux contraintes de requête clé/valeur données :
+
+$this->assertDatabaseMissing('users', [
+    'email' => 'sally@example.com',
+]);
+
+assertSoftDeleted
+La assertSoftDeletedméthode peut être utilisée pour affirmer qu'un modèle Eloquent donné a été "supprimé en douceur":
+
+$this->assertSoftDeleted($user);
+
+assertModelExists
+Affirmer qu'un modèle donné existe dans la base de données :
+
+use App\Models\User;
+ 
+$user = User::factory()->create();
+ 
+$this->assertModelExists($user);
+
+assertModelMissing
+Affirmer qu'un modèle donné n'existe pas dans la base de données :
+
+use App\Models\User;
+ 
+$user = User::factory()->create();
+ 
+$user->delete();
+ 
+$this->assertModelMissing($user);

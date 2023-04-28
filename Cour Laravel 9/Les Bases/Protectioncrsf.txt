@@ -1,0 +1,101 @@
+Protection CSRF
+Introduction
+Empêcher les requêtes CSRF
+Exclure les URI
+Jeton X-CSRF
+Jeton X-XSRF
+Introduction
+Les falsifications de requêtes intersites sont un type d'exploit malveillant par lequel des commandes non autorisées sont exécutées au nom d'un utilisateur authentifié. Heureusement, Laravel facilite la protection de votre application contre les attaques de falsification de requête intersite (CSRF).
+
+Une explication de la vulnérabilité
+Si vous n'êtes pas familier avec les falsifications de requêtes intersites, discutons d'un exemple de la façon dont cette vulnérabilité peut être exploitée. Imaginez que votre application dispose d'une /user/emailroute qui accepte une POSTdemande de modification de l'adresse e-mail de l'utilisateur authentifié. Très probablement, cette route s'attend à ce qu'un emailchamp de saisie contienne l'adresse e-mail que l'utilisateur souhaite commencer à utiliser.
+
+Sans protection CSRF, un site Web malveillant pourrait créer un formulaire HTML qui pointe vers la /user/emailroute de votre application et soumet la propre adresse e-mail de l'utilisateur malveillant :
+
+<form action="https://your-application.com/user/email" method="POST">
+    <input type="email" value="malicious-email@example.com">
+</form>
+ 
+<script>
+    document.forms[0].submit();
+</script>
+
+Si le site Web malveillant soumet automatiquement le formulaire lorsque la page est chargée, l'utilisateur malveillant n'a qu'à attirer un utilisateur sans méfiance de votre application pour qu'il visite son site Web et son adresse e-mail sera modifiée dans votre application.
+
+Pour éviter cette vulnérabilité, nous devons inspecter chaque demande entrante POST, PUT, PATCHou DELETEpour une valeur de session secrète à laquelle l'application malveillante ne peut pas accéder.
+
+Empêcher les requêtes CSRF
+Laravel génère automatiquement un "token" CSRF pour chaque session utilisateur active gérée par l'application. Ce jeton est utilisé pour vérifier que l'utilisateur authentifié est la personne qui fait réellement les requêtes à l'application. Étant donné que ce jeton est stocké dans la session de l'utilisateur et change à chaque régénération de la session, une application malveillante ne peut pas y accéder.
+
+Le jeton CSRF de la session en cours est accessible via la session de la requête ou via la csrf_tokenfonction d'assistance :
+
+use Illuminate\Http\Request;
+ 
+Route::get('/token', function (Request $request) {
+    $token = $request->session()->token();
+ 
+    $token = csrf_token();
+ 
+    // ...
+});
+
+Chaque fois que vous définissez un formulaire HTML "POST", "PUT", "PATCH" ou "DELETE" dans votre application, vous devez inclure un _tokenchamp CSRF masqué dans le formulaire afin que le middleware de protection CSRF puisse valider la demande. Pour plus de commodité, vous pouvez utiliser la @csrfdirective Blade pour générer le champ de saisie du jeton caché :
+
+<form method="POST" action="/profile">
+    @csrf
+ 
+    <!-- Equivalent to... -->
+    <input type="hidden" name="_token" value="{{ csrf_token() }}" />
+</form>
+
+Le App\Http\Middleware\VerifyCsrfToken middleware , qui est inclus dans le webgroupe middleware par défaut, vérifiera automatiquement que le jeton dans l'entrée de la requête correspond au jeton stocké dans la session. Lorsque ces deux jetons correspondent, nous savons que l'utilisateur authentifié est celui qui lance la requête.
+
+Jetons CSRF et SPA
+Si vous créez un SPA qui utilise Laravel comme backend d'API, vous devez consulter la documentation de Laravel Sanctum pour plus d'informations sur l'authentification avec votre API et la protection contre les vulnérabilités CSRF.
+
+Exclure les URI de la protection CSRF
+Parfois, vous souhaiterez peut-être exclure un ensemble d'URI de la protection CSRF. Par exemple, si vous utilisez Stripe pour traiter les paiements et utilisez leur système de webhook, vous devrez exclure votre route de gestionnaire de webhook Stripe de la protection CSRF car Stripe ne saura pas quel jeton CSRF envoyer à vos routes.
+
+En règle générale, vous devez placer ces types de routes en dehors du webgroupe de middleware qui App\Providers\RouteServiceProviders'applique à toutes les routes du routes/web.phpfichier. Cependant, vous pouvez également exclure les routes en ajoutant leurs URI à la $exceptpropriété du VerifyCsrfTokenmiddleware :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+ 
+class VerifyCsrfToken extends Middleware
+{
+    /**
+     * The URIs that should be excluded from CSRF verification.
+     *
+     * @var array
+     */
+    protected $except = [
+        'stripe/*',
+        'http://example.com/foo/bar',
+        'http://example.com/foo/*',
+    ];
+}
+
+
+Pour plus de commodité, le middleware CSRF est automatiquement désactivé pour toutes les routes lors de l'exécution de tests .
+
+
+X-CSRF-TOKEN
+En plus de vérifier le jeton CSRF en tant que paramètre POST, le App\Http\Middleware\VerifyCsrfTokenmiddleware vérifiera également l' X-CSRF-TOKENen-tête de la requête. Vous pouvez, par exemple, stocker le jeton dans une metabalise HTML :
+
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+Ensuite, vous pouvez demander à une bibliothèque comme jQuery d'ajouter automatiquement le jeton à tous les en-têtes de requête. Cela fournit une protection CSRF simple et pratique pour vos applications basées sur AJAX utilisant la technologie JavaScript héritée :
+
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+    }
+});
+
+X-XSRF-TOKEN
+Laravel stocke le jeton CSRF actuel dans un XSRF-TOKENcookie crypté qui est inclus avec chaque réponse générée par le framework. Vous pouvez utiliser la valeur du cookie pour définir l' X-XSRF-TOKENen-tête de la requête.
+
+Ce cookie est principalement envoyé pour la commodité des développeurs, car certains frameworks et bibliothèques JavaScript, comme Angular et Axios, placent automatiquement sa valeur dans l'en- X-XSRF-TOKENtête des requêtes de même origine.

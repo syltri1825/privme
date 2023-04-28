@@ -1,0 +1,939 @@
+Diffusion
+Introduction
+Installation côté serveur
+Configuration
+Canaux de poussée
+Habilement
+Alternatives open source
+Installation côté client
+Canaux de poussée
+Habilement
+Présentation du concept
+Utilisation d'un exemple d'application
+Définition des événements de diffusion
+Nom de diffusion
+Données de diffusion
+File d'attente de diffusion
+Conditions de diffusion
+Transactions de diffusion et de base de données
+Autorisation des canaux
+Définition des routes d'autorisation
+Définition des rappels d'autorisation
+Définition des classes de canaux
+Événements de diffusion
+Uniquement pour les autres
+Personnalisation de la connexion
+Recevoir des diffusions
+À l'écoute des événements
+Quitter un canal
+Espaces de noms
+Canaux de présence
+Autorisation des canaux de présence
+Rejoindre les canaux de présence
+Diffusion vers les canaux de présence
+Diffusion modèle
+Modèles de conventions de radiodiffusion
+Écoute des diffusions modèles
+Événements clients
+Avis
+Introduction
+Dans de nombreuses applications Web modernes, les WebSockets sont utilisés pour implémenter des interfaces utilisateur en temps réel et mises à jour en direct. Lorsque certaines données sont mises à jour sur le serveur, un message est généralement envoyé via une connexion WebSocket pour être géré par le client. Les WebSockets offrent une alternative plus efficace à l'interrogation continue du serveur de votre application pour les modifications de données qui doivent être reflétées dans votre interface utilisateur.
+
+Par exemple, imaginez que votre application soit capable d'exporter les données d'un utilisateur vers un fichier CSV et de les lui envoyer par e-mail. Cependant, la création de ce fichier CSV prend plusieurs minutes. Vous choisissez donc de créer et d'envoyer le CSV dans une tâche en file d'attente . Lorsque le CSV a été créé et envoyé à l'utilisateur, nous pouvons utiliser la diffusion d'événements pour envoyer un App\Events\UserDataExportedévénement qui est reçu par le JavaScript de notre application. Une fois l'événement reçu, nous pouvons afficher un message à l'utilisateur indiquant que son CSV lui a été envoyé par e-mail sans qu'il ait jamais besoin d'actualiser la page.
+
+Pour vous aider à créer ces types de fonctionnalités, Laravel facilite la "diffusion" de vos événements Laravel côté serveur via une connexion WebSocket. La diffusion de vos événements Laravel vous permet de partager les mêmes noms d'événements et données entre votre application Laravel côté serveur et votre application JavaScript côté client.
+
+Les concepts de base derrière la diffusion sont simples : les clients se connectent à des canaux nommés sur le frontend, tandis que votre application Laravel diffuse des événements sur ces canaux sur le backend. Ces événements peuvent contenir toutes les données supplémentaires que vous souhaitez mettre à la disposition de l'interface.
+
+Pilotes pris en charge
+Par défaut, Laravel inclut deux pilotes de diffusion côté serveur parmi lesquels vous pouvez choisir : Pusher Channels et Ably . Cependant, les packages communautaires tels que laravel-websockets et soketi fournissent des pilotes de diffusion supplémentaires qui ne nécessitent pas de fournisseurs de diffusion commerciaux.
+
+
+Avant de plonger dans la diffusion d'événements, assurez-vous d'avoir lu la documentation de Laravel sur les événements et les auditeurs .
+
+
+Installation côté serveur
+Pour commencer à utiliser la diffusion d'événements de Laravel, nous devons effectuer une configuration dans l'application Laravel et installer quelques packages.
+
+La diffusion d'événements est réalisée par un pilote de diffusion côté serveur qui diffuse vos événements Laravel afin que Laravel Echo (une bibliothèque JavaScript) puisse les recevoir dans le client du navigateur. Ne vous inquiétez pas - nous allons parcourir chaque étape du processus d'installation étape par étape.
+
+Configuration
+Toute la configuration de diffusion d'événements de votre application est stockée dans le config/broadcasting.phpfichier de configuration. Laravel prend en charge plusieurs pilotes de diffusion prêts à l'emploi : Pusher Channels , Redis et un logpilote pour le développement local et le débogage. De plus, un nullpilote est inclus qui vous permet de désactiver totalement la diffusion pendant les tests. Un exemple de configuration est inclus pour chacun de ces pilotes dans le config/broadcasting.phpfichier de configuration.
+
+Fournisseur de services de diffusion
+Avant de diffuser des événements, vous devez d'abord enregistrer le fichier App\Providers\BroadcastServiceProvider. Dans les nouvelles applications Laravel, il vous suffit de décommenter ce fournisseur dans le providerstableau de votre config/app.phpfichier de configuration. Celui -ci BroadcastServiceProvidercontient le code nécessaire pour enregistrer les routes d'autorisation de diffusion et les rappels.
+
+Configuration de la file d'attente
+Vous devrez également configurer et exécuter un agent de file d'attente . Toutes les diffusions d'événements sont effectuées via des tâches en file d'attente afin que le temps de réponse de votre application ne soit pas sérieusement affecté par les événements diffusés.
+
+Canaux de poussée
+Si vous envisagez de diffuser vos événements à l'aide de Pusher Channels , vous devez installer le SDK PHP Pusher Channels à l'aide du gestionnaire de packages Composer :
+
+composer require pusher/pusher-php-server
+
+Ensuite, vous devez configurer vos identifiants Pusher Channels dans le config/broadcasting.phpfichier de configuration. Un exemple de configuration Pusher Channels est déjà inclus dans ce fichier, vous permettant de spécifier rapidement votre clé, votre secret et votre ID d'application. Généralement, ces valeurs doivent être définies via les variables d'environnementPUSHER_APP_KEY , PUSHER_APP_SECRETet :PUSHER_APP_ID
+
+PUSHER_APP_ID=your-pusher-app-id
+PUSHER_APP_KEY=your-pusher-key
+PUSHER_APP_SECRET=your-pusher-secret
+PUSHER_APP_CLUSTER=mt1
+
+La configuration config/broadcasting.phpdu fichier pushervous permet également de spécifier des éléments supplémentaires optionspris en charge par les canaux, tels que le cluster.
+
+Ensuite, vous devrez changer votre pilote de diffusion en pusherdans votre .envfichier :
+
+BROADCAST_DRIVER=pusher
+
+Enfin, vous êtes prêt à installer et à configurer Laravel Echo , qui recevra les événements de diffusion côté client.
+
+Alternatives aux poussoirs open source
+Les packages laravel-websockets et soketi fournissent des serveurs WebSocket compatibles Pusher pour Laravel. Ces packages vous permettent de tirer parti de toute la puissance de la diffusion Laravel sans fournisseur WebSocket commercial. Pour plus d'informations sur l'installation et l'utilisation de ces packages, veuillez consulter notre documentation sur les alternatives open source .
+
+Habilement
+Si vous envisagez de diffuser vos événements à l'aide d' Ably , vous devez installer le SDK PHP d'Ably à l'aide du gestionnaire de packages Composer :
+
+composer require ably/ably-php
+
+Ensuite, vous devez configurer vos informations d'identification Ably dans le config/broadcasting.phpfichier de configuration. Un exemple de configuration Ably est déjà inclus dans ce fichier, vous permettant de spécifier rapidement votre clé. Typiquement, cette valeur doit être définie via la ABLY_KEY variable d'environnement :
+
+ABLY_KEY=your-ably-key
+
+Ensuite, vous devrez changer votre pilote de diffusion en ablydans votre .envfichier :
+
+BROADCAST_DRIVER=ably
+
+Enfin, vous êtes prêt à installer et à configurer Laravel Echo , qui recevra les événements de diffusion côté client.
+
+Alternatives open source
+PHP
+Le package laravel-websockets est un package WebSocket purement PHP, compatible Pusher pour Laravel. Ce package vous permet de tirer parti de toute la puissance de la diffusion Laravel sans fournisseur WebSocket commercial. Pour plus d'informations sur l'installation et l'utilisation de ce package, veuillez consulter sa documentation officielle .
+
+Nœud
+Soketi est un serveur WebSocket basé sur Node et compatible Pusher pour Laravel. Sous le capot, Soketi utilise µWebSockets.js pour une évolutivité et une vitesse extrêmes. Ce package vous permet de tirer parti de toute la puissance de la diffusion Laravel sans fournisseur WebSocket commercial. Pour plus d'informations sur l'installation et l'utilisation de ce package, veuillez consulter sa documentation officielle .
+
+Installation côté client
+Canaux de poussée
+Laravel Echo est une bibliothèque JavaScript qui facilite l'abonnement aux chaînes et l'écoute des événements diffusés par votre pilote de diffusion côté serveur. Vous pouvez installer Echo via le gestionnaire de packages NPM. Dans cet exemple, nous allons également installer le pusher-jspackage puisque nous allons utiliser le diffuseur Pusher Channels :
+
+npm install --save-dev laravel-echo pusher-js
+
+Une fois Echo installé, vous êtes prêt à créer une nouvelle instance Echo dans le JavaScript de votre application. Un bon endroit pour le faire est au bas du resources/js/bootstrap.jsfichier qui est inclus avec le framework Laravel. Par défaut, un exemple de configuration Echo est déjà inclus dans ce fichier - il vous suffit de le décommenter :
+
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+ 
+window.Pusher = Pusher;
+ 
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key: import.meta.env.VITE_PUSHER_APP_KEY,
+    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+    forceTLS: true
+});
+
+Une fois que vous avez décommenté et ajusté la configuration d'Echo en fonction de vos besoins, vous pouvez compiler les assets de votre application :
+
+npm run dev
+
+
+Pour en savoir plus sur la compilation des actifs JavaScript de votre application, veuillez consulter la documentation sur Vite .
+
+
+Utilisation d'une instance client existante
+Si vous avez déjà une instance de client Pusher Channels préconfigurée que vous souhaitez qu'Echo utilise, vous pouvez la transmettre à Echo via l' clientoption de configuration :
+
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+ 
+const options = {
+    broadcaster: 'pusher',
+    key: 'your-pusher-channels-key'
+}
+ 
+window.Echo = new Echo({
+    ...options,
+    client: new Pusher(options.key, options)
+});
+
+Habilement
+Laravel Echo est une bibliothèque JavaScript qui facilite l'abonnement aux chaînes et l'écoute des événements diffusés par votre pilote de diffusion côté serveur. Vous pouvez installer Echo via le gestionnaire de packages NPM. Dans cet exemple, nous allons également installer le pusher-jspackage.
+
+Vous vous demandez peut-être pourquoi nous installerions la pusher-jsbibliothèque JavaScript alors que nous utilisons Ably pour diffuser nos événements. Heureusement, Ably inclut un mode de compatibilité Pusher qui nous permet d'utiliser le protocole Pusher lors de l'écoute d'événements dans notre application côté client :
+
+npm install --save-dev laravel-echo pusher-js
+
+Avant de continuer, vous devez activer la prise en charge du protocole Pusher dans les paramètres de votre application Ably. Vous pouvez activer cette fonctionnalité dans la partie "Paramètres de l'adaptateur de protocole" du tableau de bord des paramètres de votre application Ably.
+
+Une fois Echo installé, vous êtes prêt à créer une nouvelle instance Echo dans le JavaScript de votre application. Un bon endroit pour le faire est au bas du resources/js/bootstrap.jsfichier qui est inclus avec le framework Laravel. Par défaut, un exemple de configuration Echo est déjà inclus dans ce fichier ; cependant, la configuration par défaut dans le bootstrap.jsfichier est destinée à Pusher. Vous pouvez copier la configuration ci-dessous pour transférer votre configuration vers Ably :
+
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+ 
+window.Pusher = Pusher;
+ 
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key: import.meta.env.VITE_ABLY_PUBLIC_KEY,
+    wsHost: 'realtime-pusher.ably.io',
+    wsPort: 443,
+    disableStats: true,
+    encrypted: true,
+});
+
+Notez que notre configuration Ably Echo fait référence à une VITE_ABLY_PUBLIC_KEYvariable d'environnement. La valeur de cette variable doit être votre clé publique Ably. Votre clé publique est la partie de votre clé Ably qui apparaît avant le :caractère.
+
+Une fois que vous avez décommenté et ajusté la configuration d'Echo en fonction de vos besoins, vous pouvez compiler les assets de votre application :
+
+npm run dev
+
+
+Pour en savoir plus sur la compilation des actifs JavaScript de votre application, veuillez consulter la documentation sur Vite .
+
+
+Présentation du concept
+La diffusion d'événements de Laravel vous permet de diffuser vos événements Laravel côté serveur vers votre application JavaScript côté client en utilisant une approche basée sur les pilotes pour WebSockets. Actuellement, Laravel est livré avec les pilotes Pusher Channels et Ably . Les événements peuvent être facilement consommés côté client à l'aide du package JavaScript Laravel Echo .
+
+Les événements sont diffusés sur des "canaux", qui peuvent être spécifiés comme publics ou privés. Tout visiteur de votre application peut s'abonner à une chaîne publique sans aucune authentification ni autorisation ; cependant, pour s'abonner à un canal privé, un utilisateur doit être authentifié et autorisé à écouter sur ce canal.
+
+
+Si vous souhaitez explorer des alternatives open source à Pusher, consultez les alternatives open source .
+
+
+Utilisation d'un exemple d'application
+Avant de plonger dans chaque composant de la diffusion d'événements, prenons un aperçu de haut niveau en utilisant un magasin de commerce électronique comme exemple.
+
+Dans notre application, supposons que nous ayons une page qui permet aux utilisateurs de voir le statut d'expédition de leurs commandes. Supposons également qu'un OrderShipmentStatusUpdatedévénement est déclenché lorsqu'une mise à jour du statut d'expédition est traitée par l'application :
+
+use App\Events\OrderShipmentStatusUpdated;
+ 
+OrderShipmentStatusUpdated::dispatch($order);
+
+L' ShouldBroadcastinterface
+Lorsqu'un utilisateur consulte l'une de ses commandes, nous ne voulons pas qu'il doive actualiser la page pour afficher les mises à jour de statut. Au lieu de cela, nous souhaitons diffuser les mises à jour de l'application au fur et à mesure de leur création. Donc, nous devons marquer l' OrderShipmentStatusUpdatedévénement avec l' ShouldBroadcastinterface. Cela demandera à Laravel de diffuser l'événement lorsqu'il est déclenché :
+
+<?php
+ 
+namespace App\Events;
+ 
+use App\Models\Order;
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Queue\SerializesModels;
+ 
+class OrderShipmentStatusUpdated implements ShouldBroadcast
+{
+    /**
+     * The order instance.
+     *
+     * @var \App\Order
+     */
+    public $order;
+}
+
+L' ShouldBroadcastinterface nécessite notre événement pour définir une broadcastOnméthode. Cette méthode est chargée de renvoyer les canaux sur lesquels l'événement doit être diffusé. Un stub vide de cette méthode est déjà défini sur les classes d'événements générées, nous n'avons donc qu'à remplir ses détails. Nous souhaitons que seul le créateur de la commande puisse voir les mises à jour de statut, nous diffuserons donc l'événement sur une chaîne privée liée à la commande :
+
+/**
+ * Get the channels the event should broadcast on.
+ *
+ * @return \Illuminate\Broadcasting\PrivateChannel
+ */
+public function broadcastOn()
+{
+    return new PrivateChannel('orders.'.$this->order->id);
+}
+
+Autorisation des canaux
+N'oubliez pas que les utilisateurs doivent être autorisés à écouter sur les canaux privés. Nous pouvons définir nos règles d'autorisation de chaîne dans le routes/channels.phpdossier de notre application. Dans cet exemple, nous devons vérifier que tout utilisateur tentant d'écouter sur le orders.1canal privé est bien le créateur de la commande :
+
+use App\Models\Order;
+ 
+Broadcast::channel('orders.{orderId}', function ($user, $orderId) {
+    return $user->id === Order::findOrNew($orderId)->user_id;
+});
+
+La channelméthode accepte deux arguments : le nom du canal et un rappel qui renvoie trueou falseindique si l'utilisateur est autorisé à écouter sur le canal.
+
+Tous les rappels d'autorisation reçoivent l'utilisateur actuellement authentifié comme premier argument et tous les paramètres génériques supplémentaires comme arguments suivants. Dans cet exemple, nous utilisons l' {orderId}espace réservé pour indiquer que la partie "ID" du nom de la chaîne est un caractère générique.
+
+Écouter les diffusions d'événements
+Ensuite, il ne reste plus qu'à écouter l'événement dans notre application JavaScript. Nous pouvons le faire en utilisant Laravel Echo . Tout d'abord, nous allons utiliser la privateméthode pour vous abonner à la chaîne privée. Ensuite, nous pouvons utiliser la listenméthode pour écouter l' OrderShipmentStatusUpdatedévénement. Par défaut, toutes les propriétés publiques de l'événement seront incluses dans l'événement diffusé :
+
+Echo.private(`orders.${orderId}`)
+    .listen('OrderShipmentStatusUpdated', (e) => {
+        console.log(e.order);
+    });
+
+Définition des événements de diffusion
+Pour informer Laravel qu'un événement donné doit être diffusé, vous devez implémenter l' Illuminate\Contracts\Broadcasting\ShouldBroadcastinterface sur la classe d'événement. Cette interface est déjà importée dans toutes les classes d'événements générées par le framework afin que vous puissiez facilement l'ajouter à n'importe lequel de vos événements.
+
+L' ShouldBroadcastinterface vous demande d'implémenter une seule méthode : broadcastOn. La broadcastOnméthode doit renvoyer un canal ou un tableau de canaux sur lequel l'événement doit être diffusé. Les canaux doivent être des instances de Channel, PrivateChannelou PresenceChannel. Les instances de Channelreprésentent des canaux publics auxquels tout utilisateur peut s'abonner, tandis que PrivateChannelset PresenceChannelsreprésentent des canaux privés nécessitant une autorisation de canal :
+
+<?php
+ 
+namespace App\Events;
+ 
+use App\Models\User;
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Queue\SerializesModels;
+ 
+class ServerCreated implements ShouldBroadcast
+{
+    use SerializesModels;
+ 
+    /**
+     * The user that created the server.
+     *
+     * @var \App\Models\User
+     */
+    public $user;
+ 
+    /**
+     * Create a new event instance.
+     *
+     * @param  \App\Models\User  $user
+     * @return void
+     */
+    public function __construct(User $user)
+    {
+        $this->user = $user;
+    }
+ 
+    /**
+     * Get the channels the event should broadcast on.
+     *
+     * @return Channel|array
+     */
+    public function broadcastOn()
+    {
+        return new PrivateChannel('user.'.$this->user->id);
+    }
+}
+
+Après avoir implémenté l' ShouldBroadcastinterface, il vous suffit de déclencher l'événement comme vous le feriez normalement. Une fois l'événement déclenché, une tâche en file d'attente diffusera automatiquement l'événement à l'aide du pilote de diffusion spécifié.
+
+Nom de diffusion
+Par défaut, Laravel diffusera l'événement en utilisant le nom de classe de l'événement. Cependant, vous pouvez personnaliser le nom de diffusion en définissant une broadcastAsméthode sur l'événement :
+
+/**
+ * The event's broadcast name.
+ *
+ * @return string
+ */
+public function broadcastAs()
+{
+    return 'server.created';
+}
+
+Si vous personnalisez le nom de diffusion à l'aide de la broadcastAsméthode, vous devez vous assurer d'enregistrer votre auditeur avec un premier .caractère. Cela demandera à Echo de ne pas ajouter l'espace de noms de l'application à l'événement :
+
+.listen('.server.created', function (e) {
+    ....
+});
+
+Données de diffusion
+Lorsqu'un événement est diffusé, toutes ses publicpropriétés sont automatiquement sérialisées et diffusées en tant que charge utile de l'événement, vous permettant d'accéder à toutes ses données publiques à partir de votre application JavaScript. Ainsi, par exemple, si votre événement a une seule $userpropriété publique qui contient un modèle Eloquent, la charge utile de diffusion de l'événement serait :
+
+{
+    "user": {
+        "id": 1,
+        "name": "Patrick Stewart"
+        ...
+    }
+}
+
+Cependant, si vous souhaitez avoir un contrôle plus précis sur votre charge utile de diffusion, vous pouvez ajouter une broadcastWithméthode à votre événement. Cette méthode doit renvoyer le tableau de données que vous souhaitez diffuser en tant que charge utile de l'événement :
+
+/**
+ * Get the data to broadcast.
+ *
+ * @return array
+ */
+public function broadcastWith()
+{
+    return ['id' => $this->user->id];
+}
+
+File d'attente de diffusion
+Par défaut, chaque événement de diffusion est placé dans la file d'attente par défaut pour la connexion à la file d'attente par défaut spécifiée dans votre queue.phpfichier de configuration. Vous pouvez personnaliser la connexion à la file d'attente et le nom utilisé par le diffuseur en définissant des connectionpropriétés queuesur votre classe d'événement :
+
+/**
+ * The name of the queue connection to use when broadcasting the event.
+ *
+ * @var string
+ */
+public $connection = 'redis';
+ 
+/**
+ * The name of the queue on which to place the broadcasting job.
+ *
+ * @var string
+ */
+public $queue = 'default';
+
+Vous pouvez également personnaliser le nom de la file d'attente en définissant une broadcastQueueméthode sur votre événement :
+
+/**
+ * The name of the queue on which to place the broadcasting job.
+ *
+ * @return string
+ */
+public function broadcastQueue()
+{
+    return 'default';
+}
+
+Si vous souhaitez diffuser votre événement en utilisant la syncfile d'attente au lieu du pilote de file d'attente par défaut, vous pouvez implémenter l' ShouldBroadcastNowinterface au lieu de ShouldBroadcast:
+
+<?php
+ 
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+ 
+class OrderShipmentStatusUpdated implements ShouldBroadcastNow
+{
+    //
+}
+
+Conditions de diffusion
+Parfois, vous souhaitez diffuser votre événement uniquement si une condition donnée est vraie. Vous pouvez définir ces conditions en ajoutant une broadcastWhenméthode à votre classe d'événement :
+
+/**
+ * Determine if this event should broadcast.
+ *
+ * @return bool
+ */
+public function broadcastWhen()
+{
+    return $this->order->value > 100;
+}
+
+Transactions de diffusion et de base de données
+Lorsque des événements de diffusion sont distribués dans des transactions de base de données, ils peuvent être traités par la file d'attente avant que la transaction de base de données ne soit validée. Lorsque cela se produit, les mises à jour que vous avez apportées aux modèles ou aux enregistrements de base de données lors de la transaction de base de données peuvent ne pas encore être reflétées dans la base de données. De plus, tous les modèles ou enregistrements de base de données créés dans la transaction peuvent ne pas exister dans la base de données. Si votre événement dépend de ces modèles, des erreurs inattendues peuvent se produire lors du traitement de la tâche qui diffuse l'événement.
+
+Si l' after_commitoption de configuration de votre connexion à la file d'attente est définie sur false, vous pouvez toujours indiquer qu'un événement de diffusion particulier doit être distribué après que toutes les transactions de base de données ouvertes ont été validées en définissant une $afterCommitpropriété sur la classe d'événement :
+
+<?php
+ 
+namespace App\Events;
+ 
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Queue\SerializesModels;
+ 
+class ServerCreated implements ShouldBroadcast
+{
+    use SerializesModels;
+ 
+    public $afterCommit = true;
+}
+
+
+Pour en savoir plus sur la façon de contourner ces problèmes, veuillez consulter la documentation relative aux travaux en file d'attente et aux transactions de base de données .
+
+
+Autorisation des canaux
+Les chaînes privées nécessitent que vous autorisiez l'utilisateur actuellement authentifié à écouter la chaîne. Ceci est accompli en faisant une requête HTTP à votre application Laravel avec le nom du canal et en permettant à votre application de déterminer si l'utilisateur peut écouter sur ce canal. Lors de l'utilisation de Laravel Echo , la requête HTTP pour autoriser les abonnements aux chaînes privées se fera automatiquement ; cependant, vous devez définir les itinéraires appropriés pour répondre à ces demandes.
+
+Définition des routes d'autorisation
+Heureusement, Laravel facilite la définition des routes pour répondre aux demandes d'autorisation de canal. Dans le App\Providers\BroadcastServiceProviderinclus avec votre application Laravel, vous verrez un appel à la Broadcast::routesméthode. Cette méthode enregistrera la /broadcasting/authroute pour gérer les demandes d'autorisation :
+
+Broadcast::routes();
+
+La Broadcast::routesméthode placera automatiquement ses routes dans le webgroupe middleware ; cependant, vous pouvez passer un tableau d'attributs de route à la méthode si vous souhaitez personnaliser les attributs assignés :
+
+Broadcast::routes($attributes);
+
+Personnalisation du point de terminaison d'autorisation
+Par défaut, Echo utilisera le /broadcasting/authpoint de terminaison pour autoriser l'accès au canal. Cependant, vous pouvez spécifier votre propre point de terminaison d'autorisation en transmettant l' authEndpointoption de configuration à votre instance Echo :
+
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    // ...
+    authEndpoint: '/custom/endpoint/auth'
+});
+
+Personnalisation de la demande d'autorisation
+Vous pouvez personnaliser la façon dont Laravel Echo effectue les demandes d'autorisation en fournissant un mécanisme d'autorisation personnalisé lors de l'initialisation d'Echo :
+
+window.Echo = new Echo({
+    // ...
+    authorizer: (channel, options) => {
+        return {
+            authorize: (socketId, callback) => {
+                axios.post('/api/broadcasting/auth', {
+                    socket_id: socketId,
+                    channel_name: channel.name
+                })
+                .then(response => {
+                    callback(false, response.data);
+                })
+                .catch(error => {
+                    callback(true, error);
+                });
+            }
+        };
+    },
+})
+
+Définition des rappels d'autorisation
+Ensuite, nous devons définir la logique qui déterminera réellement si l'utilisateur actuellement authentifié peut écouter un canal donné. Cela se fait dans le routes/channels.phpfichier qui est inclus avec votre application. Dans ce fichier, vous pouvez utiliser la Broadcast::channelméthode pour enregistrer les rappels d'autorisation de canal :
+
+Broadcast::channel('orders.{orderId}', function ($user, $orderId) {
+    return $user->id === Order::findOrNew($orderId)->user_id;
+});
+
+La channelméthode accepte deux arguments : le nom du canal et un rappel qui renvoie trueou falseindique si l'utilisateur est autorisé à écouter sur le canal.
+
+Tous les rappels d'autorisation reçoivent l'utilisateur actuellement authentifié comme premier argument et tous les paramètres génériques supplémentaires comme arguments suivants. Dans cet exemple, nous utilisons l' {orderId}espace réservé pour indiquer que la partie "ID" du nom de la chaîne est un caractère générique.
+
+Liaison de modèle de rappel d'autorisation
+Tout comme les routes HTTP, les routes de canal peuvent également tirer parti de la liaison de modèle de route implicite et explicite . Par exemple, au lieu de recevoir une chaîne ou un ID de commande numérique, vous pouvez demander une Orderinstance de modèle réelle :
+
+use App\Models\Order;
+ 
+Broadcast::channel('orders.{order}', function ($user, Order $order) {
+    return $user->id === $order->user_id;
+});
+
+
+Contrairement à la liaison de modèle de route HTTP, la liaison de modèle de canal ne prend pas en charge la portée de liaison de modèle implicite automatique . Cependant, cela pose rarement un problème, car la plupart des canaux peuvent être délimités en fonction de la clé primaire unique d'un modèle unique.
+
+
+Authentification de rappel d'autorisation
+Les canaux de diffusion privés et de présence authentifient l'utilisateur actuel via la protection d'authentification par défaut de votre application. Si l'utilisateur n'est pas authentifié, l'autorisation de canal est automatiquement refusée et le rappel d'autorisation n'est jamais exécuté. Cependant, vous pouvez affecter plusieurs gardes personnalisés qui doivent authentifier la demande entrante si nécessaire :
+
+Broadcast::channel('channel', function () {
+    // ...
+}, ['guards' => ['web', 'admin']]);
+
+Définition des classes de canaux
+Si votre application utilise de nombreux canaux différents, votre routes/channels.phpfichier pourrait devenir volumineux. Ainsi, au lieu d'utiliser des fermetures pour autoriser les canaux, vous pouvez utiliser des classes de canaux. Pour générer une classe de canal, utilisez la make:channelcommande Artisan. Cette commande placera une nouvelle classe de canal dans le App/Broadcastingrépertoire.
+
+php artisan make:channel OrderChannel
+
+Ensuite, enregistrez votre chaîne dans votre routes/channels.phpfichier :
+
+use App\Broadcasting\OrderChannel;
+ 
+Broadcast::channel('orders.{order}', OrderChannel::class);
+
+Enfin, vous pouvez placer la logique d'autorisation de votre canal dans la joinméthode de la classe de canal. Cette joinméthode hébergera la même logique que vous auriez généralement placée dans la fermeture de l'autorisation de votre canal. Vous pouvez également tirer parti de la liaison de modèle de canal :
+
+<?php
+ 
+namespace App\Broadcasting;
+ 
+use App\Models\Order;
+use App\Models\User;
+ 
+class OrderChannel
+{
+    /**
+     * Create a new channel instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        //
+    }
+ 
+    /**
+     * Authenticate the user's access to the channel.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Order  $order
+     * @return array|bool
+     */
+    public function join(User $user, Order $order)
+    {
+        return $user->id === $order->user_id;
+    }
+}
+
+
+Comme beaucoup d'autres classes dans Laravel, les classes de canal seront automatiquement résolues par le service container . Ainsi, vous pouvez indiquer toutes les dépendances requises par votre canal dans son constructeur.
+
+
+Événements de diffusion
+Une fois que vous avez défini un événement et l'avez marqué avec l' ShouldBroadcastinterface, il vous suffit de déclencher l'événement en utilisant la méthode de répartition de l'événement. Le répartiteur d'événements remarquera que l'événement est marqué avec l' ShouldBroadcastinterface et mettra l'événement en file d'attente pour diffusion :
+
+use App\Events\OrderShipmentStatusUpdated;
+ 
+OrderShipmentStatusUpdated::dispatch($order);
+
+Uniquement pour les autres
+Lors de la création d'une application qui utilise la diffusion d'événements, vous devrez peut-être occasionnellement diffuser un événement à tous les abonnés d'un canal donné, à l'exception de l'utilisateur actuel. Vous pouvez accomplir cela en utilisant l' broadcastassistant et la toOthersméthode :
+
+use App\Events\OrderShipmentStatusUpdated;
+ 
+broadcast(new OrderShipmentStatusUpdated($update))->toOthers();
+
+Pour mieux comprendre quand vous pouvez utiliser la toOthersméthode, imaginons une application de liste de tâches où un utilisateur peut créer une nouvelle tâche en saisissant un nom de tâche. Pour créer une tâche, votre application peut adresser une requête à une /taskURL qui diffuse la création de la tâche et renvoie une représentation JSON de la nouvelle tâche. Lorsque votre application JavaScript reçoit la réponse du point de terminaison, elle peut insérer directement la nouvelle tâche dans sa liste de tâches comme suit :
+
+axios.post('/task', task)
+    .then((response) => {
+        this.tasks.push(response.data);
+    });
+
+Cependant, rappelez-vous que nous diffusons également la création de la tâche. Si votre application JavaScript écoute également cet événement afin d'ajouter des tâches à la liste des tâches, vous aurez des tâches en double dans votre liste : une du point de terminaison et une de la diffusion. Vous pouvez résoudre ce problème en utilisant la toOthersméthode pour demander au diffuseur de ne pas diffuser l'événement à l'utilisateur actuel.
+
+
+Votre événement doit utiliser le Illuminate\Broadcasting\InteractsWithSocketstrait pour appeler la toOthersméthode.
+
+
+Configuration
+Lorsque vous initialisez une instance Laravel Echo, un ID de socket est attribué à la connexion. Si vous utilisez une instance globale Axios pour effectuer des requêtes HTTP à partir de votre application JavaScript, l'ID de socket sera automatiquement joint à chaque requête sortante en tant qu'en- X-Socket-IDtête. Ensuite, lorsque vous appelez la toOthersméthode, Laravel extraira l'ID de socket de l'en-tête et demandera au diffuseur de ne diffuser sur aucune connexion avec cet ID de socket.
+
+Si vous n'utilisez pas d'instance globale Axios, vous devrez configurer manuellement votre application JavaScript pour envoyer l' X-Socket-IDen-tête avec toutes les requêtes sortantes. Vous pouvez récupérer l'ID de socket en utilisant la Echo.socketIdméthode :
+
+var socketId = Echo.socketId();
+
+Personnalisation de la connexion
+Si votre application interagit avec plusieurs connexions de diffusion et que vous souhaitez diffuser un événement à l'aide d'un diffuseur autre que celui par défaut, vous pouvez spécifier sur quelle connexion pousser un événement à l'aide de la viaméthode :
+
+use App\Events\OrderShipmentStatusUpdated;
+ 
+broadcast(new OrderShipmentStatusUpdated($update))->via('pusher');
+
+Vous pouvez également spécifier la connexion de diffusion de l'événement en appelant la broadcastViaméthode dans le constructeur de l'événement. Cependant, avant de le faire, vous devez vous assurer que la classe d'événement utilise le InteractsWithBroadcastingtrait :
+
+<?php
+ 
+namespace App\Events;
+ 
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithBroadcasting;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Queue\SerializesModels;
+ 
+class OrderShipmentStatusUpdated implements ShouldBroadcast
+{
+    use InteractsWithBroadcasting;
+ 
+    /**
+     * Create a new event instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->broadcastVia('pusher');
+    }
+}
+
+Recevoir des diffusions
+À l'écoute des événements
+Une fois que vous avez installé et instancié Laravel Echo , vous êtes prêt à commencer à écouter les événements diffusés depuis votre application Laravel. Commencez par utiliser la channelméthode pour récupérer une instance d'un canal, puis appelez la listenméthode pour écouter un événement spécifié :
+
+Echo.channel(`orders.${this.order.id}`)
+    .listen('OrderShipmentStatusUpdated', (e) => {
+        console.log(e.order.name);
+    });
+
+Si vous souhaitez écouter les événements sur un canal privé, utilisez privateplutôt la méthode . Vous pouvez continuer à enchaîner les appels à la listenméthode pour écouter plusieurs événements sur un seul canal :
+
+Echo.private(`orders.${this.order.id}`)
+    .listen(/* ... */)
+    .listen(/* ... */)
+    .listen(/* ... */);
+
+Arrêtez d'écouter les événements
+Si vous souhaitez arrêter d'écouter un événement donné sans quitter la chaîne , vous pouvez utiliser la stopListeningméthode :
+
+Echo.private(`orders.${this.order.id}`)
+    .stopListening('OrderShipmentStatusUpdated')
+
+Quitter un canal
+Pour quitter un canal, vous pouvez appeler la leaveChannelméthode sur votre instance Echo :
+
+Echo.leaveChannel(`orders.${this.order.id}`);
+
+Si vous souhaitez quitter un canal ainsi que ses canaux privés et de présence associés, vous pouvez appeler la leaveméthode :
+
+Echo.leave(`orders.${this.order.id}`);
+
+Espaces de noms
+Vous avez peut-être remarqué dans les exemples ci-dessus que nous n'avons pas spécifié l' App\Eventsespace de noms complet pour les classes d'événements. En effet, Echo supposera automatiquement que les événements se trouvent dans l' espace de App\Eventsnoms. Cependant, vous pouvez configurer l'espace de noms racine lorsque vous instanciez Echo en passant une namespaceoption de configuration :
+
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    // ...
+    namespace: 'App.Other.Namespace'
+});
+
+Alternativement, vous pouvez préfixer les classes d'événements avec un .lorsque vous vous y abonnez à l'aide d'Echo. Cela vous permettra de toujours spécifier le nom complet de la classe :
+
+Echo.channel('orders')
+    .listen('.Namespace\\Event\\Class', (e) => {
+        //
+    });
+
+Canaux de présence
+Les canaux de présence s'appuient sur la sécurité des canaux privés tout en exposant la fonctionnalité supplémentaire de savoir qui est abonné au canal. Cela facilite la création de fonctionnalités d'application puissantes et collaboratives telles que la notification aux utilisateurs lorsqu'un autre utilisateur consulte la même page ou la liste des habitants d'un salon de discussion.
+
+Autorisation des canaux de présence
+Tous les canaux de présence sont également des canaux privés ; par conséquent, les utilisateurs doivent être autorisés à y accéder . Cependant, lors de la définition des rappels d'autorisation pour les canaux de présence, vous ne reviendrez pas truesi l'utilisateur est autorisé à rejoindre le canal. Au lieu de cela, vous devez renvoyer un tableau de données sur l'utilisateur.
+
+Les données renvoyées par le rappel d'autorisation seront mises à la disposition des écouteurs d'événement du canal de présence dans votre application JavaScript. Si l'utilisateur n'est pas autorisé à rejoindre le canal de présence, vous devez retourner falseou null:
+
+Broadcast::channel('chat.{roomId}', function ($user, $roomId) {
+    if ($user->canJoinRoom($roomId)) {
+        return ['id' => $user->id, 'name' => $user->name];
+    }
+});
+
+Rejoindre les canaux de présence
+Pour rejoindre un canal de présence, vous pouvez utiliser la joinméthode d'Echo. La joinméthode renverra une PresenceChannelimplémentation qui, en plus d'exposer la listenméthode, vous permet de vous abonner aux événements here, joininget leaving.
+
+Echo.join(`chat.${roomId}`)
+    .here((users) => {
+        //
+    })
+    .joining((user) => {
+        console.log(user.name);
+    })
+    .leaving((user) => {
+        console.log(user.name);
+    })
+    .error((error) => {
+        console.error(error);
+    });
+
+Le hererappel sera exécuté immédiatement une fois le canal rejoint avec succès et recevra un tableau contenant les informations utilisateur pour tous les autres utilisateurs actuellement abonnés au canal. La joiningméthode sera exécutée lorsqu'un nouvel utilisateur rejoindra un canal, tandis que la leavingméthode sera exécutée lorsqu'un utilisateur quittera le canal. La errorméthode sera exécutée lorsque le point de terminaison d'authentification renvoie un code d'état HTTP autre que 200 ou en cas de problème d'analyse du JSON renvoyé.
+
+Diffusion vers les canaux de présence
+Les canaux de présence peuvent recevoir des événements tout comme les canaux publics ou privés. En utilisant l'exemple d'une salle de discussion, nous pouvons souhaiter diffuser des NewMessageévénements sur le canal de présence de la salle. Pour ce faire, nous renverrons une instance de PresenceChannelà partir de la méthode de l'événementbroadcastOn :
+
+/**
+ * Get the channels the event should broadcast on.
+ *
+ * @return Channel|array
+ */
+public function broadcastOn()
+{
+    return new PresenceChannel('room.'.$this->message->room_id);
+}
+
+Comme pour les autres événements, vous pouvez utiliser l' broadcastassistant et la toOthersméthode pour empêcher l'utilisateur actuel de recevoir la diffusion :
+
+broadcast(new NewMessage($message));
+ 
+broadcast(new NewMessage($message))->toOthers();
+
+Comme pour les autres types d'événements, vous pouvez écouter les événements envoyés aux canaux de présence à l'aide de la listenméthode d'Echo :
+
+Echo.join(`chat.${roomId}`)
+    .here(/* ... */)
+    .joining(/* ... */)
+    .leaving(/* ... */)
+    .listen('NewMessage', (e) => {
+        //
+    });
+
+Diffusion modèle
+
+Avant de lire la documentation suivante sur la diffusion de modèles, nous vous recommandons de vous familiariser avec les concepts généraux des services de diffusion de modèles de Laravel ainsi que la façon de créer et d'écouter manuellement des événements de diffusion.
+
+
+Il est courant de diffuser des événements lorsque les modèles Eloquent de votre application sont créés, mis à jour ou supprimés. Bien sûr, cela peut facilement être accompli en définissant manuellement des événements personnalisés pour les changements d'état du modèle Eloquent et en marquant ces événements avec l' ShouldBroadcastinterface.
+
+Cependant, si vous n'utilisez pas ces événements à d'autres fins dans votre application, il peut être fastidieux de créer des classes d'événements dans le seul but de les diffuser. Pour y remédier, Laravel permet d'indiquer qu'un modèle Eloquent doit automatiquement diffuser ses changements d'état.
+
+Pour commencer, votre modèle Eloquent doit utiliser le Illuminate\Database\Eloquent\BroadcastsEventstrait. De plus, le modèle doit définir une broadcastOnméthode, qui renverra un tableau de canaux sur lesquels les événements du modèle doivent être diffusés :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Database\Eloquent\BroadcastsEvents;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+ 
+class Post extends Model
+{
+    use BroadcastsEvents, HasFactory;
+ 
+    /**
+     * Get the user that the post belongs to.
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+ 
+    /**
+     * Get the channels that model events should broadcast on.
+     *
+     * @param  string  $event
+     * @return \Illuminate\Broadcasting\Channel|array
+     */
+    public function broadcastOn($event)
+    {
+        return [$this, $this->user];
+    }
+}
+
+Une fois que votre modèle inclut ce trait et définit ses canaux de diffusion, il commencera automatiquement à diffuser des événements lorsqu'une instance de modèle est créée, mise à jour, supprimée, supprimée ou restaurée.
+
+De plus, vous avez peut-être remarqué que la broadcastOnméthode reçoit un $eventargument de chaîne. Cet argument contient le type d'événement qui s'est produit sur le modèle et aura une valeur de created, updated, deleted, trashed, ou restored. En inspectant la valeur de cette variable, vous pouvez déterminer sur quels canaux (le cas échéant) le modèle doit diffuser pour un événement particulier :
+
+/**
+ * Get the channels that model events should broadcast on.
+ *
+ * @param  string  $event
+ * @return \Illuminate\Broadcasting\Channel|array
+ */
+public function broadcastOn($event)
+{
+    return match ($event) {
+        'deleted' => [],
+        default => [$this, $this->user],
+    };
+}
+
+Personnalisation de la création d'événements de diffusion de modèles
+Parfois, vous souhaiterez peut-être personnaliser la façon dont Laravel crée l'événement de diffusion du modèle sous-jacent. Vous pouvez y parvenir en définissant une newBroadcastableEventméthode sur votre modèle Eloquent. Cette méthode doit renvoyer une Illuminate\Database\Eloquent\BroadcastableModelEventOccurredinstance :
+
+use Illuminate\Database\Eloquent\BroadcastableModelEventOccurred;
+ 
+/**
+ * Create a new broadcastable model event for the model.
+ *
+ * @param  string  $event
+ * @return \Illuminate\Database\Eloquent\BroadcastableModelEventOccurred
+ */
+protected function newBroadcastableEvent($event)
+{
+    return (new BroadcastableModelEventOccurred(
+        $this, $event
+    ))->dontBroadcastToCurrentUser();
+}
+
+Modèles de conventions de radiodiffusion
+Conventions de canal
+Comme vous l'avez peut-être remarqué, la broadcastOnméthode de l'exemple de modèle ci-dessus n'a pas renvoyé d' Channelinstances. Au lieu de cela, les modèles Eloquent ont été renvoyés directement. Si une instance de modèle Eloquent est renvoyée par la broadcastOnméthode de votre modèle (ou est contenue dans un tableau renvoyé par la méthode), Laravel instancie automatiquement une instance de canal privé pour le modèle en utilisant le nom de classe du modèle et l'identifiant de clé primaire comme nom de canal.
+
+Ainsi, un App\Models\Usermodèle avec un idde 1serait converti en une Illuminate\Broadcasting\PrivateChannelinstance avec un nom de App.Models.User.1. Bien sûr, en plus de renvoyer des instances de modèle Eloquent à partir de la broadcastOnméthode de votre modèle, vous pouvez renvoyer des Channelinstances complètes afin d'avoir un contrôle total sur les noms de canaux du modèle :
+
+use Illuminate\Broadcasting\PrivateChannel;
+ 
+/**
+ * Get the channels that model events should broadcast on.
+ *
+ * @param  string  $event
+ * @return \Illuminate\Broadcasting\Channel|array
+ */
+public function broadcastOn($event)
+{
+    return [new PrivateChannel('user.'.$this->id)];
+}
+
+Si vous envisagez de renvoyer explicitement une instance de canal à partir de la broadcastOnméthode de votre modèle, vous pouvez transmettre une instance de modèle Eloquent au constructeur du canal. Ce faisant, Laravel utilisera les conventions de canal de modèle décrites ci-dessus pour convertir le modèle Eloquent en une chaîne de nom de canal :
+
+return [new Channel($this->user)];
+
+Si vous devez déterminer le nom de canal d'un modèle, vous pouvez appeler la broadcastChannelméthode sur n'importe quelle instance de modèle. Par exemple, cette méthode renvoie la chaîne App.Models.User.1pour un App\Models\Usermodèle avec un idde1 :
+
+$user->broadcastChannel()
+
+Conventions événementielles
+Étant donné que les événements de diffusion de modèle ne sont pas associés à un événement "réel" dans le App\Eventsrépertoire de votre application, un nom et une charge utile leur sont attribués en fonction de conventions. La convention de Laravel est de diffuser l'événement en utilisant le nom de classe du modèle (sans compter l'espace de noms) et le nom de l'événement de modèle qui a déclenché la diffusion.
+
+Ainsi, par exemple, une mise à jour du App\Models\Postmodèle diffuserait un événement à votre application côté client comme PostUpdatedavec la charge utile suivante :
+
+{
+    "model": {
+        "id": 1,
+        "title": "My first post"
+        ...
+    },
+    ...
+    "socket": "someSocketId",
+}
+
+La suppression du App\Models\Usermodèle diffuserait un événement nommé UserDeleted.
+
+Si vous le souhaitez, vous pouvez définir un nom de diffusion personnalisé et une charge utile en ajoutant une méthode broadcastAset broadcastWithà votre modèle. Ces méthodes reçoivent le nom de l'événement/de l'opération de modèle qui se produit, ce qui vous permet de personnaliser le nom de l'événement et la charge utile pour chaque opération de modèle. Si nullest renvoyé par la broadcastAsméthode, Laravel utilisera les conventions de nom d'événement de diffusion du modèle décrites ci-dessus lors de la diffusion de l'événement :
+
+/**
+ * The model event's broadcast name.
+ *
+ * @param  string  $event
+ * @return string|null
+ */
+public function broadcastAs($event)
+{
+    return match ($event) {
+        'created' => 'post.created',
+        default => null,
+    };
+}
+ 
+/**
+ * Get the data to broadcast for the model.
+ *
+ * @param  string  $event
+ * @return array
+ */
+public function broadcastWith($event)
+{
+    return match ($event) {
+        'created' => ['title' => $this->title],
+        default => ['model' => $this],
+    };
+}
+
+Écoute des diffusions modèles
+Une fois que vous avez ajouté le BroadcastsEventstrait à votre modèle et défini la broadcastOnméthode de votre modèle, vous êtes prêt à commencer à écouter les événements de modèle diffusés dans votre application côté client. Avant de commencer, vous pouvez consulter la documentation complète sur l' écoute des événements .
+
+Tout d'abord, utilisez la privateméthode pour récupérer une instance d'un canal, puis appelez la listenméthode pour écouter un événement spécifié. En règle générale, le nom de canal donné à la privateméthode doit correspondre aux conventions de diffusion du modèle de Laravel .
+
+Une fois que vous avez obtenu une instance de canal, vous pouvez utiliser la listenméthode pour écouter un événement particulier. Étant donné que les événements de diffusion de modèle ne sont pas associés à un événement "réel" dans le App\Eventsrépertoire de votre application, le nom de l'événement doit être précédé d'un .pour indiquer qu'il n'appartient pas à un espace de noms particulier. Chaque événement de diffusion de modèle possède une modelpropriété qui contient toutes les propriétés diffusables du modèle :
+
+Echo.private(`App.Models.User.${this.user.id}`)
+    .listen('.PostUpdated', (e) => {
+        console.log(e.model);
+    });
+
+Événements clients
+
+Lorsque vous utilisez Pusher Channels , vous devez activer l'option "Client Events" dans la section "App Settings" du tableau de bord de votre application afin d'envoyer des événements client.
+
+
+Parfois, vous souhaiterez peut-être diffuser un événement à d'autres clients connectés sans toucher du tout votre application Laravel. Cela peut être particulièrement utile pour des choses comme les notifications de "saisie", où vous souhaitez alerter les utilisateurs de votre application qu'un autre utilisateur est en train de taper un message sur un écran donné.
+
+Pour diffuser des événements clients, vous pouvez utiliser la whisperméthode d'Echo :
+
+Echo.private(`chat.${roomId}`)
+    .whisper('typing', {
+        name: this.user.name
+    });
+
+Pour écouter les événements client, vous pouvez utiliser la listenForWhisperméthode :
+
+Echo.private(`chat.${roomId}`)
+    .listenForWhisper('typing', (e) => {
+        console.log(e.name);
+    });
+
+Avis
+En associant la diffusion d'événements aux notifications , votre application JavaScript peut recevoir de nouvelles notifications au fur et à mesure de leur apparition sans avoir à actualiser la page. Avant de commencer, assurez-vous de lire la documentation sur l'utilisation du canal de notification de diffusion .
+
+Une fois que vous avez configuré une notification pour utiliser le canal de diffusion, vous pouvez écouter les événements de diffusion en utilisant la notificationméthode d'Echo. N'oubliez pas que le nom du canal doit correspondre au nom de classe de l'entité recevant les notifications :
+
+Echo.private(`App.Models.User.${userId}`)
+    .notification((notification) => {
+        console.log(notification.type);
+    });
+
+Dans cet exemple, toutes les notifications envoyées aux App\Models\Userinstances via le broadcastcanal seraient reçues par le rappel. Un rappel d'autorisation de canal pour le App.Models.User.{id}canal est inclus dans la valeur par défaut fournie BroadcastServiceProvideravec le framework Laravel.

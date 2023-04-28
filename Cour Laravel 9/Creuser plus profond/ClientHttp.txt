@@ -1,0 +1,472 @@
+Client HTTP
+Introduction
+Faire des demandes
+Demander des données
+En-têtes
+Authentification
+Temps libre
+Nouvelles tentatives
+La gestion des erreurs
+Intergiciel Guzzle
+Options de gueule
+Demandes simultanées
+Macros
+Essai
+Faire semblant de répondre
+Inspection des demandes
+Empêcher les demandes parasites
+Événements
+Introduction
+Laravel fournit une API expressive et minimale autour du client HTTP Guzzle , vous permettant de faire rapidement des requêtes HTTP sortantes pour communiquer avec d'autres applications Web. L'emballage de Laravel autour de Guzzle se concentre sur ses cas d'utilisation les plus courants et sur une merveilleuse expérience de développement.
+
+Avant de commencer, vous devez vous assurer que vous avez installé le package Guzzle en tant que dépendance de votre application. Par défaut, Laravel inclut automatiquement cette dépendance. Cependant, si vous avez précédemment supprimé le package, vous pouvez le réinstaller via Composer :
+
+composer require guzzlehttp/guzzle
+
+Faire des demandes
+Pour faire des requêtes, vous pouvez utiliser les méthodes head, get, post, put, patchet deletefournies par la Httpfaçade. Examinons d'abord comment effectuer une GETrequête basique vers une autre URL :
+
+use Illuminate\Support\Facades\Http;
+ 
+$response = Http::get('http://example.com');
+
+La getméthode renvoie une instance de Illuminate\Http\Client\Response, qui fournit une variété de méthodes pouvant être utilisées pour inspecter la réponse :
+
+$response->body() : string;
+$response->json($key = null) : array|mixed;
+$response->object() : object;
+$response->collect($key = null) : Illuminate\Support\Collection;
+$response->status() : int;
+$response->ok() : bool;
+$response->successful() : bool;
+$response->redirect(): bool;
+$response->failed() : bool;
+$response->serverError() : bool;
+$response->clientError() : bool;
+$response->header($header) : string;
+$response->headers() : array;
+
+L' Illuminate\Http\Client\Responseobjet implémente également l'interface PHP ArrayAccess, vous permettant d'accéder aux données de réponse JSON directement sur la réponse :
+
+return Http::get('http://example.com/users/1')['name'];
+
+Demandes de dumping
+Si vous souhaitez vider l'instance de requête sortante avant qu'elle ne soit envoyée et mettre fin à l'exécution du script, vous pouvez ajouter la ddméthode au début de la définition de votre requête :
+
+return Http::dd()->get('http://example.com');
+
+Demander des données
+Bien sûr, il est courant lors de requêtes POST, PUTet PATCHd'envoyer des données supplémentaires avec votre requête, de sorte que ces méthodes acceptent un tableau de données comme deuxième argument. Par défaut, les données seront envoyées en utilisant le application/jsontype de contenu :
+
+use Illuminate\Support\Facades\Http;
+ 
+$response = Http::post('http://example.com/users', [
+    'name' => 'Steve',
+    'role' => 'Network Administrator',
+]);
+
+Paramètres de requête de requête GET
+Lorsque vous effectuez des GETrequêtes, vous pouvez soit ajouter une chaîne de requête directement à l'URL, soit passer un tableau de paires clé/valeur comme deuxième argument de la getméthode :
+
+$response = Http::get('http://example.com/users', [
+    'name' => 'Taylor',
+    'page' => 1,
+]);
+
+Envoi de demandes encodées d'URL de formulaire
+Si vous souhaitez envoyer des données en utilisant le application/x-www-form-urlencodedtype de contenu, vous devez appeler la asFormméthode avant de faire votre demande :
+
+$response = Http::asForm()->post('http://example.com/users', [
+    'name' => 'Sara',
+    'role' => 'Privacy Consultant',
+]);
+
+Envoi d'un corps de requête brut
+Vous pouvez utiliser la withBodyméthode si vous souhaitez fournir un corps de requête brut lors de la création d'une requête. Le type de contenu peut être fourni via le deuxième argument de la méthode :
+
+$response = Http::withBody(
+    base64_encode($photo), 'image/jpeg'
+)->post('http://example.com/photo');
+
+Requêtes en plusieurs parties
+Si vous souhaitez envoyer des fichiers sous forme de requêtes en plusieurs parties, vous devez appeler la attachméthode avant de faire votre requête. Cette méthode accepte le nom du fichier et son contenu. Si nécessaire, vous pouvez fournir un troisième argument qui sera considéré comme le nom de fichier du fichier :
+
+$response = Http::attach(
+    'attachment', file_get_contents('photo.jpg'), 'photo.jpg'
+)->post('http://example.com/attachments');
+
+Au lieu de transmettre le contenu brut d'un fichier, vous pouvez transmettre une ressource de flux :
+
+$photo = fopen('photo.jpg', 'r');
+ 
+$response = Http::attach(
+    'attachment', $photo, 'photo.jpg'
+)->post('http://example.com/attachments');
+
+En-têtes
+Des en-têtes peuvent être ajoutés aux requêtes à l'aide de la withHeadersméthode. Cette withHeadersméthode accepte un tableau de paires clé/valeur :
+
+$response = Http::withHeaders([
+    'X-First' => 'foo',
+    'X-Second' => 'bar'
+])->post('http://example.com/users', [
+    'name' => 'Taylor',
+]);
+
+Vous pouvez utiliser la acceptméthode pour spécifier le type de contenu que votre application attend en réponse à votre requête :
+
+$response = Http::accept('application/json')->get('http://example.com/users');
+
+Pour plus de commodité, vous pouvez utiliser la acceptJsonméthode pour spécifier rapidement que votre application attend le application/jsontype de contenu en réponse à votre requête :
+
+$response = Http::acceptJson()->get('http://example.com/users');
+
+Authentification
+Vous pouvez spécifier les identifiants d'authentification de base et Digest en utilisant respectivement les méthodes withBasicAuthet withDigestAuth:
+
+// Basic authentication...
+$response = Http::withBasicAuth('taylor@laravel.com', 'secret')->post(/* ... */);
+ 
+// Digest authentication...
+$response = Http::withDigestAuth('taylor@laravel.com', 'secret')->post(/* ... */);
+
+Jetons porteurs
+Si vous souhaitez ajouter rapidement un jeton de porteur à l'en- Authorizationtête de la requête, vous pouvez utiliser la withTokenméthode :
+
+$response = Http::withToken('token')->post(/* ... */);
+
+Temps libre
+La timeoutméthode peut être utilisée pour spécifier le nombre maximal de secondes d'attente d'une réponse :
+
+$response = Http::timeout(3)->get(/* ... */);
+
+Si le délai d'attente donné est dépassé, une instance de Illuminate\Http\Client\ConnectionExceptionsera lancée.
+
+Vous pouvez spécifier le nombre maximal de secondes à attendre lors de la tentative de connexion à un serveur en utilisant la connectTimeoutméthode :
+
+$response = Http::connectTimeout(3)->get(/* ... */);
+
+Nouvelles tentatives
+Si vous souhaitez que le client HTTP réessaye automatiquement la demande si une erreur client ou serveur se produit, vous pouvez utiliser la retryméthode. La retryméthode accepte le nombre maximum de tentatives de requête et le nombre de millisecondes que Laravel doit attendre entre les tentatives :
+
+$response = Http::retry(3, 100)->post(/* ... */);
+
+Si nécessaire, vous pouvez passer un troisième argument à la retryméthode. Le troisième argument doit être un appelable qui détermine si les tentatives doivent réellement être tentées. Par exemple, vous souhaiterez peut-être réessayer la requête uniquement si la requête initiale rencontre un ConnectionException:
+
+$response = Http::retry(3, 100, function ($exception, $request) {
+    return $exception instanceof ConnectionException;
+})->post(/* ... */);
+
+Si une tentative de demande échoue, vous souhaiterez peut-être apporter une modification à la demande avant qu'une nouvelle tentative ne soit effectuée. Vous pouvez y parvenir en modifiant l'argument de requête fourni à l'appelable que vous avez fourni à la retryméthode. Par exemple, vous pouvez réessayer la requête avec un nouveau jeton d'autorisation si la première tentative a renvoyé une erreur d'authentification :
+
+$response = Http::withToken($this->getToken())->retry(2, 0, function ($exception, $request) {
+    if (! $exception instanceof RequestException || $exception->response->status() !== 401) {
+        return false;
+    }
+ 
+    $request->withToken($this->getNewToken());
+ 
+    return true;
+})->post(/* ... */);
+
+Si toutes les requêtes échouent, une instance de Illuminate\Http\Client\RequestExceptionsera levée. Si vous souhaitez désactiver ce comportement, vous pouvez fournir un throwargument avec une valeur de false. Lorsqu'elle est désactivée, la dernière réponse reçue par le client sera renvoyée après toutes les tentatives :
+
+$response = Http::retry(3, 100, throw: false)->post(/* ... */);
+
+
+Si toutes les requêtes échouent en raison d'un problème de connexion, un Illuminate\Http\Client\ConnectionExceptionsera toujours lancé même lorsque l' throwargument est défini sur false.
+
+
+La gestion des erreurs
+Contrairement au comportement par défaut de Guzzle, le wrapper client HTTP de Laravel ne génère pas d'exceptions sur les erreurs client ou serveur ( 400et nivelle les 500réponses des serveurs). Vous pouvez déterminer si l'une de ces erreurs a été renvoyée à l'aide des méthodes successful, clientErrorou :serverError
+
+// Determine if the status code is >= 200 and < 300...
+$response->successful();
+ 
+// Determine if the status code is >= 400...
+$response->failed();
+ 
+// Determine if the response has a 400 level status code...
+$response->clientError();
+ 
+// Determine if the response has a 500 level status code...
+$response->serverError();
+ 
+// Immediately execute the given callback if there was a client or server error...
+$response->onError(callable $callback);
+
+Lancer des exceptions
+Si vous avez une instance de réponse et souhaitez lancer une instance Illuminate\Http\Client\RequestExceptionsi le code d'état de la réponse indique une erreur client ou serveur, vous pouvez utiliser les méthodes throwou throwIf:
+
+$response = Http::post(/* ... */);
+ 
+// Throw an exception if a client or server error occurred...
+$response->throw();
+ 
+// Throw an exception if an error occurred and the given condition is true...
+$response->throwIf($condition);
+ 
+// Throw an exception if an error occurred and the given condition is false...
+$response->throwUnless($condition);
+ 
+return $response['user']['id'];
+
+L' Illuminate\Http\Client\RequestExceptioninstance a une $responsepropriété publique qui vous permettra d'inspecter la réponse renvoyée.
+
+La throwméthode renvoie l'instance de réponse si aucune erreur ne s'est produite, vous permettant d'enchaîner d'autres opérations sur la throwméthode :
+
+return Http::post(/* ... */)->throw()->json();
+
+Si vous souhaitez effectuer une logique supplémentaire avant que l'exception ne soit levée, vous pouvez passer une fermeture à la throwméthode. L'exception sera levée automatiquement après l'invocation de la fermeture, vous n'avez donc pas besoin de relancer l'exception depuis la fermeture :
+
+return Http::post(/* ... */)->throw(function ($response, $e) {
+    //
+})->json();
+
+Intergiciel Guzzle
+Étant donné que le client HTTP de Laravel est alimenté par Guzzle, vous pouvez tirer parti de Guzzle Middleware pour manipuler la requête sortante ou inspecter la réponse entrante. Pour manipuler la requête sortante, enregistrez un middleware Guzzle via la withMiddlewareméthode en combinaison avec l' mapRequestusine middleware de Guzzle :
+
+use GuzzleHttp\Middleware;
+use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\RequestInterface;
+ 
+$response = Http::withMiddleware(
+    Middleware::mapRequest(function (RequestInterface $request) {
+        $request->withHeader('X-Example', 'Value');
+    })
+->get('http://example.com');
+
+De même, vous pouvez inspecter la réponse HTTP entrante en enregistrant un middleware via la withMiddlewareméthode en combinaison avec l' mapResponseusine middleware de Guzzle :
+
+use GuzzleHttp\Middleware;
+use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\ResponseInterface;
+ 
+$response = Http::withMiddleware(
+    Middleware::mapResponse(function (ResponseInterface $response) {
+        $header = $response->getHeader('X-Example');
+ 
+        // ...
+    })
+)->get('http://example.com');
+
+Options de gueule
+Vous pouvez spécifier des options de requête Guzzle supplémentaires à l'aide de la withOptionsméthode. La withOptionsméthode accepte un tableau de paires clé/valeur :
+
+$response = Http::withOptions([
+    'debug' => true,
+])->get('http://example.com/users');
+
+Demandes simultanées
+Parfois, vous souhaiterez peut-être effectuer plusieurs requêtes HTTP simultanément. En d'autres termes, vous souhaitez que plusieurs demandes soient envoyées en même temps au lieu d'émettre les demandes de manière séquentielle. Cela peut entraîner des améliorations substantielles des performances lors de l'interaction avec des API HTTP lentes.
+
+Heureusement, vous pouvez accomplir cela en utilisant la poolméthode. La poolméthode accepte une fermeture qui reçoit une Illuminate\Http\Client\Poolinstance, ce qui vous permet d'ajouter facilement des requêtes au pool de requêtes pour répartition :
+
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
+ 
+$responses = Http::pool(fn (Pool $pool) => [
+    $pool->get('http://localhost/first'),
+    $pool->get('http://localhost/second'),
+    $pool->get('http://localhost/third'),
+]);
+ 
+return $responses[0]->ok() &&
+       $responses[1]->ok() &&
+       $responses[2]->ok();
+
+Comme vous pouvez le voir, chaque instance de réponse est accessible en fonction de l'ordre dans lequel elle a été ajoutée au pool. Si vous le souhaitez, vous pouvez nommer les requêtes à l'aide de la asméthode, qui permet d'accéder par leur nom aux réponses correspondantes :
+
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
+ 
+$responses = Http::pool(fn (Pool $pool) => [
+    $pool->as('first')->get('http://localhost/first'),
+    $pool->as('second')->get('http://localhost/second'),
+    $pool->as('third')->get('http://localhost/third'),
+]);
+ 
+return $responses['first']->ok();
+
+Macros
+Le client HTTP Laravel vous permet de définir des "macros", qui peuvent servir de mécanisme fluide et expressif pour configurer des chemins de requête et des en-têtes communs lors de l'interaction avec des services dans votre application. Pour commencer, vous pouvez définir la macro dans la bootméthode de la App\Providers\AppServiceProviderclasse de votre application :
+
+use Illuminate\Support\Facades\Http;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Http::macro('github', function () {
+        return Http::withHeaders([
+            'X-Example' => 'example',
+        ])->baseUrl('https://github.com');
+    });
+}
+
+Une fois votre macro configurée, vous pouvez l'invoquer de n'importe où dans votre application pour créer une requête en attente avec la configuration spécifiée :
+
+$response = Http::github()->get('/');
+
+Essai
+De nombreux services Laravel fournissent des fonctionnalités pour vous aider à écrire facilement et de manière expressive des tests, et le client HTTP de Laravel ne fait pas exception. La méthode Httpde la façade fakevous permet de demander au client HTTP de renvoyer des réponses stub/dummy lorsque des requêtes sont faites.
+
+Faire semblant de répondre
+Par exemple, pour demander au client HTTP de renvoyer des 200réponses de code d'état vides pour chaque requête, vous pouvez appeler la fakeméthode sans argument :
+
+use Illuminate\Support\Facades\Http;
+ 
+Http::fake();
+ 
+$response = Http::post(/* ... */);
+
+Falsifier des URL spécifiques
+Alternativement, vous pouvez passer un tableau à la fakeméthode. Les clés du tableau doivent représenter les modèles d'URL que vous souhaitez falsifier et leurs réponses associées. Le *caractère peut être utilisé comme caractère générique. Toutes les requêtes adressées à des URL qui n'ont pas été falsifiées seront effectivement exécutées. Vous pouvez utiliser la méthode de la Httpfaçade responsepour construire des réponses stub / fake pour ces points de terminaison :
+
+Http::fake([
+    // Stub a JSON response for GitHub endpoints...
+    'github.com/*' => Http::response(['foo' => 'bar'], 200, $headers),
+ 
+    // Stub a string response for Google endpoints...
+    'google.com/*' => Http::response('Hello World', 200, $headers),
+]);
+
+Si vous souhaitez spécifier un modèle d'URL de secours qui remplacera toutes les URL sans correspondance, vous pouvez utiliser un seul *caractère :
+
+Http::fake([
+    // Stub a JSON response for GitHub endpoints...
+    'github.com/*' => Http::response(['foo' => 'bar'], 200, ['Headers']),
+ 
+    // Stub a string response for all other endpoints...
+    '*' => Http::response('Hello World', 200, ['Headers']),
+]);
+
+Simulation de séquences de réponse
+Parfois, vous devrez peut-être spécifier qu'une seule URL doit renvoyer une série de fausses réponses dans un ordre spécifique. Vous pouvez accomplir cela en utilisant la Http::sequenceméthode pour construire les réponses :
+
+Http::fake([
+    // Stub a series of responses for GitHub endpoints...
+    'github.com/*' => Http::sequence()
+                            ->push('Hello World', 200)
+                            ->push(['foo' => 'bar'], 200)
+                            ->pushStatus(404),
+]);
+
+Lorsque toutes les réponses d'une séquence de réponses ont été consommées, toute demande supplémentaire entraînera la levée d'une exception par la séquence de réponses. Si vous souhaitez spécifier une réponse par défaut qui doit être renvoyée lorsqu'une séquence est vide, vous pouvez utiliser la whenEmptyméthode :
+
+Http::fake([
+    // Stub a series of responses for GitHub endpoints...
+    'github.com/*' => Http::sequence()
+                            ->push('Hello World', 200)
+                            ->push(['foo' => 'bar'], 200)
+                            ->whenEmpty(Http::response()),
+]);
+
+Si vous souhaitez simuler une séquence de réponses mais que vous n'avez pas besoin de spécifier un modèle d'URL spécifique à falsifier, vous pouvez utiliser la Http::fakeSequenceméthode :
+
+Http::fakeSequence()
+        ->push('Hello World', 200)
+        ->whenEmpty(Http::response());
+
+Faux rappel
+Si vous avez besoin d'une logique plus compliquée pour déterminer les réponses à renvoyer pour certains points de terminaison, vous pouvez passer une fermeture à la fakeméthode. Cette fermeture recevra une instance de Illuminate\Http\Client\Requestet devrait renvoyer une instance de réponse. Dans votre clôture, vous pouvez effectuer toute logique nécessaire pour déterminer le type de réponse à renvoyer :
+
+use Illuminate\Http\Client\Request;
+ 
+Http::fake(function (Request $request) {
+    return Http::response('Hello World', 200);
+});
+
+Empêcher les demandes parasites
+Si vous souhaitez vous assurer que toutes les requêtes envoyées via le client HTTP ont été truquées tout au long de votre test individuel ou de votre suite de tests complète, vous pouvez appeler la preventStrayRequestsméthode. Après avoir appelé cette méthode, toutes les requêtes qui n'ont pas de fausse réponse correspondante lèveront une exception plutôt que de faire la vraie requête HTTP :
+
+use Illuminate\Support\Facades\Http;
+ 
+Http::preventStrayRequests();
+ 
+Http::fake([
+    'github.com/*' => Http::response('ok'),
+]);
+ 
+// An "ok" response is returned...
+Http::get('https://github.com/laravel/framework');
+ 
+// An exception is thrown...
+Http::get('https://laravel.com');
+
+Inspection des demandes
+Lorsque vous simulez des réponses, vous souhaiterez peut-être occasionnellement inspecter les requêtes que le client reçoit afin de vous assurer que votre application envoie les données ou les en-têtes corrects. Vous pouvez accomplir cela en appelant la Http::assertSentméthode après avoir appelé Http::fake.
+
+La assertSentméthode accepte une fermeture qui recevra une Illuminate\Http\Client\Requestinstance et doit renvoyer une valeur booléenne indiquant si la requête correspond à vos attentes. Pour que le test réussisse, au moins une requête doit avoir été émise correspondant aux attentes données :
+
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+ 
+Http::fake();
+ 
+Http::withHeaders([
+    'X-First' => 'foo',
+])->post('http://example.com/users', [
+    'name' => 'Taylor',
+    'role' => 'Developer',
+]);
+ 
+Http::assertSent(function (Request $request) {
+    return $request->hasHeader('X-First', 'foo') &&
+           $request->url() == 'http://example.com/users' &&
+           $request['name'] == 'Taylor' &&
+           $request['role'] == 'Developer';
+});
+
+Si nécessaire, vous pouvez affirmer qu'une requête spécifique n'a pas été envoyée en utilisant la assertNotSentméthode :
+
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+ 
+Http::fake();
+ 
+Http::post('http://example.com/users', [
+    'name' => 'Taylor',
+    'role' => 'Developer',
+]);
+ 
+Http::assertNotSent(function (Request $request) {
+    return $request->url() === 'http://example.com/posts';
+});
+
+Vous pouvez utiliser la assertSentCountméthode pour affirmer combien de requêtes ont été "envoyées" pendant le test :
+
+Http::fake();
+ 
+Http::assertSentCount(5);
+
+Ou, vous pouvez utiliser la assertNothingSentméthode pour affirmer qu'aucune requête n'a été envoyée pendant le test :
+
+Http::fake();
+ 
+Http::assertNothingSent();
+
+Événements
+Laravel déclenche trois événements lors du processus d'envoi de requêtes HTTP. L' RequestSendingévénement est déclenché avant l'envoi d'une demande, tandis que l' ResponseReceivedévénement est déclenché après la réception d'une réponse pour une demande donnée. L' ConnectionFailedévénement est déclenché si aucune réponse n'est reçue pour une requête donnée.
+
+Les événements RequestSendinget ConnectionFailedcontiennent tous deux une $requestpropriété publique que vous pouvez utiliser pour inspecter l' Illuminate\Http\Client\Requestinstance. De même, l' ResponseReceivedévénement contient une $requestpropriété ainsi qu'une $responsepropriété qui peut être utilisée pour inspecter l' Illuminate\Http\Client\Responseinstance. Vous pouvez enregistrer des auditeurs d'événements pour cet événement auprès de votre App\Providers\EventServiceProviderfournisseur de services :
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Http\Client\Events\RequestSending' => [
+        'App\Listeners\LogRequestSending',
+    ],
+    'Illuminate\Http\Client\Events\ResponseReceived' => [
+        'App\Listeners\LogResponseReceived',
+    ],
+    'Illuminate\Http\Client\Events\ConnectionFailed' => [
+        'App\Listeners\LogConnectionFailed',
+    ],
+];

@@ -1,0 +1,1416 @@
+Routage
+Routage de base
+Rediriger les itinéraires
+Afficher les itinéraires
+La liste des itinéraires
+Paramètres d'itinéraire
+Paramètres requis
+Paramètres facultatifs
+Contraintes d'expression régulière
+Itinéraires nommés
+Groupes de routage
+Intergiciel
+Contrôleurs
+Routage de sous-domaine
+Préfixes d'itinéraire
+Préfixes de nom de route
+Liaison de modèle d'itinéraire
+Liaison implicite
+Liaison d'énumération implicite
+Liaison explicite
+Itinéraires de secours
+Limitation de débit
+Définition des limiteurs de débit
+Attacher des limiteurs de débit aux routes
+Usurpation de méthode de formulaire
+Accéder à l'itinéraire actuel
+Partage des ressources d'origine croisée (CORS)
+Mise en cache des itinéraires
+Routage de base
+Les routes Laravel les plus basiques acceptent un URI 
+
+et une fermeture, fournissant une méthode très simple et 
+
+expressive de définition des routes et du comportement sans 
+
+fichiers de configuration de routage compliqués :
+
+use Illuminate\Support\Facades\Route;
+ 
+Route::get('/greeting', function () {
+    return 'Hello World';
+});
+
+Les fichiers de routage par défaut
+Toutes les routes Laravel sont définies dans vos fichiers de route, 
+
+qui se trouvent dans le routes répertoire. Ces fichiers sont 
+
+automatiquement chargés par le 
+
+fichier App\Providers\RouteServiceProvider. Le routes/web.php 
+
+fichier définit les itinéraires qui sont 
+
+destinés à votre interface Web. Ces routes sont affectées au 
+
+web groupe middleware, qui fournit des 
+
+fonctionnalités telles que l'état de session et la protection CSRF. 
+
+Les routes dans routes/api.php sont 
+
+sans état et sont affectées au api groupe middleware.
+
+Pour la plupart des applications, vous commencerez par définir 
+
+des routes dans votre routes/web.php fichier. 
+
+Les itinéraires définis dans routes/web.php sont accessibles 
+
+en saisissant l'URL de l'itinéraire défini dans 
+
+votre navigateur. Par exemple, vous pouvez accéder à 
+
+l'itinéraire suivant en naviguant vers 
+
+http://example.com/user  dans votre navigateur :
+
+use App\Http\Controllers\UserController;
+ 
+Route::get('/user', [UserController::class, 'index']);
+
+Les routes définies dans le routes/api.php fichier sont 
+
+imbriquées dans un groupe de routes par le RouteServiceProvider. 
+
+Dans ce groupe, le /apipréfixe URI est automatiquement appliqué, 
+
+vous n'avez donc pas besoin de l'appliquer manuellement 
+
+à chaque route du fichier. Vous pouvez modifier le 
+
+préfixe et d'autres options de groupe de routage en modifiant 
+
+votre RouteServiceProviderclasse.
+
+Méthodes de routeur disponibles
+Le routeur vous permet d'enregistrer des routes qui 
+
+répondent à n'importe quel verbe HTTP :
+
+Route::get($uri, $callback);
+Route::post($uri, $callback);
+Route::put($uri, $callback);
+Route::patch($uri, $callback);
+Route::delete($uri, $callback);
+Route::options($uri, $callback);
+
+Parfois, vous devrez peut-être enregistrer une route 
+
+qui répond à plusieurs verbes HTTP. Vous pouvez le 
+
+faire en utilisant la match méthode. Ou, vous pouvez même 
+
+enregistrer une route qui répond à tous les verbes 
+
+HTTP en utilisant la any méthode :
+
+Route::match(['get', 'post'], '/', function () {
+    //
+});
+ 
+Route::any('/', function () {
+    //
+});
+
+
+Lors de la définition de plusieurs routes partageant le 
+
+même URI, les routes 
+
+utilisant les méthodes get, post, put, patch, delete et 
+
+options doivent être définies 
+
+avant les routes utilisant les méthodes any, match et 
+
+redirect. Cela garantit que la demande 
+
+entrante correspond à la bonne route.
+
+
+Injection de dépendance
+Vous pouvez indiquer toutes les dépendances requises 
+
+par votre itinéraire dans la signature de rappel de 
+
+votre itinéraire. Les dépendances déclarées seront 
+
+automatiquement résolues et injectées dans le rappel 
+
+par le conteneur de service Laravel . Par exemple, vous 
+
+pouvez donner un indice de type à la 
+
+Illuminate\Http\Requestclasse pour que la requête HTTP 
+
+actuelle soit automatiquement injectée dans votre 
+
+rappel de route :
+
+use Illuminate\Http\Request;
+ 
+Route::get('/users', function (Request $request) {
+    // ...
+});
+
+Protection CSRF
+N'oubliez pas que tous les formulaires HTML pointant vers 
+
+POST, PUT, PATCHou DELETEdes itinéraires définis dans le web
+
+fichier d'itinéraires doivent inclure un champ de jeton CSRF. 
+
+A défaut, la demande sera rejetée. 
+
+Vous pouvez en savoir plus sur la protection CSRF dans la 
+
+documentation CSRF :
+
+<form method="POST" action="/profile">
+    @csrf
+    ...
+</form>
+
+Rediriger les itinéraires
+Si vous définissez une route qui redirige vers un autre URI, 
+
+vous pouvez utiliser la Route::redirect méthode. 
+
+Cette méthode fournit un raccourci pratique pour que vous 
+
+n'ayez pas à définir une route ou un contrôleur complet 
+
+pour effectuer une simple redirection :
+
+Route::redirect('/here', '/there');
+
+Par défaut, Route::redirect renvoie un 302 code d'état. Vous 
+
+pouvez personnaliser le code d'état 
+
+à l'aide du troisième paramètre facultatif :
+
+Route::redirect('/here', '/there', 301);
+
+Ou, vous pouvez utiliser la Route::permanentRedirect méthode 
+
+pour renvoyer un 301 code d'état :
+
+Route::permanentRedirect('/here', '/there');
+
+
+Lorsque vous utilisez des paramètres de route dans des routes 
+
+de redirection, les paramètres suivants 
+
+sont réservés par Laravel et ne peuvent pas être utilisés : 
+
+destination et status.
+
+
+Afficher les itinéraires
+Si votre itinéraire ne doit renvoyer qu'une vue , vous pouvez 
+
+utiliser la Route::view méthode. 
+
+Comme la redirect méthode, cette méthode fournit un raccourci 
+
+simple pour que vous n'ayez pas à définir 
+
+une route ou un contrôleur complet. La view méthode accepte 
+
+un URI comme premier argument et un nom de 
+
+vue comme deuxième argument. De plus, vous pouvez fournir un 
+
+tableau de données à transmettre à la vue en 
+
+tant que troisième argument facultatif :
+
+Route::view('/welcome', 'welcome');
+ 
+Route::view('/welcome', 'welcome', ['name' => 'Taylor']);
+
+
+Lors de l'utilisation des paramètres de route dans les routes de vue, 
+
+les paramètres suivants sont réservés par Laravel et ne 
+
+peuvent pas être utilisés : view, data, status et headers.
+
+
+La liste des itinéraires
+La route:list commande Artisan peut facilement fournir une 
+
+vue d'ensemble de toutes les routes définies par votre 
+
+application :
+
+php artisan route:list
+
+Par défaut, le middleware de route affecté à chaque route 
+
+ne sera pas affiché dans la route:list sortie ; 
+
+cependant, vous pouvez demander à Laravel d'afficher le 
+
+middleware de route en ajoutant l'option -v à la commande :
+
+php artisan route:list -v
+
+Vous pouvez également demander à Laravel de n'afficher que 
+
+les routes commençant par un URI donné :
+
+php artisan route:list --path=api
+
+De plus, vous pouvez demander à Laravel de masquer toutes 
+
+les routes définies par des packages tiers en 
+
+fournissant l'option --except-vendor lors de l'exécution 
+
+de la route:listcommande :
+
+php artisan route:list --except-vendor
+
+De même, vous pouvez également demander à Laravel de 
+
+n'afficher que les routes définies par des packages 
+
+tiers en fournissant l'option --only-vendor lors de 
+
+l'exécution de la route:listcommande :
+
+php artisan route:list --only-vendor
+
+Paramètres d'itinéraire
+Paramètres requis
+Parfois, vous devrez capturer des segments de l'URI 
+
+dans votre route. Par exemple, vous devrez peut-être 
+
+capturer l'ID d'un utilisateur à partir de l'URL. Vous 
+
+pouvez le faire en définissant les paramètres de route :
+
+Route::get('/user/{id}', function ($id) {
+    return 'User '.$id;
+});
+
+Vous pouvez définir autant de paramètres de route que 
+
+requis par votre route :
+
+Route::get('/posts/{post}/comments/{comment}', 
+
+function ($postId, $commentId) {
+    //
+});
+
+Les paramètres de route sont toujours entourés d'accolades 
+
+{} et doivent être composés de caractères alphabétiques. 
+
+Les traits de soulignement ( _) sont également acceptables 
+
+dans les noms de paramètre de route. Les paramètres de 
+
+route sont injectés dans les rappels/contrôleurs de route 
+
+en fonction de leur ordre - les noms des arguments 
+
+de rappel/contrôleur de route n'ont pas d'importance.
+
+Paramètres et injection de dépendance
+Si votre route a des dépendances que vous aimeriez que le 
+
+conteneur de service Laravel injecte automatiquement 
+
+dans le rappel de votre route, vous devez lister vos 
+
+paramètres de route après vos dépendances :
+
+use Illuminate\Http\Request;
+ 
+Route::get('/user/{id}', function (Request $request, $id) {
+    return 'User '.$id;
+});
+
+Paramètres facultatifs
+Parfois, vous devrez peut-être spécifier un paramètre de 
+
+route qui n'est pas toujours présent dans l'URI. 
+
+Vous pouvez le faire en plaçant une ?marque après le nom 
+
+du paramètre. Assurez-vous de donner une valeur par 
+
+défaut à la variable correspondante de la route :
+
+Route::get('/user/{name?}', function ($name = null) {
+    return $name;
+});
+ 
+Route::get('/user/{name?}', function ($name = 'John') {
+    return $name;
+});
+
+Contraintes d'expression régulière
+Vous pouvez restreindre le format de vos paramètres de 
+
+route à l'aide de la méthode where 
+
+sur une instance de route. La where méthode accepte le 
+
+nom du paramètre et une expression régulière 
+
+définissant comment le paramètre doit être contraint :
+
+Route::get('/user/{name}', function ($name) {
+    //
+})->where('name', '[A-Za-z]+');
+ 
+Route::get('/user/{id}', function ($id) {
+    //
+})->where('id', '[0-9]+');
+ 
+Route::get('/user/{id}/{name}', function ($id, $name) {
+    //
+})->where(['id' => '[0-9]+', 'name' => '[a-z]+']);
+
+Pour plus de commodité, certains modèles d'expressions 
+
+régulières couramment utilisés ont des méthodes 
+
+d'assistance qui vous permettent d'ajouter rapidement 
+
+des contraintes de modèle à vos itinéraires :
+
+Route::get('/user/{id}/{name}', function ($id, $name) {
+    //
+})->whereNumber('id')->whereAlpha('name');
+ 
+Route::get('/user/{name}', function ($name) {
+    //
+})->whereAlphaNumeric('name');
+ 
+Route::get('/user/{id}', function ($id) {
+    //
+})->whereUuid('id');
+ 
+Route::get('/category/{category}', function ($category) {
+    //
+})->whereIn('category', ['movie', 'song', 'painting']);
+
+Si la demande entrante ne correspond pas aux contraintes 
+
+du modèle de route, une réponse HTTP 404 sera renvoyée.
+
+Contraintes globales
+Si vous souhaitez qu'un paramètre de route soit toujours 
+
+contraint par une expression régulière donnée, 
+
+vous pouvez utiliser la pattern méthode . Vous devez 
+
+définir ces modèles dans la bootméthode de votre 
+
+App\Providers\RouteServiceProviderclasse :
+
+/**
+ * Define your route model bindings, pattern filters, etc.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Route::pattern('id', '[0-9]+');
+}
+
+Une fois le modèle défini, il est automatiquement appliqué 
+
+à toutes les routes utilisant ce nom de paramètre :
+
+Route::get('/user/{id}', function ($id) {
+    // Only executed if {id} is numeric...
+});
+
+Barres obliques codées
+Le composant de routage Laravel permet à tous les caractères 
+
+sauf /d'être présents dans les valeurs des 
+
+paramètres de route. Vous devez autoriser explicitement 
+
+/à faire partie de votre espace réservé à l'aide d'une where
+
+expression régulière de condition :
+
+Route::get('/search/{search}', function ($search) {
+    return $search;
+})->where('search', '.*');
+
+
+Les barres obliques codées ne sont prises en charge que 
+
+dans le dernier segment de route.
+
+
+Itinéraires nommés
+Les routes nommées permettent la génération pratique 
+
+d'URL ou de redirections pour des routes spécifiques. Vous 
+
+pouvez spécifier un nom pour une route en enchaînant la 
+
+nameméthode sur la définition de route :
+
+Route::get('/user/profile', function () {
+    //
+})->name('profile');
+
+Vous pouvez également spécifier des noms de route pour 
+
+les actions du contrôleur :
+
+Route::get(
+    '/user/profile',
+    [UserProfileController::class, 'show']
+)->name('profile');
+
+
+Les noms de route doivent toujours être uniques.
+
+
+Génération d'URL vers des routes nommées
+Une fois que vous avez attribué un nom à une route donnée, 
+
+vous pouvez utiliser le nom de la route lors 
+
+de la génération d'URL ou de redirections via les fonctions 
+
+de Laravel route et redirect d' assistance :
+
+// Generating URLs...
+$url = route('profile');
+ 
+// Generating Redirects...
+return redirect()->route('profile');
+
+Si la route nommée définit des paramètres, vous pouvez passer les 
+
+paramètres comme deuxième argument 
+
+à la route fonction. Les paramètres donnés seront automatiquement 
+
+insérés dans l'URL générée dans leurs 
+
+positions correctes :
+
+Route::get('/user/{id}/profile', function ($id) {
+    //
+})->name('profile');
+ 
+$url = route('profile', ['id' => 1]);
+
+Si vous transmettez des paramètres supplémentaires dans 
+
+le tableau, ces paires clé/valeur seront automatiquement 
+
+ajoutées à la chaîne de requête de l'URL générée :
+
+Route::get('/user/{id}/profile', function ($id) {
+    //
+})->name('profile');
+ 
+$url = route('profile', ['id' => 1, 'photos' => 'yes']);
+ 
+// /user/1/profile?photos=yes
+
+
+Parfois, vous souhaiterez peut-être spécifier des valeurs 
+
+par défaut à l'échelle de la demande pour les 
+
+paramètres d'URL, tels que les paramètres régionaux actuels. 
+
+Pour ce faire, vous pouvez utiliser la 
+
+URL::defaultsméthode .
+
+
+Inspecter l'itinéraire actuel
+Si vous souhaitez déterminer si la demande actuelle a été 
+
+acheminée vers une route nommée donnée, 
+
+vous pouvez utiliser la named méthode sur une instance Route. 
+
+Par exemple, vous pouvez vérifier 
+
+le nom de la route actuelle à partir d'un middleware de route :
+
+/**
+ * Handle an incoming request.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @param  \Closure  $next
+ * @return mixed
+ */
+public function handle($request, Closure $next)
+{
+    if ($request->route()->named('profile')) {
+        //
+    }
+ 
+    return $next($request);
+}
+
+Groupes de routage
+Les groupes de routage vous permettent de partager des 
+
+attributs de routage, 
+
+tels que le middleware, sur un grand nombre de routages 
+
+sans avoir à définir 
+
+ces attributs sur chaque routage individuel.
+
+Les groupes imbriqués tentent de "fusionner" intelligemment 
+
+les attributs avec leur groupe parent. 
+
+Le middleware et where les conditions sont fusionnés tandis 
+
+que les noms et les préfixes sont ajoutés. 
+
+Les délimiteurs d'espace de noms et les barres obliques 
+
+dans les préfixes d'URI sont automatiquement ajoutés, 
+
+le cas échéant.
+
+Intergiciel
+Pour affecter un middleware à toutes les routes d'un groupe, 
+
+vous pouvez utiliser la middleware 
+
+méthode avant de définir le groupe. Les intergiciels sont 
+
+exécutés dans l'ordre dans lequel ils sont répertoriés 
+
+dans le tableau :
+
+Route::middleware(['first', 'second'])->group(function () {
+    Route::get('/', function () {
+        // Uses first & second middleware...
+    });
+ 
+    Route::get('/user/profile', function () {
+        // Uses first & second middleware...
+    });
+});
+
+Contrôleurs
+Si un groupe de routes utilise toutes le même contrôleur , 
+
+vous pouvez utiliser la 
+
+controller méthode pour définir le contrôleur commun pour 
+
+toutes les routes du groupe. 
+
+Ensuite, lors de la définition des routes, il vous suffit 
+
+de fournir la méthode de contrôleur qu'ils invoquent :
+
+use App\Http\Controllers\OrderController;
+ 
+Route::controller(OrderController::class)->group(function () {
+    Route::get('/orders/{id}', 'show');
+    Route::post('/orders', 'store');
+});
+
+Routage de sous-domaine
+Les groupes de routage peuvent également être utilisés 
+
+pour gérer le routage de sous-domaine. 
+
+Les sous-domaines peuvent se voir attribuer des 
+
+paramètres de route, tout comme les URI de route, 
+
+ce qui vous permet de capturer une partie du sous-domaine 
+
+pour l'utiliser dans votre route ou votre contrôleur. 
+
+Le sous-domaine peut être spécifié en appelant la domain 
+
+méthode avant de définir le groupe :
+
+Route::domain('{account}.example.com')->group(function () {
+    Route::get('user/{id}', function ($account, $id) {
+        //
+    });
+});
+
+
+Afin de vous assurer que vos routes de sous-domaine 
+
+sont accessibles, vous devez enregistrer les routes de 
+
+sous-domaine avant d'enregistrer les routes de domaine 
+
+racine. Cela empêchera les routes de domaine racine 
+
+d'écraser les routes de sous-domaine qui ont le même chemin d'URI.
+
+
+Préfixes d'itinéraire
+La prefix méthode peut être utilisée pour préfixer 
+
+chaque route du groupe avec un URI donné. Par exemple, 
+
+vous pouvez préfixer tous les URI de route au sein du 
+
+groupe avec admin :
+
+Route::prefix('admin')->group(function () {
+    Route::get('/users', function () {
+        // Matches The "/admin/users" URL
+    });
+});
+
+Préfixes de nom de route
+La name méthode peut être utilisée pour préfixer 
+
+chaque nom de route dans le groupe 
+
+avec une chaîne donnée. Par exemple, vous pouvez 
+
+préfixer tous les noms de routes groupées avec admin. 
+
+La chaîne donnée est préfixée au nom de la route 
+
+exactement comme elle est spécifiée, nous nous 
+
+assurerons donc de fournir le .caractère de fin dans le préfixe :
+
+Route::name('admin.')->group(function () {
+    Route::get('/users', function () {
+        // Route assigned name "admin.users"...
+    })->name('users');
+});
+
+Liaison de modèle d'itinéraire
+Lors de l'injection d'un ID de modèle dans une route 
+
+ou une action de contrôleur, 
+
+vous interrogerez souvent la base de données pour 
+
+récupérer le modèle qui correspond à cet ID. 
+
+La liaison de modèle de route Laravel offre un moyen 
+
+pratique d'injecter automatiquement les instances 
+
+de modèle directement dans vos routes. Par exemple, 
+
+au lieu d'injecter l'ID d'un utilisateur, 
+
+vous pouvez injecter l'intégralité de l' instance User 
+
+de modèle qui correspond à l'ID donné.
+
+Liaison implicite
+Laravel résout automatiquement les modèles Eloquent 
+
+définis dans les routes ou 
+
+les actions de contrôleur dont les noms de variable à 
+
+indication de type correspondent 
+
+à un nom de segment de route. Par exemple:
+
+use App\Models\User;
+ 
+Route::get('/users/{user}', function (User $user) {
+    return $user->email;
+});
+
+Étant donné que la $user variable est typée comme 
+
+App\Models\User modèle Eloquent et 
+
+que le nom de la variable correspond au {user} segment 
+
+URI, Laravel injectera automatiquement l'instance de modèle 
+
+qui a un ID correspondant à la valeur correspondante 
+
+de l'URI de la demande. Si une instance de modèle correspondante 
+
+n'est pas trouvée dans la base de données, une réponse 
+
+HTTP 404 sera automatiquement générée.
+
+Bien sûr, la liaison implicite est également possible 
+
+lors de l'utilisation de méthodes de contrôleur. 
+
+Encore une fois, notez que le {user} segment URI 
+
+correspond à la $user variable dans le contrôleur qui contient 
+
+une App\Models\User indication de type :
+
+use App\Http\Controllers\UserController;
+use App\Models\User;
+ 
+// Route definition...
+Route::get('/users/{user}', [UserController::class, 'show']);
+ 
+// Controller method definition...
+public function show(User $user)
+{
+    return view('user.profile', ['user' => $user]);
+}
+
+Modèles supprimés de manière logicielle
+En règle générale, la liaison de modèle implicite 
+
+ne récupère pas les modèles qui ont été supprimés 
+
+de manière réversible . Cependant, vous pouvez demander 
+
+à la liaison implicite de récupérer ces modèles en enchaînant 
+
+la withTrashed méthode sur la définition de votre route :
+
+use App\Models\User;
+ 
+Route::get('/users/{user}', function (User $user) {
+    return $user->email;
+})->withTrashed();
+
+Personnaliser la clé
+Parfois, vous souhaiterez peut-être résoudre des modèles 
+
+Eloquent en utilisant une colonne autre que id. 
+
+Pour ce faire, vous pouvez spécifier la colonne dans la 
+
+définition du paramètre de route :
+
+use App\Models\Post;
+ 
+Route::get('/posts/{post:slug}', function (Post $post) {
+    return $post;
+});
+
+Si vous souhaitez que la liaison de modèle utilise 
+
+toujours une colonne de base de données autre que id 
+
+lors de la récupération d'une classe de modèle donnée, 
+
+vous pouvez remplacer la getRouteKeyName méthode 
+
+sur le modèle Eloquent :
+
+/**
+ * Get the route key for the model.
+ *
+ * @return string
+ */
+public function getRouteKeyName()
+{
+    return 'slug';
+}
+
+Clés personnalisées et portée
+Lorsque vous liez implicitement plusieurs modèles 
+
+Eloquent dans une seule définition de route, 
+
+vous souhaiterez peut-être définir la portée du 
+
+deuxième modèle Eloquent de sorte qu'il soit 
+
+un enfant du modèle Eloquent précédent. Par exemple, 
+
+considérons cette définition de route qui 
+
+récupère un article de blog par slug pour un utilisateur spécifique :
+
+use App\Models\Post;
+use App\Models\User;
+ 
+Route::get('/users/{user}/posts/{post:slug}', 
+function (User $user, Post $post) {
+    return $post;
+});
+
+Lors de l'utilisation d'une liaison implicite 
+
+à clé personnalisée en tant que paramètre de route imbriqué, 
+
+Laravel étendra automatiquement la requête pour récupérer 
+
+le modèle imbriqué par son parent en utilisant des 
+
+conventions pour deviner le nom de la relation sur le parent. 
+
+Dans ce cas, on supposera que le User modèle a une 
+
+relation nommée posts(la forme plurielle du nom 
+
+du paramètre de route) qui peut être utilisée 
+
+pour récupérer le Post modèle.
+
+Si vous le souhaitez, vous pouvez demander à Laravel 
+
+d'étendre les liaisons "enfants" même lorsqu'une 
+
+clé personnalisée n'est pas fournie. Pour ce faire, 
+
+vous pouvez invoquer la scopeBindingsméthode lors de la 
+
+définition de votre route :
+
+use App\Models\Post;
+use App\Models\User;
+ 
+Route::get('/users/{user}/posts/{post}', 
+
+function (User $user, Post $post) {
+    return $post;
+})->scopeBindings();
+
+Ou, vous pouvez demander à un groupe entier de 
+
+définitions de routes d'utiliser des liaisons étendues :
+
+Route::scopeBindings()->group(function () {
+    Route::get('/users/{user}/posts/{post}', 
+    
+    function (User $user, Post $post) {
+        return $post;
+    });
+});
+
+Personnalisation du comportement du modèle manquant
+Généralement, une réponse HTTP 404 sera générée si 
+
+un modèle implicitement lié n'est pas trouvé. 
+
+Cependant, vous pouvez personnaliser ce comportement 
+
+en appelant la missing méthode lors de la définition 
+
+de votre route. La missing méthode accepte une 
+
+fermeture qui sera invoquée si un modèle lié implicitement 
+
+ne peut pas être trouvé :
+
+use App\Http\Controllers\LocationsController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redirect;
+ 
+Route::get('/locations/{location:slug}', 
+
+[LocationsController::class, 'show'])
+        ->name('locations.view')
+        ->missing(function (Request $request) {
+            return Redirect::route('locations.index');
+        });
+
+Liaison d'énumération implicite
+PHP 8.1 a introduit la prise en charge des Enums . 
+
+Pour compléter cette fonctionnalité, Laravel vous 
+
+permet de taper un Enum sauvegardé sur 
+
+votre définition d'itinéraire et Laravel n'invoquera 
+
+l'itinéraire que si ce segment d'itinéraire 
+
+correspond à une valeur Enum valide. Sinon, une 
+
+réponse HTTP 404 sera renvoyée automatiquement. 
+
+Par exemple, étant donné l'énumération suivante :
+
+<?php
+ 
+namespace App\Enums;
+ 
+enum Category: string
+{
+    case Fruits = 'fruits';
+    case People = 'people';
+}
+
+Vous pouvez définir une route qui ne sera 
+
+invoquée que si le {category} segment 
+
+de route est fruits ou people. Sinon, Laravel 
+
+renverra une réponse HTTP 404 :
+
+use App\Enums\Category;
+use Illuminate\Support\Facades\Route;
+ 
+Route::get('/categories/{category}', 
+
+function (Category $category) {
+    return $category->value;
+});
+
+Liaison explicite
+Vous n'êtes pas obligé d'utiliser la 
+
+résolution de modèle implicite basée sur la convention 
+
+de Laravel pour utiliser la liaison de modèle. 
+
+Vous pouvez également définir explicitement la 
+
+manière dont les paramètres d'itinéraire correspondent 
+
+aux modèles. Pour enregistrer une liaison explicite, 
+
+utilisez la model méthode du routeur pour spécifier la 
+
+classe d'un paramètre donné. 
+
+Vous devez définir vos liaisons de modèle explicites au 
+
+début de la boot méthode de votre RouteServiceProviderclasse :
+
+use App\Models\User;
+use Illuminate\Support\Facades\Route;
+ 
+/**
+ * Define your route model bindings, pattern filters, etc.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Route::model('user', User::class);
+ 
+    // ...
+}
+
+Définissez ensuite une route contenant un {user}paramètre :
+
+use App\Models\User;
+ 
+Route::get('/users/{user}', function (User $user) {
+    //
+});
+
+Puisque nous avons lié tous les {user}paramètres 
+
+au App\Models\Usermodèle, 
+
+une instance de cette classe sera injectée dans la route. 
+
+Ainsi, par exemple, 
+
+une requête à users/1injectera l' Userinstance de la base 
+
+de données qui a un ID de 1.
+
+Si une instance de modèle correspondante n'est pas 
+
+trouvée dans la base de données, 
+
+une réponse HTTP 404 sera automatiquement générée.
+
+Personnalisation de la logique de résolution
+Si vous souhaitez définir votre propre logique de 
+
+résolution de liaison de modèle, 
+
+vous pouvez utiliser la Route::bindméthode. La fermeture 
+
+que vous passez à la bindméthode 
+
+recevra la valeur du segment URI et devrait renvoyer 
+
+l'instance de la classe qui doit être 
+
+injectée dans la route. Encore une fois, cette 
+
+personnalisation doit avoir lieu dans la bootméthode 
+
+de votre application RouteServiceProvider:
+
+use App\Models\User;
+use Illuminate\Support\Facades\Route;
+ 
+/**
+ * Define your route model bindings, pattern filters, etc.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Route::bind('user', function ($value) {
+        return User::where('name', $value)->firstOrFail();
+    });
+ 
+    // ...
+}
+
+Alternativement, vous pouvez remplacer la 
+
+resolveRouteBindingméthode sur votre modèle Eloquent. 
+
+Cette méthode recevra la valeur du segment URI et devra 
+
+renvoyer l'instance de la classe qui devra 
+
+être injectée dans la route :
+
+/**
+ * Retrieve the model for a bound value.
+ *
+ * @param  mixed  $value
+ * @param  string|null  $field
+ * @return \Illuminate\Database\Eloquent\Model|null
+ */
+public function resolveRouteBinding($value, $field = null)
+{
+    return $this->where('name', $value)->firstOrFail();
+}
+
+Si une route utilise une portée de liaison implicite , 
+
+la resolveChildRouteBindingméthode 
+
+sera utilisée pour résoudre la liaison enfant du modèle parent :
+
+/**
+ * Retrieve the child model for a bound value.
+ *
+ * @param  string  $childType
+ * @param  mixed  $value
+ * @param  string|null  $field
+ * @return \Illuminate\Database\Eloquent\Model|null
+ */
+public function resolveChildRouteBinding($childType, $value, $field)
+{
+    return parent::resolveChildRouteBinding($childType, $value, $field);
+}
+
+Itinéraires de secours
+En utilisant la Route::fallbackméthode, vous pouvez 
+
+définir une route qui sera 
+
+exécutée lorsqu'aucune autre route ne correspond à 
+
+la demande entrante. 
+
+En règle générale, les requêtes non gérées 
+
+afficheront automatiquement une page "404" 
+
+via le gestionnaire d'exceptions de votre application. 
+
+Cependant, comme vous définissez 
+
+généralement la fallbackroute dans votre 
+
+routes/web.phpfichier, tous les middleware 
+
+du webgroupe middleware s'appliqueront à la route. 
+
+Vous êtes libre d'ajouter un middleware 
+
+supplémentaire à cette route si nécessaire :
+
+Route::fallback(function () {
+    //
+});
+
+
+La route de secours doit toujours être la dernière route 
+
+enregistrée par votre application.
+
+
+Limitation de débit
+Définition des limiteurs de débit
+Laravel comprend des services de limitation de débit 
+
+puissants et personnalisables que vous pouvez 
+
+utiliser pour limiter la quantité de trafic pour un 
+
+itinéraire ou un groupe d'itinéraires donné. 
+
+Pour commencer, vous devez définir des configurations 
+
+de limiteur de débit qui répondent aux besoins 
+
+de votre application. En règle générale, cela doit être 
+
+fait dans la configureRateLimitingméthode de la 
+
+App\Providers\RouteServiceProviderclasse de votre application.
+
+Les limiteurs de débit sont définis à l'aide de la méthode 
+
+RateLimiterde la façade for. La forméthode accepte un 
+
+nom de limiteur de débit et une fermeture qui renvoie la 
+
+configuration de limite qui doit s'appliquer aux routes 
+
+affectées au limiteur de débit. La configuration limite 
+
+sont des instances de la 
+
+Illuminate\Cache\RateLimiting\Limitclasse. Cette classe 
+
+contient des méthodes "builder" utiles pour vous permettre 
+
+de définir rapidement votre limite. Le nom du limiteur de 
+
+débit peut être n'importe quelle chaîne de votre choix :
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+ 
+/**
+ * Configure the rate limiters for the application.
+ *
+ * @return void
+ */
+protected function configureRateLimiting()
+{
+    RateLimiter::for('global', function (Request $request) {
+        return Limit::perMinute(1000);
+    });
+}
+
+Si la demande entrante dépasse la limite de débit spécifiée, 
+
+une réponse avec un code d'état HTTP 429 sera 
+
+automatiquement renvoyée par Laravel. Si vous souhaitez 
+
+définir votre propre réponse qui doit être renvoyée 
+
+par une limite de débit, vous pouvez utiliser la responseméthode :
+
+RateLimiter::for('global', function (Request $request) {
+    return Limit::perMinute(1000)->response(
+        function (Request $request, array $headers) {
+        return response('Custom response...', 429, $headers);
+    });
+});
+
+Étant donné que les rappels du limiteur de débit 
+
+reçoivent l'instance de requête HTTP entrante, vous 
+
+pouvez créer dynamiquement la limite de débit appropriée 
+
+en fonction de la requête entrante ou de l'utilisateur 
+
+authentifié :
+
+RateLimiter::for('uploads', function (Request $request) {
+    return $request->user()->vipCustomer()
+                ? Limit::none()
+                : Limit::perMinute(100);
+});
+
+Limites de taux de segmentation
+Parfois, vous souhaiterez peut-être segmenter les limites 
+
+de débit par une valeur arbitraire. Par exemple, 
+
+vous pouvez autoriser les utilisateurs à accéder à une 
+
+route donnée 100 fois par minute et par adresse IP. 
+
+Pour ce faire, vous pouvez utiliser la byméthode lors 
+
+de la création de votre limite de débit :
+
+RateLimiter::for('uploads', function (Request $request) {
+    return $request->user()->vipCustomer()
+                ? Limit::none()
+                : Limit::perMinute(100)->by($request->ip());
+});
+
+Pour illustrer cette fonctionnalité à l'aide d'un 
+
+autre exemple, nous pouvons limiter l'accès à la route à 100 
+
+fois par minute par ID utilisateur authentifié ou 10 fois 
+
+par minute par adresse IP pour les invités :
+
+RateLimiter::for('uploads', function (Request $request) {
+    return $request->user()
+                ? Limit::perMinute(100)->by($request->user()->id)
+                : Limit::perMinute(10)->by($request->ip());
+});
+
+Limites de taux multiples
+Si nécessaire, vous pouvez renvoyer un tableau de limites 
+
+de débit pour une configuration de limiteur de débit donnée. 
+
+Chaque limite de débit sera évaluée pour l'itinéraire en 
+
+fonction de l'ordre dans lequel elles sont placées dans le 
+
+tableau :
+
+RateLimiter::for('login', function (Request $request) {
+    return [
+        Limit::perMinute(500),
+        Limit::perMinute(3)->by($request->input('email')),
+    ];
+});
+
+Attacher des limiteurs de débit aux routes
+Des limiteurs de débit peuvent être attachés à des routes 
+
+ou à des groupes de routes à l'aide du throttle middleware . 
+
+Le middleware de la manette accepte le nom du limiteur de 
+
+débit que vous souhaitez attribuer à la route :
+
+Route::middleware(['throttle:uploads'])->group(function () {
+    Route::post('/audio', function () {
+        //
+    });
+ 
+    Route::post('/video', function () {
+        //
+    });
+});
+
+Limitation avec Redis
+En règle générale, le throttlemiddleware est mappé à la 
+
+Illuminate\Routing\Middleware\ThrottleRequestsclasse. Ce 
+
+mappage est défini dans le noyau HTTP de votre application 
+
+( App\Http\Kernel). Toutefois, si vous utilisez Redis 
+
+comme pilote de cache de votre application, vous souhaiterez 
+
+peut-être modifier ce mappage pour utiliser la 
+
+Illuminate\Routing\Middleware\ThrottleRequestsWithRedisclasse. 
+
+Cette classe est plus efficace pour gérer la limitation de 
+
+débit à l'aide de Redis :
+
+'throttle' => 
+
+\Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
+
+Usurpation de méthode de formulaire
+Les formulaires HTML ne prennent pas en charge les 
+
+actions PUT, PATCHou . DELETEAinsi, lors de la définition de 
+
+routes PUT, PATCHou DELETEappelées à partir d'un 
+
+formulaire HTML, vous devrez ajouter un _methodchamp masqué au 
+
+formulaire. La valeur envoyée avec le _methodchamp sera 
+
+utilisée comme méthode de requête HTTP :
+
+<form action="/example" method="POST">
+    <input type="hidden" name="_method" value="PUT">
+    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+</form>
+
+Pour plus de commodité, vous pouvez utiliser la @method 
+
+directive Blade pour générer le _methodchamp de saisie :
+
+<form action="/example" method="POST">
+    @method('PUT')
+    @csrf
+</form>
+
+Accéder à l'itinéraire actuel
+Vous pouvez utiliser les méthodes current, 
+
+currentRouteNameet currentRouteActionsur la 
+
+Routefaçade pour accéder aux 
+informations sur 
+
+la route traitant la requête entrante :
+
+use Illuminate\Support\Facades\Route;
+ 
+$route = Route::current(); // Illuminate\Routing\Route
+$name = Route::currentRouteName(); // string
+$action = Route::currentRouteAction(); // string
+
+Vous pouvez vous référer à la documentation de l'API 
+
+pour la classe sous-jacente de la façade Route et de 
+
+l' instance Route pour passer en revue toutes les méthodes 
+
+disponibles sur les classes de routeur et de route.
+
+Partage des ressources d'origine croisée (CORS)
+Laravel peut répondre automatiquement aux OPTIONSrequêtes 
+
+HTTP CORS avec des valeurs que vous configurez. 
+
+Tous les paramètres CORS peuvent être configurés dans le 
+
+config/cors.phpfichier de configuration de votre application. 
+
+Les OPTIONSrequêtes seront automatiquement traitées par 
+
+le HandleCors middleware qui est inclus par défaut dans votre 
+
+pile middleware globale. Votre pile middleware globale se 
+
+trouve dans le noyau HTTP de votre application 
+
+( App\Http\Kernel).

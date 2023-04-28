@@ -1,0 +1,1252 @@
+Avis
+Introduction
+Génération de notifications
+Envoi de notifications
+Utilisation du caractère notifiable
+Utilisation de la façade de notification
+Spécification des canaux de livraison
+Notifications de file d'attente
+Notifications à la demande
+Notifications par courrier
+Formatage des messages électroniques
+Personnalisation de l'expéditeur
+Personnalisation du destinataire
+Personnaliser le sujet
+Personnaliser le Mailer
+Personnalisation des modèles
+Pièces jointes
+Ajout de balises et de métadonnées
+Personnaliser le message Symfony
+Utilisation des e-mails
+Aperçu des notifications par e-mail
+Notifications de courrier Markdown
+Générer le message
+Écrire le message
+Personnalisation des composants
+Notifications de base de données
+Conditions préalables
+Formatage des notifications de base de données
+Accéder aux notifications
+Marquage des notifications comme lues
+Notifications de diffusion
+Conditions préalables
+Formatage des notifications de diffusion
+À l'écoute des notifications
+Notifications par SMS
+Conditions préalables
+Formatage des notifications SMS
+Formatage des notifications de code court
+Personnaliser le numéro "De"
+Ajouter une référence client
+Routage des notifications par SMS
+Notifications de relâchement
+Conditions préalables
+Formatage des notifications Slack
+Pièces jointes lâches
+Acheminement des notifications de marge
+Localisation des notifications
+Événements de notification
+Canaux personnalisés
+Introduction
+En plus de la prise en charge de l' envoi d'e-mails , Laravel prend en charge l'envoi de notifications sur divers canaux de distribution, notamment les e-mails, les SMS (via Vonage , anciennement connu sous le nom de Nexmo) et Slack . De plus, une variété de canaux de notification créés par la communauté ont été créés pour envoyer des notifications sur des dizaines de canaux différents ! Les notifications peuvent également être stockées dans une base de données afin qu'elles puissent être affichées dans votre interface Web.
+
+En règle générale, les notifications doivent être de courts messages d'information informant les utilisateurs de quelque chose qui s'est produit dans votre application. Par exemple, si vous écrivez une application de facturation, vous pouvez envoyer une notification "Facture payée" à vos utilisateurs via les canaux e-mail et SMS.
+
+Génération de notifications
+Dans Laravel, chaque notification est représentée par une seule classe qui est généralement stockée dans le app/Notificationsrépertoire. Ne vous inquiétez pas si vous ne voyez pas ce répertoire dans votre application - il sera créé pour vous lorsque vous exécuterez la make:notificationcommande Artisan :
+
+php artisan make:notification InvoicePaid
+
+Cette commande placera une nouvelle classe de notification dans votre app/Notificationsrépertoire. Chaque classe de notification contient une viaméthode et un nombre variable de méthodes de création de message, telles que toMailou toDatabase, qui convertissent la notification en un message adapté à ce canal particulier.
+
+Envoi de notifications
+Utilisation du caractère notifiable
+Les notifications peuvent être envoyées de deux manières : en utilisant la notifyméthode du Notifiabletrait ou en utilisant la Notification façade . Le Notifiabletrait est inclus App\Models\Userpar défaut dans le modèle de votre application :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+ 
+class User extends Authenticatable
+{
+    use Notifiable;
+}
+
+La notifyméthode fournie par ce trait s'attend à recevoir une instance de notification :
+
+use App\Notifications\InvoicePaid;
+ 
+$user->notify(new InvoicePaid($invoice));
+
+
+N'oubliez pas que vous pouvez utiliser le Notifiabletrait sur n'importe lequel de vos modèles. Vous n'êtes pas limité à l'inclure uniquement sur votre Usermodèle.
+
+
+Utilisation de la façade de notification
+Alternativement, vous pouvez envoyer des notifications via la Notification façade . Cette approche est utile lorsque vous devez envoyer une notification à plusieurs entités notifiables telles qu'un ensemble d'utilisateurs. Pour envoyer des notifications à l'aide de la façade, transmettez toutes les entités notifiables et l'instance de notification à la sendméthode :
+
+use Illuminate\Support\Facades\Notification;
+ 
+Notification::send($users, new InvoicePaid($invoice));
+
+Vous pouvez également envoyer des notifications immédiatement en utilisant la sendNowméthode. Cette méthode enverra la notification immédiatement même si la notification implémente l' ShouldQueueinterface :
+
+Notification::sendNow($developers, new DeploymentCompleted($deployment));
+
+Spécification des canaux de livraison
+Chaque classe de notification a une viaméthode qui détermine sur quels canaux la notification sera livrée. Les notifications peuvent être envoyées sur les canaux mail, database, broadcast, vonageet .slack
+
+
+Si vous souhaitez utiliser d'autres canaux de distribution tels que Telegram ou Pusher, consultez le site Web communautaire Laravel Notification Channels .
+
+
+La viaméthode reçoit une $notifiableinstance, qui sera une instance de la classe à laquelle la notification est envoyée. Vous pouvez utiliser $notifiablepour déterminer sur quels canaux la notification doit être envoyée :
+
+/**
+ * Get the notification's delivery channels.
+ *
+ * @param  mixed  $notifiable
+ * @return array
+ */
+public function via($notifiable)
+{
+    return $notifiable->prefers_sms ? ['vonage'] : ['mail', 'database'];
+}
+
+Notifications de file d'attente
+
+Avant de mettre les notifications en file d'attente, vous devez configurer votre file d'attente et démarrer un agent .
+
+
+L'envoi de notifications peut prendre du temps, en particulier si le canal doit effectuer un appel d'API externe pour envoyer la notification. Pour accélérer le temps de réponse de votre application, laissez votre notification être mise en file d'attente en ajoutant l' ShouldQueueinterface et le Queueabletrait à votre classe. L'interface et le trait sont déjà importés pour toutes les notifications générées à l'aide de la make:notificationcommande, vous pouvez donc les ajouter immédiatement à votre classe de notification :
+
+<?php
+ 
+namespace App\Notifications;
+ 
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Notification;
+ 
+class InvoicePaid extends Notification implements ShouldQueue
+{
+    use Queueable;
+ 
+    // ...
+}
+
+Une fois l' ShouldQueueinterface ajoutée à votre notification, vous pouvez envoyer la notification normalement. Laravel détectera l' ShouldQueueinterface sur la classe et mettra automatiquement en file d'attente la livraison de la notification :
+
+$user->notify(new InvoicePaid($invoice));
+
+Lors de la mise en file d'attente des notifications, une tâche en file d'attente sera créée pour chaque combinaison de destinataire et de canal. Par exemple, six tâches seront envoyées à la file d'attente si votre notification a trois destinataires et deux canaux.
+
+Retarder les notifications
+Si vous souhaitez retarder la livraison de la notification, vous pouvez enchaîner la delayméthode sur votre instanciation de notification :
+
+$delay = now()->addMinutes(10);
+ 
+$user->notify((new InvoicePaid($invoice))->delay($delay));
+
+Retarder les notifications par canal
+Vous pouvez passer un tableau à la delayméthode pour spécifier le délai pour des canaux spécifiques :
+
+$user->notify((new InvoicePaid($invoice))->delay([
+    'mail' => now()->addMinutes(5),
+    'sms' => now()->addMinutes(10),
+]));
+
+Alternativement, vous pouvez définir une withDelayméthode sur la classe de notification elle-même. La withDelayméthode doit renvoyer un tableau de noms de canaux et de valeurs de délai :
+
+/**
+ * Determine the notification's delivery delay.
+ *
+ * @param  mixed  $notifiable
+ * @return array
+ */
+public function withDelay($notifiable)
+{
+    return [
+        'mail' => now()->addMinutes(5),
+        'sms' => now()->addMinutes(10),
+    ];
+}
+
+Personnalisation de la connexion à la file d'attente des notifications
+Par défaut, les notifications mises en file d'attente seront mises en file d'attente à l'aide de la connexion de file d'attente par défaut de votre application. Si vous souhaitez spécifier une connexion différente à utiliser pour une notification particulière, vous pouvez définir une $connectionpropriété sur la classe de notification :
+
+/**
+ * The name of the queue connection to use when queueing the notification.
+ *
+ * @var string
+ */
+public $connection = 'redis';
+
+Personnalisation des files d'attente des canaux de notification
+Si vous souhaitez spécifier une file d'attente spécifique à utiliser pour chaque canal de notification pris en charge par la notification, vous pouvez définir une viaQueuesméthode sur votre notification. Cette méthode doit renvoyer un tableau de paires nom de canal/nom de file d'attente :
+
+/**
+ * Determine which queues should be used for each notification channel.
+ *
+ * @return array
+ */
+public function viaQueues()
+{
+    return [
+        'mail' => 'mail-queue',
+        'slack' => 'slack-queue',
+    ];
+}
+
+Notifications en file d'attente et transactions de base de données
+Lorsque des notifications en file d'attente sont distribuées dans des transactions de base de données, elles peuvent être traitées par la file d'attente avant que la transaction de base de données ne soit validée. Lorsque cela se produit, les mises à jour que vous avez apportées aux modèles ou aux enregistrements de base de données lors de la transaction de base de données peuvent ne pas encore être reflétées dans la base de données. De plus, tous les modèles ou enregistrements de base de données créés dans la transaction peuvent ne pas exister dans la base de données. Si votre notification dépend de ces modèles, des erreurs inattendues peuvent se produire lors du traitement du travail qui envoie la notification en file d'attente.
+
+Si l' after_commitoption de configuration de votre connexion à la file d'attente est définie sur false, vous pouvez toujours indiquer qu'une notification particulière en file d'attente doit être envoyée après que toutes les transactions de base de données ouvertes ont été validées en appelant la afterCommitméthode lors de l'envoi de la notification :
+
+use App\Notifications\InvoicePaid;
+ 
+$user->notify((new InvoicePaid($invoice))->afterCommit());
+
+Vous pouvez également appeler la afterCommitméthode à partir du constructeur de votre notification :
+
+<?php
+ 
+namespace App\Notifications;
+ 
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Notification;
+ 
+class InvoicePaid extends Notification implements ShouldQueue
+{
+    use Queueable;
+ 
+    /**
+     * Create a new notification instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->afterCommit();
+    }
+}
+
+
+Pour en savoir plus sur la façon de contourner ces problèmes, veuillez consulter la documentation relative aux travaux en file d'attente et aux transactions de base de données .
+
+
+Déterminer si une notification en file d'attente doit être envoyée
+Une fois qu'une notification en file d'attente a été envoyée à la file d'attente pour un traitement en arrière-plan, elle est généralement acceptée par un agent de file d'attente et envoyée au destinataire prévu.
+
+Toutefois, si vous souhaitez déterminer définitivement si la notification en file d'attente doit être envoyée après son traitement par un agent de file d'attente, vous pouvez définir une shouldSendméthode sur la classe de notification. Si cette méthode renvoie false, la notification ne sera pas envoyée :
+
+/**
+ * Determine if the notification should be sent.
+ *
+ * @param  mixed  $notifiable
+ * @param  string  $channel
+ * @return bool
+ */
+public function shouldSend($notifiable, $channel)
+{
+    return $this->invoice->isPaid();
+}
+
+Notifications à la demande
+Parfois, vous devrez peut-être envoyer une notification à quelqu'un qui n'est pas enregistré en tant qu'"utilisateur" de votre application. En utilisant la méthode Notificationde la façade route, vous pouvez spécifier des informations de routage de notification ad hoc avant d'envoyer la notification :
+
+Notification::route('mail', 'taylor@example.com')
+            ->route('vonage', '5555555555')
+            ->route('slack', 'https://hooks.slack.com/services/...')
+            ->notify(new InvoicePaid($invoice));
+
+Si vous souhaitez fournir le nom du destinataire lors de l'envoi d'une notification à la demande à la mailroute, vous pouvez fournir un tableau contenant l'adresse e-mail comme clé et le nom comme valeur du premier élément du tableau :
+
+Notification::route('mail', [
+    'barrett@example.com' => 'Barrett Blair',
+])->notify(new InvoicePaid($invoice));
+
+Notifications par courrier
+Formatage des messages électroniques
+Si une notification prend en charge l'envoi par e-mail, vous devez définir une toMailméthode sur la classe de notification. Cette méthode recevra une $notifiableentité et devrait renvoyer une Illuminate\Notifications\Messages\MailMessageinstance.
+
+La MailMessageclasse contient quelques méthodes simples pour vous aider à créer des messages électroniques transactionnels. Les messages électroniques peuvent contenir des lignes de texte ainsi qu'un "appel à l'action". Prenons un exemple de toMailméthode :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    $url = url('/invoice/'.$this->invoice->id);
+ 
+    return (new MailMessage)
+                ->greeting('Hello!')
+                ->line('One of your invoices has been paid!')
+                ->action('View Invoice', $url)
+                ->line('Thank you for using our application!');
+}
+
+
+Notez que nous utilisons $this->invoice->iddans notre toMailméthode. Vous pouvez transmettre toutes les données dont votre notification a besoin pour générer son message dans le constructeur de la notification.
+
+
+Dans cet exemple, nous enregistrons une salutation, une ligne de texte, un appel à l'action, puis une autre ligne de texte. Ces méthodes fournies par l' MailMessageobjet permettent de formater simplement et rapidement les petits emails transactionnels. Le canal de messagerie traduira ensuite les composants du message en un beau modèle d'e-mail HTML réactif avec une contrepartie en texte brut. Voici un exemple d'e-mail généré par le mailcanal :
+
+
+
+Lors de l'envoi de notifications par e-mail, veillez à définir l' nameoption de configuration dans votre config/app.phpfichier de configuration. Cette valeur sera utilisée dans l'en-tête et le pied de page de vos messages de notification par e-mail.
+
+
+Autres options de formatage des notifications par e-mail
+Au lieu de définir les "lignes" de texte dans la classe de notification, vous pouvez utiliser la viewméthode pour spécifier un modèle personnalisé qui doit être utilisé pour afficher l'e-mail de notification :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)->view(
+        'emails.name', ['invoice' => $this->invoice]
+    );
+}
+
+Vous pouvez spécifier une vue en texte brut pour le message électronique en transmettant le nom de la vue comme deuxième élément d'un tableau donné à la viewméthode :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)->view(
+        ['emails.name.html', 'emails.name.plain'],
+        ['invoice' => $this->invoice]
+    );
+}
+
+Messages d'erreur
+Certaines notifications informent les utilisateurs d'erreurs, telles qu'un échec de paiement de facture. Vous pouvez indiquer qu'un message électronique concerne une erreur en appelant la errorméthode lors de la création de votre message. Lorsque vous utilisez la errorméthode sur un message électronique, le bouton d'appel à l'action sera rouge au lieu de noir :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->error()
+                ->subject('Notification Subject')
+                ->line('...');
+}
+
+Personnalisation de l'expéditeur
+Par défaut, l'adresse de l'expéditeur / de l'expéditeur de l'e-mail est définie dans le config/mail.phpfichier de configuration. Cependant, vous pouvez spécifier l'adresse d'expédition d'une notification spécifique à l'aide de la fromméthode :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->from('barrett@example.com', 'Barrett Blair')
+                ->line('...');
+}
+
+Personnalisation du destinataire
+Lors de l'envoi de notifications via le mailcanal, le système de notification recherchera automatiquement une emailpropriété sur votre entité notifiable. Vous pouvez personnaliser l'adresse e-mail utilisée pour envoyer la notification en définissant une routeNotificationForMailméthode sur l'entité notifiable :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+ 
+class User extends Authenticatable
+{
+    use Notifiable;
+ 
+    /**
+     * Route notifications for the mail channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return array|string
+     */
+    public function routeNotificationForMail($notification)
+    {
+        // Return email address only...
+        return $this->email_address;
+ 
+        // Return email address and name...
+        return [$this->email_address => $this->name];
+    }
+}
+
+Personnaliser le sujet
+Par défaut, l'objet de l'e-mail est le nom de classe de la notification au format "Title Case". Ainsi, si votre classe de notification est nommée InvoicePaid, le sujet de l'e-mail sera Invoice Paid. Si vous souhaitez spécifier un sujet différent pour le message, vous pouvez appeler la subjectméthode lors de la construction de votre message :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->subject('Notification Subject')
+                ->line('...');
+}
+
+Personnaliser le Mailer
+Par défaut, la notification par e-mail sera envoyée à l'aide de l'expéditeur par défaut défini dans le config/mail.phpfichier de configuration. Cependant, vous pouvez spécifier un mailer différent lors de l'exécution en appelant la mailerméthode lors de la construction de votre message :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->mailer('postmark')
+                ->line('...');
+}
+
+Personnalisation des modèles
+Vous pouvez modifier le modèle HTML et texte brut utilisé par les notifications par e-mail en publiant les ressources du package de notification. Après avoir exécuté cette commande, les modèles de notification par e-mail seront situés dans le resources/views/vendor/notificationsrépertoire :
+
+php artisan vendor:publish --tag=laravel-notifications
+
+Pièces jointes
+Pour ajouter des pièces jointes à une notification par e-mail, utilisez la attachméthode lors de la création de votre message. La attachméthode accepte le chemin absolu vers le fichier comme premier argument :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->greeting('Hello!')
+                ->attach('/path/to/file');
+}
+
+
+La attachméthode proposée par les messages électroniques de notification accepte également les objets pouvant être joints . Veuillez consulter la documentation complète sur les objets pouvant être joints pour en savoir plus.
+
+
+Lorsque vous joignez des fichiers à un message, vous pouvez également spécifier le nom d'affichage et/ou le type MIME en passant un arraycomme deuxième argument à la attachméthode :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->greeting('Hello!')
+                ->attach('/path/to/file', [
+                    'as' => 'name.pdf',
+                    'mime' => 'application/pdf',
+                ]);
+}
+
+Contrairement à joindre des fichiers dans des objets pouvant être envoyés par courrier, vous ne pouvez pas joindre un fichier directement à partir d'un disque de stockage à l'aide de attachFromStorage. Vous devriez plutôt utiliser la attachméthode avec un chemin absolu vers le fichier sur le disque de stockage. Alternativement, vous pouvez renvoyer un mailable à partir de la toMailméthode :
+
+use App\Mail\InvoicePaid as InvoicePaidMailable;
+ 
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return Mailable
+ */
+public function toMail($notifiable)
+{
+    return (new InvoicePaidMailable($this->invoice))
+                ->to($notifiable->email)
+                ->attachFromStorage('/path/to/file');
+}
+
+Pièces jointes de données brutes
+La attachDataméthode peut être utilisée pour joindre une chaîne brute d'octets en tant que pièce jointe. Lors de l'appel de la attachDataméthode, vous devez fournir le nom de fichier qui doit être attribué à la pièce jointe :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->greeting('Hello!')
+                ->attachData($this->pdf, 'name.pdf', [
+                    'mime' => 'application/pdf',
+                ]);
+}
+
+Ajout de balises et de métadonnées
+Certains fournisseurs de messagerie tiers tels que Mailgun et Postmark prennent en charge les "tags" et les "métadonnées" des messages, qui peuvent être utilisés pour regrouper et suivre les e-mails envoyés par votre application. Vous pouvez ajouter des balises et des métadonnées à un e-mail via les méthodes taget :metadata
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->greeting('Comment Upvoted!')
+                ->tag('upvote')
+                ->metadata('comment_id', $this->comment->id);
+}
+
+Si votre application utilise le pilote Mailgun, vous pouvez consulter la documentation de Mailgun pour plus d'informations sur les balises et les métadonnées . De même, la documentation Postmark peut également être consultée pour plus d'informations sur leur prise en charge des balises et des métadonnées .
+
+Si votre application utilise Amazon SES pour envoyer des e-mails, vous devez utiliser la metadataméthode pour attacher des « balises » SES au message. Des balises et des métadonnées peuvent être ajoutées au MailMessage- elles sont utilisées par votre service de messagerie pour le filtrage/traitement :
+
+Personnaliser le message Symfony
+La withSymfonyMessageméthode de la MailMessageclasse permet d'enregistrer une fermeture qui sera invoquée avec l'instance Symfony Message avant d'envoyer le message. Cela vous donne la possibilité de personnaliser en profondeur le message avant qu'il ne soit diffusé :
+
+use Symfony\Component\Mime\Email;
+ 
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->withSymfonyMessage(function (Email $message) {
+                    $message->getHeaders()->addTextHeader(
+                        'Custom-Header', 'Header Value'
+                    );
+                });
+}
+
+Utilisation des e-mails
+Si nécessaire, vous pouvez renvoyer un objet mailable complet à partir de la méthode de votre notification toMail. Lors du renvoi d'un Mailableau lieu d'un MailMessage, vous devrez spécifier le destinataire du message en utilisant la méthode de l'objet mailable to:
+
+use App\Mail\InvoicePaid as InvoicePaidMailable;
+ 
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return Mailable
+ */
+public function toMail($notifiable)
+{
+    return (new InvoicePaidMailable($this->invoice))
+                ->to($notifiable->email);
+}
+
+Mailables et notifications à la demande
+Si vous envoyez une notification à la demande , l' $notifiableinstance donnée à la toMailméthode sera une instance de Illuminate\Notifications\AnonymousNotifiable, qui propose une routeNotificationForméthode pouvant être utilisée pour récupérer l'adresse e-mail à laquelle la notification à la demande doit être envoyée :
+
+use App\Mail\InvoicePaid as InvoicePaidMailable;
+use Illuminate\Notifications\AnonymousNotifiable;
+ 
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return Mailable
+ */
+public function toMail($notifiable)
+{
+    $address = $notifiable instanceof AnonymousNotifiable
+            ? $notifiable->routeNotificationFor('mail')
+            : $notifiable->email;
+ 
+    return (new InvoicePaidMailable($this->invoice))
+                ->to($address);
+}
+
+Aperçu des notifications par e-mail
+Lors de la conception d'un modèle de notification par e-mail, il est pratique de prévisualiser rapidement le message électronique rendu dans votre navigateur comme un modèle Blade typique. Pour cette raison, Laravel vous permet de renvoyer tout message électronique généré par une notification par courrier électronique directement à partir d'une fermeture de route ou d'un contrôleur. Lorsqu'un MailMessageest renvoyé, il sera rendu et affiché dans le navigateur, vous permettant de prévisualiser rapidement sa conception sans avoir besoin de l'envoyer à une adresse e-mail réelle :
+
+use App\Models\Invoice;
+use App\Notifications\InvoicePaid;
+ 
+Route::get('/notification', function () {
+    $invoice = Invoice::find(1);
+ 
+    return (new InvoicePaid($invoice))
+                ->toMail($invoice->user);
+});
+
+Notifications de courrier Markdown
+Les notifications par e-mail Markdown vous permettent de tirer parti des modèles prédéfinis de notifications par e-mail, tout en vous laissant plus de liberté pour rédiger des messages plus longs et personnalisés. Étant donné que les messages sont écrits en Markdown, Laravel est capable de rendre de beaux modèles HTML réactifs pour les messages tout en générant automatiquement une contrepartie en texte brut.
+
+Générer le message
+Pour générer une notification avec un modèle Markdown correspondant, vous pouvez utiliser l' --markdownoption de la make:notificationcommande Artisan :
+
+php artisan make:notification InvoicePaid --markdown=mail.invoice.paid
+
+Comme toutes les autres notifications par e-mail, les notifications qui utilisent des modèles Markdown doivent définir une toMailméthode sur leur classe de notification. Cependant, au lieu d'utiliser les méthodes lineet actionpour construire la notification, utilisez la markdownméthode pour spécifier le nom du modèle Markdown à utiliser. Un tableau de données que vous souhaitez rendre disponible pour le modèle peut être passé comme deuxième argument de la méthode :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    $url = url('/invoice/'.$this->invoice->id);
+ 
+    return (new MailMessage)
+                ->subject('Invoice Paid')
+                ->markdown('mail.invoice.paid', ['url' => $url]);
+}
+
+Écrire le message
+Les notifications par e-mail Markdown utilisent une combinaison de composants Blade et de syntaxe Markdown qui vous permettent de créer facilement des notifications tout en tirant parti des composants de notification préfabriqués de Laravel :
+
+@component('mail::message')
+# Invoice Paid
+ 
+Your invoice has been paid!
+ 
+@component('mail::button', ['url' => $url])
+View Invoice
+@endcomponent
+ 
+Thanks,<br>
+{{ config('app.name') }}
+@endcomponent
+
+Composant de bouton
+Le composant de bouton restitue un lien de bouton centré. Le composant accepte deux arguments, un urlet un facultatif color. Les couleurs prises en charge sont primary, greenet red. Vous pouvez ajouter autant de composants de bouton à une notification que vous le souhaitez :
+
+@component('mail::button', ['url' => $url, 'color' => 'green'])
+View Invoice
+@endcomponent
+
+Composant de panneau
+Le composant de panneau restitue le bloc de texte donné dans un panneau dont la couleur d'arrière-plan est légèrement différente de celle du reste de la notification. Cela vous permet d'attirer l'attention sur un bloc de texte donné :
+
+@component('mail::panel')
+This is the panel content.
+@endcomponent
+
+Composant de tableau
+Le composant tableau permet de transformer un tableau Markdown en tableau HTML. Le composant accepte la table Markdown comme contenu. L'alignement des colonnes de tableau est pris en charge à l'aide de la syntaxe d'alignement de tableau Markdown par défaut :
+
+@component('mail::table')
+| Laravel       | Table         | Example  |
+| ------------- |:-------------:| --------:|
+| Col 2 is      | Centered      | $10      |
+| Col 3 is      | Right-Aligned | $20      |
+@endcomponent
+
+Personnalisation des composants
+Vous pouvez exporter tous les composants de notification Markdown vers votre propre application pour la personnalisation. Pour exporter les composants, utilisez la vendor:publishcommande Artisan pour publier l' laravel-mailétiquette d'inventaire :
+
+php artisan vendor:publish --tag=laravel-mail
+
+Cette commande publiera les composants de messagerie Markdown dans le resources/views/vendor/mailrépertoire. Le mailrépertoire contiendra un htmlet un textrépertoire, chacun contenant leurs représentations respectives de chaque composant disponible. Vous êtes libre de personnaliser ces composants comme bon vous semble.
+
+Personnalisation du CSS
+Après avoir exporté les composants, le resources/views/vendor/mail/html/themesrépertoire contiendra un default.cssfichier. Vous pouvez personnaliser le CSS dans ce fichier et vos styles seront automatiquement alignés dans les représentations HTML de vos notifications Markdown.
+
+Si vous souhaitez créer un thème entièrement nouveau pour les composants Markdown de Laravel, vous pouvez placer un fichier CSS dans le html/themesrépertoire. Après avoir nommé et enregistré votre fichier CSS, mettez à jour l' themeoption du mailfichier de configuration pour qu'elle corresponde au nom de votre nouveau thème.
+
+Pour personnaliser le thème d'une notification individuelle, vous pouvez appeler la thememéthode lors de la création du message électronique de la notification. La thememéthode accepte le nom du thème qui doit être utilisé lors de l'envoi de la notification :
+
+/**
+ * Get the mail representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\MailMessage
+ */
+public function toMail($notifiable)
+{
+    return (new MailMessage)
+                ->theme('invoice')
+                ->subject('Invoice Paid')
+                ->markdown('mail.invoice.paid', ['url' => $url]);
+}
+
+Notifications de base de données
+Conditions préalables
+Le databasecanal de notification stocke les informations de notification dans une table de base de données. Ce tableau contiendra des informations telles que le type de notification ainsi qu'une structure de données JSON décrivant la notification.
+
+Vous pouvez interroger la table pour afficher les notifications dans l'interface utilisateur de votre application. Mais, avant de pouvoir le faire, vous devrez créer une table de base de données pour contenir vos notifications. Vous pouvez utiliser la notifications:tablecommande pour générer une migration avec le schéma de table approprié :
+
+php artisan notifications:table
+ 
+php artisan migrate
+
+Formatage des notifications de base de données
+Si une notification prend en charge le stockage dans une table de base de données, vous devez définir une méthode toDatabaseou toArraysur la classe de notification. Cette méthode recevra une $notifiableentité et devrait renvoyer un tableau PHP simple. Le tableau retourné sera encodé en JSON et stocké dans la datacolonne de votre notificationstable. Prenons un exemple de toArrayméthode :
+
+/**
+ * Get the array representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return array
+ */
+public function toArray($notifiable)
+{
+    return [
+        'invoice_id' => $this->invoice->id,
+        'amount' => $this->invoice->amount,
+    ];
+}
+
+toDatabaseContre.toArray
+La toArrayméthode est également utilisée par le broadcastcanal pour déterminer les données à diffuser sur votre interface JavaScript. Si vous souhaitez avoir deux représentations de tableau différentes pour les canaux databaseet broadcast, vous devez définir une toDatabaseméthode au lieu d'une toArrayméthode.
+
+Accéder aux notifications
+Une fois les notifications stockées dans la base de données, vous avez besoin d'un moyen pratique d'y accéder à partir de vos entités notifiables. Le Illuminate\Notifications\Notifiabletrait, qui est inclus dans le App\Models\Usermodèle par défaut de Laravel, inclut une notifications relation Eloquent qui renvoie les notifications pour l'entité. Pour récupérer les notifications, vous pouvez accéder à cette méthode comme toute autre relation Eloquent. Par défaut, les notifications seront triées par created_athorodatage avec les notifications les plus récentes au début de la collecte :
+
+$user = App\Models\User::find(1);
+ 
+foreach ($user->notifications as $notification) {
+    echo $notification->type;
+}
+
+Si vous souhaitez récupérer uniquement les notifications "non lues", vous pouvez utiliser la unreadNotificationsrelation. Encore une fois, ces notifications seront triées par created_athorodatage avec les notifications les plus récentes au début de la collecte :
+
+$user = App\Models\User::find(1);
+ 
+foreach ($user->unreadNotifications as $notification) {
+    echo $notification->type;
+}
+
+
+Pour accéder à vos notifications depuis votre client JavaScript, vous devez définir un contrôleur de notification pour votre application qui renvoie les notifications pour une entité notifiable, telle que l'utilisateur actuel. Vous pouvez ensuite envoyer une requête HTTP à l'URL de ce contrôleur à partir de votre client JavaScript.
+
+
+Marquage des notifications comme lues
+En règle générale, vous souhaiterez marquer une notification comme "lue" lorsqu'un utilisateur la consulte. Le Illuminate\Notifications\Notifiabletrait fournit une markAsReadméthode qui met à jour la read_atcolonne sur l'enregistrement de base de données de la notification :
+
+$user = App\Models\User::find(1);
+ 
+foreach ($user->unreadNotifications as $notification) {
+    $notification->markAsRead();
+}
+
+Cependant, au lieu de parcourir chaque notification en boucle, vous pouvez utiliser la markAsReadméthode directement sur une collection de notifications :
+
+$user->unreadNotifications->markAsRead();
+
+Vous pouvez également utiliser une requête de mise à jour en masse pour marquer toutes les notifications comme lues sans les récupérer de la base de données :
+
+$user = App\Models\User::find(1);
+ 
+$user->unreadNotifications()->update(['read_at' => now()]);
+
+Vous pouvez deleteles notifications pour les supprimer entièrement du tableau :
+
+$user->notifications()->delete();
+
+Notifications de diffusion
+Conditions préalables
+Avant de diffuser des notifications, vous devez configurer et vous familiariser avec les services de diffusion d'événements de Laravel . La diffusion d'événements offre un moyen de réagir aux événements Laravel côté serveur à partir de votre interface JavaScript.
+
+Formatage des notifications de diffusion
+La broadcastchaîne diffuse des notifications à l'aide des services de diffusion d'événements de Laravel , permettant à votre interface JavaScript de capter les notifications en temps réel. Si une notification prend en charge la diffusion, vous pouvez définir une toBroadcastméthode sur la classe de notification. Cette méthode recevra une $notifiableentité et devrait renvoyer une BroadcastMessageinstance. Si la toBroadcastméthode n'existe pas, la toArrayméthode sera utilisée pour rassembler les données qui doivent être diffusées. Les données renvoyées seront encodées au format JSON et diffusées sur votre interface JavaScript. Prenons un exemple de toBroadcastméthode :
+
+use Illuminate\Notifications\Messages\BroadcastMessage;
+ 
+/**
+ * Get the broadcastable representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return BroadcastMessage
+ */
+public function toBroadcast($notifiable)
+{
+    return new BroadcastMessage([
+        'invoice_id' => $this->invoice->id,
+        'amount' => $this->invoice->amount,
+    ]);
+}
+
+Configuration de la file d'attente de diffusion
+Toutes les notifications de diffusion sont mises en file d'attente pour la diffusion. Si vous souhaitez configurer la connexion à la file d'attente ou le nom de file d'attente utilisé pour mettre en file d'attente l'opération de diffusion, vous pouvez utiliser les méthodes onConnectionet de :onQueueBroadcastMessage
+
+return (new BroadcastMessage($data))
+                ->onConnection('sqs')
+                ->onQueue('broadcasts');
+
+Personnalisation du type de notification
+En plus des données que vous spécifiez, toutes les notifications de diffusion ont également un typechamp contenant le nom de classe complet de la notification. Si vous souhaitez personnaliser la notification type, vous pouvez définir une broadcastTypeméthode sur la classe notification :
+
+use Illuminate\Notifications\Messages\BroadcastMessage;
+ 
+/**
+ * Get the type of the notification being broadcast.
+ *
+ * @return string
+ */
+public function broadcastType()
+{
+    return 'broadcast.message';
+}
+
+À l'écoute des notifications
+Les notifications seront diffusées sur un canal privé formaté selon une {notifiable}.{id}convention. Ainsi, si vous envoyez une notification à une App\Models\Userinstance dont l'ID 1est , la notification sera diffusée sur le App.Models.User.1canal privé. Lorsque vous utilisez Laravel Echo , vous pouvez facilement écouter les notifications sur un canal en utilisant la notificationméthode :
+
+Echo.private('App.Models.User.' + userId)
+    .notification((notification) => {
+        console.log(notification.type);
+    });
+
+Personnalisation du canal de notification
+Si vous souhaitez personnaliser le canal sur lequel les notifications de diffusion d'une entité sont diffusées, vous pouvez définir une receivesBroadcastNotificationsOnméthode sur l'entité notifiable :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+ 
+class User extends Authenticatable
+{
+    use Notifiable;
+ 
+    /**
+     * The channels the user receives notification broadcasts on.
+     *
+     * @return string
+     */
+    public function receivesBroadcastNotificationsOn()
+    {
+        return 'users.'.$this->id;
+    }
+}
+
+Notifications par SMS
+Conditions préalables
+L'envoi de notifications par SMS dans Laravel est alimenté par Vonage (anciennement connu sous le nom de Nexmo). Avant de pouvoir envoyer des notifications via Vonage, vous devez installer les packages laravel/vonage-notification-channelet :guzzlehttp/guzzle
+
+composer require laravel/vonage-notification-channel guzzlehttp/guzzle
+
+Le package comprend un fichier de configuration . Cependant, vous n'êtes pas obligé d'exporter ce fichier de configuration vers votre propre application. Vous pouvez simplement utiliser les variables d'environnement VONAGE_KEYet VONAGE_SECRETpour définir vos clés publiques et secrètes Vonage.
+
+Après avoir défini vos clés, vous pouvez définir une VONAGE_SMS_FROMvariable d'environnement qui définit le numéro de téléphone à partir duquel vos messages SMS doivent être envoyés par défaut. Vous pouvez générer ce numéro de téléphone dans le panneau de contrôle Vonage :
+
+VONAGE_SMS_FROM=15556666666
+
+Formatage des notifications SMS
+Si une notification prend en charge l'envoi sous forme de SMS, vous devez définir une toVonageméthode sur la classe de notification. Cette méthode recevra une $notifiableentité et devrait renvoyer une Illuminate\Notifications\Messages\VonageMessageinstance :
+
+/**
+ * Get the Vonage / SMS representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\VonageMessage
+ */
+public function toVonage($notifiable)
+{
+    return (new VonageMessage)
+                ->content('Your SMS message content');
+}
+
+Contenu Unicode
+Si votre message SMS contient des caractères Unicode, vous devez appeler la unicodeméthode lors de la construction de l' VonageMessageinstance :
+
+/**
+ * Get the Vonage / SMS representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\VonageMessage
+ */
+public function toVonage($notifiable)
+{
+    return (new VonageMessage)
+                ->content('Your unicode message')
+                ->unicode();
+}
+
+Personnaliser le numéro "De"
+Si vous souhaitez envoyer des notifications à partir d'un numéro de téléphone différent du numéro de téléphone spécifié par votre VONAGE_SMS_FROMvariable d'environnement, vous pouvez appeler la fromméthode sur une VonageMessageinstance :
+
+/**
+ * Get the Vonage / SMS representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\VonageMessage
+ */
+public function toVonage($notifiable)
+{
+    return (new VonageMessage)
+                ->content('Your SMS message content')
+                ->from('15554443333');
+}
+
+Ajouter une référence client
+Si vous souhaitez suivre les coûts par utilisateur, équipe ou client, vous pouvez ajouter une "référence client" à la notification. Vonage vous permettra de générer des rapports à l'aide de cette référence client afin que vous puissiez mieux comprendre l'utilisation des SMS d'un client particulier. La référence client peut être n'importe quelle chaîne jusqu'à 40 caractères :
+
+/**
+ * Get the Vonage / SMS representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\VonageMessage
+ */
+public function toVonage($notifiable)
+{
+    return (new VonageMessage)
+                ->clientReference((string) $notifiable->id)
+                ->content('Your SMS message content');
+}
+
+Routage des notifications par SMS
+Pour acheminer les notifications Vonage vers le bon numéro de téléphone, définissez une routeNotificationForVonageméthode sur votre entité notifiable :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+ 
+class User extends Authenticatable
+{
+    use Notifiable;
+ 
+    /**
+     * Route notifications for the Vonage channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return string
+     */
+    public function routeNotificationForVonage($notification)
+    {
+        return $this->phone_number;
+    }
+}
+
+Notifications de relâchement
+Conditions préalables
+Avant de pouvoir envoyer des notifications via Slack, vous devez installer le canal de notification Slack via Composer :
+
+composer require laravel/slack-notification-channel
+
+Vous devrez également créer une application Slack pour votre équipe. Après avoir créé l'application, vous devez configurer un "Webhook entrant" pour l'espace de travail. Slack vous fournira ensuite une URL de webhook que vous pourrez utiliser lors du routage des notifications Slack .
+
+Formatage des notifications Slack
+Si une notification prend en charge l'envoi en tant que message Slack, vous devez définir une toSlackméthode sur la classe de notification. Cette méthode recevra une $notifiableentité et devrait renvoyer une Illuminate\Notifications\Messages\SlackMessageinstance. Les messages Slack peuvent contenir du texte ainsi qu'une "pièce jointe" qui formate du texte supplémentaire ou un tableau de champs. Prenons un toSlackexemple basique :
+
+/**
+ * Get the Slack representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\SlackMessage
+ */
+public function toSlack($notifiable)
+{
+    return (new SlackMessage)
+                ->content('One of your invoices has been paid!');
+}
+
+Pièces jointes lâches
+Vous pouvez également ajouter des "pièces jointes" aux messages Slack. Les pièces jointes offrent des options de formatage plus riches que les simples messages texte. Dans cet exemple, nous enverrons une notification d'erreur concernant une exception qui s'est produite dans une application, y compris un lien pour afficher plus de détails sur l'exception :
+
+/**
+ * Get the Slack representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return \Illuminate\Notifications\Messages\SlackMessage
+ */
+public function toSlack($notifiable)
+{
+    $url = url('/exceptions/'.$this->exception->id);
+ 
+    return (new SlackMessage)
+                ->error()
+                ->content('Whoops! Something went wrong.')
+                ->attachment(function ($attachment) use ($url) {
+                    $attachment->title('Exception: File Not Found', $url)
+                               ->content('File [background.jpg] was not found.');
+                });
+}
+
+Les pièces jointes vous permettent également de spécifier un tableau de données à présenter à l'utilisateur. Les données fournies seront présentées sous forme de tableau pour une lecture facile :
+
+/**
+ * Get the Slack representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return SlackMessage
+ */
+public function toSlack($notifiable)
+{
+    $url = url('/invoices/'.$this->invoice->id);
+ 
+    return (new SlackMessage)
+                ->success()
+                ->content('One of your invoices has been paid!')
+                ->attachment(function ($attachment) use ($url) {
+                    $attachment->title('Invoice 1322', $url)
+                               ->fields([
+                                    'Title' => 'Server Expenses',
+                                    'Amount' => '$1,234',
+                                    'Via' => 'American Express',
+                                    'Was Overdue' => ':-1:',
+                                ]);
+                });
+}
+
+Contenu de la pièce jointe Markdown
+Si certains de vos champs de pièce jointe contiennent Markdown, vous pouvez utiliser la markdownméthode pour demander à Slack d'analyser et d'afficher les champs de pièce jointe donnés sous forme de texte au format Markdown. Les valeurs acceptées par cette méthode sont : pretext, text, et / ou fields. Pour plus d'informations sur le formatage des pièces jointes Slack, consultez la documentation de l'API Slack :
+
+/**
+ * Get the Slack representation of the notification.
+ *
+ * @param  mixed  $notifiable
+ * @return SlackMessage
+ */
+public function toSlack($notifiable)
+{
+    $url = url('/exceptions/'.$this->exception->id);
+ 
+    return (new SlackMessage)
+                ->error()
+                ->content('Whoops! Something went wrong.')
+                ->attachment(function ($attachment) use ($url) {
+                    $attachment->title('Exception: File Not Found', $url)
+                               ->content('File [background.jpg] was *not found*.')
+                               ->markdown(['text']);
+                });
+}
+
+Acheminement des notifications de marge
+Pour acheminer les notifications Slack vers l'équipe et le canal Slack appropriés, définissez une routeNotificationForSlackméthode sur votre entité notifiable. Cela devrait renvoyer l'URL du webhook à laquelle la notification doit être envoyée. Les URL Webhook peuvent être générées en ajoutant un service "Webhook entrant" à votre équipe Slack :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+ 
+class User extends Authenticatable
+{
+    use Notifiable;
+ 
+    /**
+     * Route notifications for the Slack channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return string
+     */
+    public function routeNotificationForSlack($notification)
+    {
+        return 'https://hooks.slack.com/services/...';
+    }
+}
+
+Localisation des notifications
+Laravel vous permet d'envoyer des notifications dans des paramètres régionaux autres que les paramètres régionaux actuels de la requête HTTP, et se souviendra même de ces paramètres régionaux si la notification est mise en file d'attente.
+
+Pour ce faire, la Illuminate\Notifications\Notificationclasse propose une localeméthode pour définir la langue souhaitée. L'application passera à ces paramètres régionaux lors de l'évaluation de la notification, puis reviendra aux paramètres régionaux précédents une fois l'évaluation terminée :
+
+$user->notify((new InvoicePaid($invoice))->locale('es'));
+
+La localisation de plusieurs entrées notifiables peut également être réalisée via la Notificationfaçade :
+
+Notification::locale('es')->send(
+    $users, new InvoicePaid($invoice)
+);
+
+Paramètres régionaux préférés de l'utilisateur
+Parfois, les applications stockent les paramètres régionaux préférés de chaque utilisateur. En implémentant le HasLocalePreferencecontrat sur votre modèle notifiable, vous pouvez demander à Laravel d'utiliser ces paramètres régionaux stockés lors de l'envoi d'une notification :
+
+use Illuminate\Contracts\Translation\HasLocalePreference;
+ 
+class User extends Model implements HasLocalePreference
+{
+    /**
+     * Get the user's preferred locale.
+     *
+     * @return string
+     */
+    public function preferredLocale()
+    {
+        return $this->locale;
+    }
+}
+
+Une fois que vous avez implémenté l'interface, Laravel utilisera automatiquement les paramètres régionaux préférés lors de l'envoi de notifications et de mailables au modèle. Par conséquent, il n'est pas nécessaire d'appeler la localeméthode lors de l'utilisation de cette interface :
+
+$user->notify(new InvoicePaid($invoice));
+
+Événements de notification
+Événement d'envoi de notification
+Lorsqu'une notification est envoyée, l' Illuminate\Notifications\Events\NotificationSending événement est envoyé par le système de notification. Celui-ci contient l'entité "notifiable" et l'instance de notification elle-même. Vous pouvez enregistrer des auditeurs pour cet événement dans votre application EventServiceProvider:
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Notifications\Events\NotificationSending' => [
+        'App\Listeners\CheckNotificationStatus',
+    ],
+];
+
+La notification ne sera pas envoyée si un écouteur d'événement pour l' NotificationSendingévénement revient falsede sa handleméthode :
+
+use Illuminate\Notifications\Events\NotificationSending;
+ 
+/**
+ * Handle the event.
+ *
+ * @param  \Illuminate\Notifications\Events\NotificationSending  $event
+ * @return void
+ */
+public function handle(NotificationSending $event)
+{
+    return false;
+}
+
+Dans un écouteur d'événement, vous pouvez accéder aux propriétés notifiable, notificationet channelsur l'événement pour en savoir plus sur le destinataire de la notification ou sur la notification elle-même :
+
+/**
+ * Handle the event.
+ *
+ * @param  \Illuminate\Notifications\Events\NotificationSending  $event
+ * @return void
+ */
+public function handle(NotificationSending $event)
+{
+    // $event->channel
+    // $event->notifiable
+    // $event->notification
+}
+
+Événement de notification envoyée
+Lorsqu'une notification est envoyée, l' Illuminate\Notifications\Events\NotificationSent événement est envoyé par le système de notification. Celui-ci contient l'entité "notifiable" et l'instance de notification elle-même. Vous pouvez enregistrer des auditeurs pour cet événement dans votre EventServiceProvider:
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Notifications\Events\NotificationSent' => [
+        'App\Listeners\LogNotification',
+    ],
+];
+
+
+Après avoir enregistré les écouteurs dans votre EventServiceProvider, utilisez la event:generatecommande Artisan pour générer rapidement des classes d'écouteurs.
+
+
+Dans un écouteur d'événement, vous pouvez accéder aux propriétés notifiable, notification, channelet responsede l'événement pour en savoir plus sur le destinataire de la notification ou sur la notification elle-même :
+
+/**
+ * Handle the event.
+ *
+ * @param  \Illuminate\Notifications\Events\NotificationSent  $event
+ * @return void
+ */
+public function handle(NotificationSent $event)
+{
+    // $event->channel
+    // $event->notifiable
+    // $event->notification
+    // $event->response
+}
+
+Canaux personnalisés
+Laravel est livré avec une poignée de canaux de notification, mais vous pouvez écrire vos propres pilotes pour envoyer des notifications via d'autres canaux. Laravel simplifie les choses. Pour commencer, définissez une classe qui contient une sendméthode. La méthode doit recevoir deux arguments : a $notifiableet a $notification.
+
+Dans la sendméthode, vous pouvez appeler des méthodes sur la notification pour récupérer un objet message compris par votre canal, puis envoyer la notification à l' $notifiableinstance comme vous le souhaitez :
+
+<?php
+ 
+namespace App\Notifications;
+ 
+use Illuminate\Notifications\Notification;
+ 
+class VoiceChannel
+{
+    /**
+     * Send the given notification.
+     *
+     * @param  mixed  $notifiable
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return void
+     */
+    public function send($notifiable, Notification $notification)
+    {
+        $message = $notification->toVoice($notifiable);
+ 
+        // Send notification to the $notifiable instance...
+    }
+}
+
+Une fois que votre classe de canal de notification a été définie, vous pouvez renvoyer le nom de la classe à partir de la viaméthode de n'importe laquelle de vos notifications. Dans cet exemple, la toVoiceméthode de votre notification peut renvoyer n'importe quel objet que vous choisissez pour représenter les messages vocaux. Par exemple, vous pouvez définir votre propre VoiceMessageclasse pour représenter ces messages :
+
+<?php
+ 
+namespace App\Notifications;
+ 
+use App\Notifications\Messages\VoiceMessage;
+use App\Notifications\VoiceChannel;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Notification;
+ 
+class InvoicePaid extends Notification
+{
+    use Queueable;
+ 
+    /**
+     * Get the notification channels.
+     *
+     * @param  mixed  $notifiable
+     * @return array|string
+     */
+    public function via($notifiable)
+    {
+        return [VoiceChannel::class];
+    }
+ 
+    /**
+     * Get the voice representation of the notification.
+     *
+     * @param  mixed  $notifiable
+     * @return VoiceMessage
+     */
+    public function toVoice($notifiable)
+    {
+        // ...
+    }
+}

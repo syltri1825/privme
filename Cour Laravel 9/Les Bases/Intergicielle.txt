@@ -1,0 +1,314 @@
+Intergiciel
+Introduction
+Définir le middleware
+Enregistrement du middleware
+Intergiciel mondial
+Affectation de middleware aux routes
+Groupes de middleware
+Intergiciel de tri
+Paramètres du middleware
+Middleware résiliable
+Introduction
+Le middleware fournit un mécanisme pratique pour inspecter et filtrer les requêtes HTTP entrant dans votre application. Par exemple, Laravel inclut un middleware qui vérifie que l'utilisateur de votre application est authentifié. Si l'utilisateur n'est pas authentifié, le middleware redirigera l'utilisateur vers l'écran de connexion de votre application. Cependant, si l'utilisateur est authentifié, le middleware permettra à la demande de continuer plus loin dans l'application.
+
+Des intergiciels supplémentaires peuvent être écrits pour effectuer diverses tâches en plus de l'authentification. Par exemple, un middleware de journalisation peut consigner toutes les requêtes entrantes dans votre application. Plusieurs middlewares sont inclus dans le framework Laravel, notamment des middlewares pour l'authentification et la protection CSRF. Tous ces middlewares sont situés dans le app/Http/Middlewarerépertoire.
+
+Définir le middleware
+Pour créer un nouveau middleware, utilisez la make:middlewarecommande Artisan :
+
+php artisan make:middleware EnsureTokenIsValid
+
+Cette commande placera une nouvelle EnsureTokenIsValidclasse dans votre app/Http/Middlewarerépertoire. Dans ce middleware, nous n'autoriserons l'accès à la route que si l' tokenentrée fournie correspond à une valeur spécifiée. Sinon, nous redirigerons les utilisateurs vers l' homeURI :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+ 
+class EnsureTokenIsValid
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+        if ($request->input('token') !== 'my-secret-token') {
+            return redirect('home');
+        }
+ 
+        return $next($request);
+    }
+}
+
+Comme vous pouvez le voir, si le donné tokenne correspond pas à notre jeton secret, le middleware renverra une redirection HTTP au client ; sinon, la demande sera transmise plus loin dans l'application. Pour transmettre la demande plus profondément dans l'application (permettant au middleware de "passer"), vous devez appeler le $nextrappel avec le $request.
+
+Il est préférable d'envisager le middleware comme une série de "couches" que les requêtes HTTP doivent traverser avant d'atteindre votre application. Chaque couche peut examiner la demande et même la rejeter entièrement.
+
+
+Tous les intergiciels sont résolus via le conteneur de service , vous pouvez donc indiquer toutes les dépendances dont vous avez besoin dans le constructeur d'un intergiciel.
+
+
+Middleware et réponses
+Bien sûr, un middleware peut effectuer des tâches avant ou après avoir transmis la requête plus profondément dans l'application. Par exemple, le middleware suivant effectuerait une tâche avant que la requête ne soit traitée par l'application :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+ 
+class BeforeMiddleware
+{
+    public function handle($request, Closure $next)
+    {
+        // Perform action
+ 
+        return $next($request);
+    }
+}
+
+Cependant, ce middleware effectuerait sa tâche après le traitement de la requête par l'application :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+ 
+class AfterMiddleware
+{
+    public function handle($request, Closure $next)
+    {
+        $response = $next($request);
+ 
+        // Perform action
+ 
+        return $response;
+    }
+}
+
+Enregistrement du middleware
+Intergiciel mondial
+Si vous souhaitez qu'un middleware s'exécute lors de chaque requête HTTP adressée à votre application, répertoriez la classe middleware dans la $middlewarepropriété de votre app/Http/Kernel.phpclasse.
+
+Affectation de middleware aux routes
+Si vous souhaitez affecter un middleware à des routes spécifiques, vous devez d'abord affecter au middleware une clé dans le app/Http/Kernel.phpfichier de votre application. Par défaut, la $routeMiddlewarepropriété de cette classe contient des entrées pour le middleware inclus avec Laravel. Vous pouvez ajouter votre propre middleware à cette liste et lui attribuer une clé de votre choix :
+
+// Within App\Http\Kernel class...
+ 
+protected $routeMiddleware = [
+    'auth' => \App\Http\Middleware\Authenticate::class,
+    'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+    'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
+    'can' => \Illuminate\Auth\Middleware\Authorize::class,
+    'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+    'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
+    'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+    'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+];
+
+Une fois le middleware défini dans le noyau HTTP, vous pouvez utiliser la middlewareméthode pour affecter un middleware à une route :
+
+Route::get('/profile', function () {
+    //
+})->middleware('auth');
+
+Vous pouvez affecter plusieurs middlewares à la route en transmettant un tableau de noms de middlewares à la middlewareméthode :
+
+Route::get('/', function () {
+    //
+})->middleware(['first', 'second']);
+
+Lors de l'attribution du middleware, vous pouvez également transmettre le nom complet de la classe :
+
+use App\Http\Middleware\EnsureTokenIsValid;
+ 
+Route::get('/profile', function () {
+    //
+})->middleware(EnsureTokenIsValid::class);
+
+Hors middleware
+Lors de l'attribution d'un middleware à un groupe de routes, vous devrez peut-être parfois empêcher l'application du middleware à une route individuelle au sein du groupe. Vous pouvez accomplir cela en utilisant la withoutMiddlewareméthode :
+
+use App\Http\Middleware\EnsureTokenIsValid;
+ 
+Route::middleware([EnsureTokenIsValid::class])->group(function () {
+    Route::get('/', function () {
+        //
+    });
+ 
+    Route::get('/profile', function () {
+        //
+    })->withoutMiddleware([EnsureTokenIsValid::class]);
+});
+
+Vous pouvez également exclure un ensemble donné de middleware d'un groupe entier de définitions de route :
+
+use App\Http\Middleware\EnsureTokenIsValid;
+ 
+Route::withoutMiddleware([EnsureTokenIsValid::class])->group(function () {
+    Route::get('/profile', function () {
+        //
+    });
+});
+
+La withoutMiddlewareméthode ne peut supprimer que le middleware de route et ne s'applique pas au middleware global .
+
+Groupes de middleware
+Parfois, vous souhaiterez peut-être regrouper plusieurs middlewares sous une seule clé pour faciliter leur affectation aux routes. Vous pouvez accomplir cela en utilisant la $middlewareGroupspropriété de votre noyau HTTP.
+
+Prêt à l'emploi, Laravel est livré avec des groupes webd' apiintergiciels contenant des intergiciels communs que vous voudrez peut-être appliquer à vos itinéraires Web et API. N'oubliez pas que ces groupes de middleware sont automatiquement appliqués par le App\Providers\RouteServiceProviderfournisseur de services de votre application aux routes dans vos fichiers de routes webet correspondants :api
+
+/**
+ * The application's route middleware groups.
+ *
+ * @var array
+ */
+protected $middlewareGroups = [
+    'web' => [
+        \App\Http\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \App\Http\Middleware\VerifyCsrfToken::class,
+        \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    ],
+ 
+    'api' => [
+        'throttle:api',
+        \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    ],
+];
+
+Les groupes d'intergiciels peuvent être affectés aux routes et aux actions du contrôleur en utilisant la même syntaxe que les intergiciels individuels. Encore une fois, les groupes de middlewares facilitent l'affectation simultanée de plusieurs middlewares à une route :
+
+Route::get('/', function () {
+    //
+})->middleware('web');
+ 
+Route::middleware(['web'])->group(function () {
+    //
+});
+
+
+Par défaut, les groupes webet apimiddleware sont automatiquement appliqués aux fichiers routes/web.phpet correspondants de votre application par le .routes/api.phpApp\Providers\RouteServiceProvider
+
+
+Intergiciel de tri
+Rarement, vous pouvez avoir besoin que votre middleware s'exécute dans un ordre spécifique, mais sans contrôler leur ordre lorsqu'ils sont affectés à la route. Dans ce cas, vous pouvez spécifier votre priorité middleware en utilisant la $middlewarePrioritypropriété de votre app/Http/Kernel.phpfichier. Cette propriété peut ne pas exister dans votre noyau HTTP par défaut. S'il n'existe pas, vous pouvez copier sa définition par défaut ci-dessous :
+
+/**
+ * The priority-sorted list of middleware.
+ *
+ * This forces non-global middleware to always be in the given order.
+ *
+ * @var string[]
+ */
+protected $middlewarePriority = [
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+    \Illuminate\Routing\Middleware\ThrottleRequests::class,
+    \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
+    \Illuminate\Contracts\Session\Middleware\AuthenticatesSessions::class,
+    \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    \Illuminate\Auth\Middleware\Authorize::class,
+];
+
+Paramètres du middleware
+Le middleware peut également recevoir des paramètres supplémentaires. Par exemple, si votre application doit vérifier que l'utilisateur authentifié a un "rôle" donné avant d'effectuer une action donnée, vous pouvez créer un EnsureUserHasRolemiddleware qui reçoit un nom de rôle comme argument supplémentaire.
+
+Des paramètres middleware supplémentaires seront transmis au middleware après l' $nextargument :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+ 
+class EnsureUserHasRole
+{
+    /**
+     * Handle the incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @param  string  $role
+     * @return mixed
+     */
+    public function handle($request, Closure $next, $role)
+    {
+        if (! $request->user()->hasRole($role)) {
+            // Redirect...
+        }
+ 
+        return $next($request);
+    }
+ 
+}
+
+Les paramètres du middleware peuvent être spécifiés lors de la définition de la route en séparant le nom du middleware et les paramètres par un :. Plusieurs paramètres doivent être délimités par des virgules :
+
+Route::put('/post/{id}', function ($id) {
+    //
+})->middleware('role:editor');
+
+Middleware résiliable
+Parfois, un middleware peut avoir besoin de faire du travail après que la réponse HTTP a été envoyée au navigateur. Si vous définissez une terminateméthode sur votre middleware et que votre serveur web utilise FastCGI, la terminateméthode sera automatiquement appelée après l'envoi de la réponse au navigateur :
+
+<?php
+ 
+namespace Illuminate\Session\Middleware;
+ 
+use Closure;
+ 
+class TerminatingMiddleware
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+        return $next($request);
+    }
+ 
+    /**
+     * Handle tasks after the response has been sent to the browser.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Illuminate\Http\Response  $response
+     * @return void
+     */
+    public function terminate($request, $response)
+    {
+        // ...
+    }
+}
+
+La terminateméthode doit recevoir à la fois la demande et la réponse. Une fois que vous avez défini un middleware terminable, vous devez l'ajouter à la liste des routes ou middleware global dans le app/Http/Kernel.phpfichier.
+
+Lors de l'appel de la terminateméthode sur votre middleware, Laravel résoudra une nouvelle instance du middleware à partir du service container . Si vous souhaitez utiliser la même instance de middleware lorsque les méthodes handleet terminatesont appelées, enregistrez le middleware auprès du conteneur à l'aide de la singletonméthode du conteneur. Généralement, cela devrait être fait dans la registerméthode de votre AppServiceProvider:
+
+use App\Http\Middleware\TerminatingMiddleware;
+ 
+/**
+ * Register any application services.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->app->singleton(TerminatingMiddleware::class);
+}
+

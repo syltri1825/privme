@@ -1,0 +1,323 @@
+Base de données : Pagination
+Introduction
+Utilisation de base
+Pagination des résultats du générateur de requêtes
+Pagination de résultats éloquents
+Pagination du curseur
+Création manuelle d'un paginateur
+Personnalisation des URL de pagination
+Affichage des résultats de pagination
+Ajustement de la fenêtre de lien de pagination
+Conversion des résultats en JSON
+Personnalisation de la vue de pagination
+Utiliser Bootstrap
+Méthodes d'instance Paginator et LengthAwarePaginator
+Méthodes d'instance de paginateur de curseur
+Introduction
+Dans d'autres frameworks, la pagination peut être très pénible. Nous espérons que l'approche de Laravel en matière de pagination sera une bouffée d'air frais. Le paginateur de Laravel est intégré au générateur de requêtes et à Eloquent ORM et fournit une pagination pratique et facile à utiliser des enregistrements de base de données sans aucune configuration.
+
+Par défaut, le HTML généré par le paginateur est compatible avec le framework CSS Tailwind ; cependant, la prise en charge de la pagination Bootstrap est également disponible.
+
+Vent arrière JIT
+Si vous utilisez les vues de pagination Tailwind par défaut de Laravel et le moteur Tailwind JIT, vous devez vous assurer que la clé du tailwind.config.jsfichier de votre application fait contentréférence aux vues de pagination de Laravel afin que leurs classes Tailwind ne soient pas purgées :
+
+content: [
+    './resources/**/*.blade.php',
+    './resources/**/*.js',
+    './resources/**/*.vue',
+    './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
+],
+
+Utilisation de base
+Pagination des résultats du générateur de requêtes
+Il existe plusieurs façons de paginer les éléments. Le plus simple consiste à utiliser la paginateméthode sur le générateur de requêtes ou une requête Eloquent . La paginateméthode prend automatiquement en charge la définition de la "limite" et du "décalage" de la requête en fonction de la page actuelle consultée par l'utilisateur. Par défaut, la page en cours est détectée par la valeur de l' pageargument de chaîne de requête sur la requête HTTP. Cette valeur est automatiquement détectée par Laravel, et est également automatiquement insérée dans les liens générés par le paginateur.
+
+Dans cet exemple, le seul argument passé à la paginateméthode est le nombre d'éléments que vous souhaitez afficher "par page". Dans ce cas précisons que nous souhaitons afficher les 15éléments par page :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show all application users.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        return view('user.index', [
+            'users' => DB::table('users')->paginate(15)
+        ]);
+    }
+}
+
+Mise en page simple
+La paginateméthode compte le nombre total d'enregistrements correspondant à la requête avant de récupérer les enregistrements de la base de données. Ceci est fait pour que le paginateur sache combien de pages d'enregistrements il y a au total. Toutefois, si vous ne prévoyez pas d'afficher le nombre total de pages dans l'interface utilisateur de votre application, la requête de nombre d'enregistrements n'est pas nécessaire.
+
+Par conséquent, si vous n'avez besoin que d'afficher de simples liens "Suivant" et "Précédent" dans l'interface utilisateur de votre application, vous pouvez utiliser la simplePaginateméthode pour effectuer une seule requête efficace :
+
+$users = DB::table('users')->simplePaginate(15);
+
+Pagination de résultats éloquents
+Vous pouvez également paginer les requêtes Eloquent . Dans cet exemple, nous allons paginer le App\Models\Usermodèle et indiquer que nous prévoyons d'afficher 15 enregistrements par page. Comme vous pouvez le voir, la syntaxe est presque identique à la pagination des résultats du générateur de requête :
+
+use App\Models\User;
+ 
+$users = User::paginate(15);
+
+Bien sûr, vous pouvez appeler la paginateméthode après avoir défini d'autres contraintes sur la requête, telles que des whereclauses :
+
+$users = User::where('votes', '>', 100)->paginate(15);
+
+Vous pouvez également utiliser la simplePaginateméthode lors de la pagination des modèles Eloquent :
+
+$users = User::where('votes', '>', 100)->simplePaginate(15);
+
+De même, vous pouvez utiliser la cursorPaginateméthode pour paginer avec le curseur les modèles Eloquent :
+
+$users = User::where('votes', '>', 100)->cursorPaginate(15);
+
+Plusieurs instances de paginateur par page
+Parfois, vous devrez peut-être rendre deux paginateurs distincts sur un seul écran rendu par votre application. Cependant, si les deux instances de paginateur utilisent le pageparamètre de chaîne de requête pour stocker la page actuelle, les deux paginateurs seront en conflit. Pour résoudre ce conflit, vous pouvez passer le nom du paramètre de chaîne de requête que vous souhaitez utiliser pour stocker la page actuelle du paginateur via le troisième argument fourni aux méthodes paginate, simplePaginateet :cursorPaginate
+
+use App\Models\User;
+ 
+$users = User::where('votes', '>', 100)->paginate(
+    $perPage = 15, $columns = ['*'], $pageName = 'users'
+);
+
+Pagination du curseur
+Alors que paginateet simplePaginatecréent des requêtes à l'aide de la clause SQL "offset", la pagination du curseur fonctionne en construisant des clauses "where" qui comparent les valeurs des colonnes ordonnées contenues dans la requête, fournissant les performances de base de données les plus efficaces disponibles parmi toutes les méthodes de pagination de Laravel. Cette méthode de pagination est particulièrement bien adaptée aux grands ensembles de données et aux interfaces utilisateur à défilement "infini".
+
+Contrairement à la pagination basée sur le décalage, qui inclut un numéro de page dans la chaîne de requête des URL générées par le paginateur, la pagination basée sur le curseur place une chaîne "curseur" dans la chaîne de requête. Le curseur est une chaîne codée contenant l'emplacement où la prochaine requête paginée doit commencer à paginer et la direction dans laquelle elle doit paginer :
+
+http://localhost/users?cursor=eyJpZCI6MTUsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0
+
+Vous pouvez créer une instance de pagination basée sur un curseur via la cursorPaginateméthode proposée par le générateur de requêtes. Cette méthode retourne une instance de Illuminate\Pagination\CursorPaginator:
+
+$users = DB::table('users')->orderBy('id')->cursorPaginate(15);
+
+Une fois que vous avez récupéré une instance de paginateur de curseur, vous pouvez afficher les résultats de la pagination comme vous le feriez généralement lorsque vous utilisez les méthodes paginateet . simplePaginatePour plus d'informations sur les méthodes d'instance proposées par le paginateur de curseur, veuillez consulter la documentation sur les méthodes d'instance de paginateur de curseur .
+
+
+Votre requête doit contenir une clause "order by" afin de tirer parti de la pagination du curseur.
+
+
+Curseur vs pagination décalée
+Pour illustrer les différences entre la pagination décalée et la pagination du curseur, examinons quelques exemples de requêtes SQL. Les deux requêtes suivantes afficheront toutes deux la "deuxième page" de résultats pour une userstable triée parid :
+
+# Offset Pagination...
+select * from users order by id asc limit 15 offset 15;
+ 
+# Cursor Pagination...
+select * from users where id > 15 order by id asc limit 15;
+
+La requête de pagination du curseur offre les avantages suivants par rapport à la pagination décalée :
+
+Pour les grands ensembles de données, la pagination du curseur offrira de meilleures performances si les colonnes "trier par" sont indexées. En effet, la clause "offset" analyse toutes les données précédemment mises en correspondance.
+Pour les ensembles de données avec des écritures fréquentes, la pagination décalée peut ignorer des enregistrements ou afficher des doublons si des résultats ont été récemment ajoutés ou supprimés de la page qu'un utilisateur consulte actuellement.
+Cependant, la pagination du curseur présente les limitations suivantes :
+
+Comme simplePaginate, la pagination du curseur ne peut être utilisée que pour afficher les liens "Suivant" et "Précédent" et ne prend pas en charge la génération de liens avec des numéros de page.
+Il nécessite que le classement soit basé sur au moins une colonne unique ou une combinaison de colonnes uniques. Les colonnes avec des nullvaleurs ne sont pas prises en charge.
+Les expressions de requête dans les clauses "order by" ne sont prises en charge que si elles sont associées à un alias et ajoutées également à la clause "select".
+Création manuelle d'un paginateur
+Parfois, vous souhaiterez peut-être créer une instance de pagination manuellement, en lui transmettant un tableau d'éléments que vous avez déjà en mémoire. Vous pouvez le faire en créant soit un Illuminate\Pagination\Paginator, Illuminate\Pagination\LengthAwarePaginatorsoit une Illuminate\Pagination\CursorPaginatorinstance, selon vos besoins.
+
+Les classes Paginatoret CursorPaginatorn'ont pas besoin de connaître le nombre total d'éléments dans le jeu de résultats ; cependant, à cause de cela, ces classes n'ont pas de méthodes pour récupérer l'index de la dernière page. Le LengthAwarePaginatoraccepte presque les mêmes arguments que le Paginator; cependant, il nécessite un décompte du nombre total d'éléments dans le jeu de résultats.
+
+En d'autres termes, le Paginatorcorrespond à la simplePaginateméthode sur le générateur de requêtes, le CursorPaginatorcorrespond à la cursorPaginateméthode et le LengthAwarePaginatorcorrespond à la paginateméthode.
+
+
+Lors de la création manuelle d'une instance de paginateur, vous devez "découper" manuellement le tableau des résultats que vous transmettez au paginateur. Si vous ne savez pas comment procéder, consultez la fonction PHP array_slice .
+
+
+Personnalisation des URL de pagination
+Par défaut, les liens générés par le paginateur correspondront à l'URI de la requête actuelle. Cependant, la withPathméthode du paginateur vous permet de personnaliser l'URI utilisée par le paginateur lors de la génération des liens. Par exemple, si vous voulez que le paginateur génère des liens comme http://example.com/admin/users?page=N, vous devez passer /admin/usersà la withPathméthode :
+
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    $users = User::paginate(15);
+ 
+    $users->withPath('/admin/users');
+ 
+    //
+});
+
+Ajout de valeurs de chaîne de requête
+Vous pouvez ajouter à la chaîne de requête des liens de pagination à l'aide de la appendsméthode. Par exemple, pour ajouter sort=votesà chaque lien de pagination, vous devez faire l'appel suivant à appends:
+
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    $users = User::paginate(15);
+ 
+    $users->appends(['sort' => 'votes']);
+ 
+    //
+});
+
+Vous pouvez utiliser la withQueryStringméthode si vous souhaitez ajouter toutes les valeurs de chaîne de requête de la requête actuelle aux liens de pagination :
+
+$users = User::paginate(15)->withQueryString();
+
+Ajout de fragments de hachage
+Si vous devez ajouter un "fragment de hachage" aux URL générées par le paginateur, vous pouvez utiliser la fragmentméthode. Par exemple, pour ajouter #usersà la fin de chaque lien de pagination, vous devez invoquer la fragmentméthode comme suit :
+
+$users = User::paginate(15)->fragment('users');
+
+Affichage des résultats de pagination
+Lors de l'appel de la paginateméthode, vous recevrez une instance de Illuminate\Pagination\LengthAwarePaginator, tandis que l'appel de la simplePaginateméthode renvoie une instance de Illuminate\Pagination\Paginator. Et, enfin, l'appel de la cursorPaginateméthode renvoie une instance de Illuminate\Pagination\CursorPaginator.
+
+Ces objets fournissent plusieurs méthodes qui décrivent le jeu de résultats. En plus de ces méthodes d'assistance, les instances de paginateur sont des itérateurs et peuvent être bouclées sous forme de tableau. Ainsi, une fois que vous avez récupéré les résultats, vous pouvez afficher les résultats et rendre les liens de page en utilisant Blade :
+
+<div class="container">
+    @foreach ($users as $user)
+        {{ $user->name }}
+    @endforeach
+</div>
+ 
+{{ $users->links() }}
+
+La linksméthode rendra les liens vers le reste des pages dans le jeu de résultats. Chacun de ces liens contiendra déjà la pagevariable de chaîne de requête appropriée. N'oubliez pas que le code HTML généré par la linksméthode est compatible avec le framework CSS Tailwind .
+
+Ajustement de la fenêtre de lien de pagination
+Lorsque le paginateur affiche les liens de pagination, le numéro de la page courante est affiché ainsi que les liens des trois pages avant et après la page courante. En utilisant la onEachSideméthode, vous pouvez contrôler le nombre de liens supplémentaires affichés de chaque côté de la page actuelle dans la fenêtre coulissante centrale des liens générés par le paginateur :
+
+{{ $users->onEachSide(5)->links() }}
+
+Conversion des résultats en JSON
+Les classes de pagination Laravel implémentent le Illuminate\Contracts\Support\Jsonablecontrat Interface et exposent la toJsonméthode, il est donc très facile de convertir vos résultats de pagination en JSON. Vous pouvez également convertir une instance de paginateur en JSON en la renvoyant à partir d'une route ou d'une action de contrôleur :
+
+use App\Models\User;
+ 
+Route::get('/users', function () {
+    return User::paginate();
+});
+
+Le JSON du paginateur inclura des méta-informations telles que total, current_page, last_page, etc. Les enregistrements de résultat sont disponibles via la dataclé dans le tableau JSON. Voici un exemple de JSON créé en renvoyant une instance de paginateur à partir d'une route :
+
+{
+   "total": 50,
+   "per_page": 15,
+   "current_page": 1,
+   "last_page": 4,
+   "first_page_url": "http://laravel.app?page=1",
+   "last_page_url": "http://laravel.app?page=4",
+   "next_page_url": "http://laravel.app?page=2",
+   "prev_page_url": null,
+   "path": "http://laravel.app",
+   "from": 1,
+   "to": 15,
+   "data":[
+        {
+            // Record...
+        },
+        {
+            // Record...
+        }
+   ]
+}
+
+Personnalisation de la vue de pagination
+Par défaut, les vues rendues pour afficher les liens de pagination sont compatibles avec le framework CSS Tailwind . Cependant, si vous n'utilisez pas Tailwind, vous êtes libre de définir vos propres vues pour afficher ces liens. Lors de l'appel de la linksméthode sur une instance de paginateur, vous pouvez passer le nom de la vue comme premier argument à la méthode :
+
+{{ $paginator->links('view.name') }}
+ 
+<!-- Passing additional data to the view... -->
+{{ $paginator->links('view.name', ['foo' => 'bar']) }}
+
+Cependant, le moyen le plus simple de personnaliser les vues de pagination consiste à les exporter dans votre resources/views/vendorrépertoire à l'aide de la vendor:publishcommande :
+
+php artisan vendor:publish --tag=laravel-pagination
+
+Cette commande placera les vues dans le resources/views/vendor/paginationrépertoire de votre application. Le tailwind.blade.phpfichier dans ce répertoire correspond à la vue de pagination par défaut. Vous pouvez éditer ce fichier pour modifier la pagination HTML.
+
+Si vous souhaitez désigner un fichier différent comme vue de pagination par défaut, vous pouvez invoquer les méthodes de pagination defaultViewet defaultSimpleViewdans la bootméthode de votre App\Providers\AppServiceProviderclasse :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Pagination\Paginator;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Paginator::defaultView('view-name');
+ 
+        Paginator::defaultSimpleView('view-name');
+    }
+}
+
+Utiliser Bootstrap
+Laravel inclut des vues de pagination construites à l'aide de Bootstrap CSS . Pour utiliser ces vues au lieu des vues par défaut de Tailwind, vous pouvez appeler le paginateur useBootstrapFourou les useBootstrapFiveméthodes dans la bootméthode de votre App\Providers\AppServiceProviderclasse :
+
+use Illuminate\Pagination\Paginator;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Paginator::useBootstrapFive();
+    Paginator::useBootstrapFour();
+}
+
+Méthodes d'instance Paginator / LengthAwarePaginator
+Chaque instance de paginateur fournit des informations de pagination supplémentaires via les méthodes suivantes :
+
+Méthode	La description
+$paginator->count()	Obtenir le nombre d'éléments pour la page actuelle.
+$paginator->currentPage()	Obtenir le numéro de page actuel.
+$paginator->firstItem()	Obtenez le numéro de résultat du premier élément dans les résultats.
+$paginator->getOptions()	Obtenez les options de pagination.
+$paginator->getUrlRange($start, $end)	Créez une plage d'URL de pagination.
+$paginator->hasPages()	Déterminez s'il y a suffisamment d'éléments à diviser en plusieurs pages.
+$paginator->hasMorePages()	Déterminez s'il y a plus d'éléments dans le magasin de données.
+$paginator->items()	Obtenir les éléments de la page actuelle.
+$paginator->lastItem()	Obtenez le numéro de résultat du dernier élément dans les résultats.
+$paginator->lastPage()	Obtenir le numéro de page de la dernière page disponible. (Non disponible lors de l'utilisation de simplePaginate).
+$paginator->nextPageUrl()	Obtenez l'URL de la page suivante.
+$paginator->onFirstPage()	Déterminez si le paginateur est sur la première page.
+$paginator->perPage()	Le nombre d'éléments à afficher par page.
+$paginator->previousPageUrl()	Obtenez l'URL de la page précédente.
+$paginator->total()	Déterminez le nombre total d'éléments correspondants dans le magasin de données. (Non disponible lors de l'utilisation de simplePaginate).
+$paginator->url($page)	Obtenir l'URL d'un numéro de page donné.
+$paginator->getPageName()	Obtenez la variable de chaîne de requête utilisée pour stocker la page.
+$paginator->setPageName($name)	Définissez la variable de chaîne de requête utilisée pour stocker la page.
+Méthodes d'instance de paginateur de curseur
+Chaque instance de paginateur de curseur fournit des informations de pagination supplémentaires via les méthodes suivantes :
+
+Méthode	La description
+$paginator->count()	Obtenir le nombre d'éléments pour la page actuelle.
+$paginator->cursor()	Obtenez l'instance actuelle du curseur.
+$paginator->getOptions()	Obtenez les options de pagination.
+$paginator->hasPages()	Déterminez s'il y a suffisamment d'éléments à diviser en plusieurs pages.
+$paginator->hasMorePages()	Déterminez s'il y a plus d'éléments dans le magasin de données.
+$paginator->getCursorName()	Obtenez la variable de chaîne de requête utilisée pour stocker le curseur.
+$paginator->items()	Obtenir les éléments de la page actuelle.
+$paginator->nextCursor()	Obtenez l'instance du curseur pour le prochain ensemble d'éléments.
+$paginator->nextPageUrl()	Obtenez l'URL de la page suivante.
+$paginator->onFirstPage()	Déterminez si le paginateur est sur la première page.
+$paginator->onLastPage()	Déterminez si le paginateur est sur la dernière page.
+$paginator->perPage()	Le nombre d'éléments à afficher par page.
+$paginator->previousCursor()	Obtenez l'instance de curseur pour l'ensemble d'éléments précédent.
+$paginator->previousPageUrl()	Obtenez l'URL de la page précédente.
+$paginator->setCursorName()	Définissez la variable de chaîne de requête utilisée pour stocker le curseur.
+$paginator->url($cursor)	Obtenez l'URL d'une instance de curseur donnée.

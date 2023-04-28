@@ -1,0 +1,155 @@
+Contrats
+Introduction
+Contrats Vs. Façades
+Quand utiliser les contrats
+Comment utiliser les contrats
+Référence du contrat
+Introduction
+Les "contrats" de Laravel sont un ensemble d'interfaces qui définissent les services de base fournis par le framework. Par exemple, un Illuminate\Contracts\Queue\Queuecontrat définit les méthodes nécessaires à la mise en file d'attente des travaux, tandis que le Illuminate\Contracts\Mail\Mailercontrat définit les méthodes nécessaires à l'envoi d'e-mails.
+
+Chaque contrat a une implémentation correspondante fournie par le framework. Par exemple, Laravel fournit une implémentation de file d'attente avec une variété de pilotes et une implémentation de courrier qui est alimentée par Symfony Mailer .
+
+Tous les contrats Laravel vivent dans leur propre référentiel GitHub . Cela fournit un point de référence rapide pour tous les contrats disponibles, ainsi qu'un seul package découplé qui peut être utilisé lors de la création de packages qui interagissent avec les services Laravel.
+
+Contrats Vs. Façades
+Les façades et les fonctions d'assistance de Laravel offrent un moyen simple d'utiliser les services de Laravel sans avoir besoin d'indiquer et de résoudre des contrats hors du conteneur de services. Dans la plupart des cas, chaque façade a un contrat équivalent.
+
+Contrairement aux façades, qui ne vous obligent pas à les exiger dans le constructeur de votre classe, les contrats vous permettent de définir des dépendances explicites pour vos classes. Certains développeurs préfèrent définir explicitement leurs dépendances de cette manière et préfèrent donc utiliser des contrats, tandis que d'autres développeurs apprécient la commodité des façades. En général, la plupart des applications peuvent utiliser des façades sans problème lors du développement.
+
+Quand utiliser les contrats
+La décision d'utiliser des contrats ou des façades dépendra de vos goûts personnels et des goûts de votre équipe de développement. Les contrats et les façades peuvent être utilisés pour créer des applications Laravel robustes et bien testées. Contrats et façades ne s'excluent pas mutuellement. Certaines parties de vos applications peuvent utiliser des façades tandis que d'autres dépendent de contrats. Tant que vous vous concentrez sur les responsabilités de votre classe, vous remarquerez très peu de différences pratiques entre l'utilisation de contrats et de façades.
+
+En général, la plupart des applications peuvent utiliser des façades sans problème lors du développement. Si vous créez un package qui s'intègre à plusieurs frameworks PHP, vous souhaiterez peut-être utiliser le illuminate/contractspackage pour définir votre intégration avec les services de Laravel sans avoir besoin d'exiger les implémentations concrètes de Laravel dans le composer.jsonfichier de votre package.
+
+Comment utiliser les contrats
+Alors, comment obtenez-vous une mise en œuvre d'un contrat? C'est en fait assez simple.
+
+De nombreux types de classes dans Laravel sont résolus via le conteneur de services , notamment les contrôleurs, les écouteurs d'événements, les intergiciels, les tâches en file d'attente et même les fermetures de routes. Ainsi, pour obtenir une implémentation d'un contrat, vous pouvez simplement "indiquer le type" de l'interface dans le constructeur de la classe en cours de résolution.
+
+Par exemple, jetez un œil à cet écouteur d'événement :
+
+<?php
+ 
+namespace App\Listeners;
+ 
+use App\Events\OrderWasPlaced;
+use App\Models\User;
+use Illuminate\Contracts\Redis\Factory;
+ 
+class CacheOrderInformation
+{
+    /**
+     * The Redis factory implementation.
+     *
+     * @var \Illuminate\Contracts\Redis\Factory
+     */
+    protected $redis;
+ 
+    /**
+     * Create a new event handler instance.
+     *
+     * @param  \Illuminate\Contracts\Redis\Factory  $redis
+     * @return void
+     */
+    public function __construct(Factory $redis)
+    {
+        $this->redis = $redis;
+    }
+ 
+    /**
+     * Handle the event.
+     *
+     * @param  \App\Events\OrderWasPlaced  $event
+     * @return void
+     */
+    public function handle(OrderWasPlaced $event)
+    {
+        //
+    }
+}
+
+Lorsque l'écouteur d'événement est résolu, le conteneur de service lit les indications de type sur le constructeur de la classe et injecte la valeur appropriée. Pour en savoir plus sur l'enregistrement d'éléments dans le conteneur de service, consultez sa documentation .
+
+Référence du contrat
+Ce tableau fournit une référence rapide à tous les contrats Laravel et leurs façades équivalentes :
+
+Contracter	Façade de références
+Illuminate\Contracts\Auth\Access\Authorizable	  
+Illuminate\Contracts\Auth\Access\Gate	Gate
+Illuminate\Contracts\Auth\Authenticatable	  
+Illuminate\Contracts\Auth\CanResetPassword	 
+Illuminate\Contrats\Auth\Usine	Auth
+Illuminate\Contrats\Auth\Guard	Auth::guard()
+Illuminate\Contracts\Auth\PasswordBroker	Password::broker()
+Illuminate\Contracts\Auth\PasswordBrokerFactory	Password
+Illuminate\Contrats\Auth\StatefulGuard	 
+Illuminate\Contracts\Auth\SupportsBasicAuth	 
+Illuminate\Contracts\Auth\UserProvider	 
+Illuminate\Contrats\Bus\Dispatcher	Bus
+Illuminate\Contrats\Bus\QueueingDispatcher	Bus::dispatchToQueue()
+Illuminate\Contrats\Diffusion\Usine	Broadcast
+Illuminate\Contrats\Diffusion\Diffuseur	Broadcast::connection()
+Illuminate\Contracts\Broadcasting\ShouldBroadcast	 
+Illuminate\Contracts\Broadcasting\ShouldBroadcastNow	 
+Illuminate\Contrats\Cache\Factory	Cache
+Illuminate\Contrats\Cache\Verrouiller	 
+Illuminate\Contrats\Cache\LockProvider	 
+Illuminate\Contrats\Cache\Repository	Cache::driver()
+Illuminate\Contrats\Cache\Store	 
+Illuminate\Contrats\Config\Repository	Config
+Illuminate\Contrats\Console\Application	 
+Illuminate\Contrats\Console\Noyau	Artisan
+Illuminate\Contrats\Conteneur\Conteneur	App
+Illuminate\Contrats\Cookie\Usine	Cookie
+Illuminate\Contrats\Cookie\QueueingFactory	Cookie::queue()
+Illuminate\Contracts\Database\ModelIdentifier	 
+Illuminate\Contracts\Debug\ExceptionHandler	 
+Illuminate\Contrats\Encryption\Encrypter	Crypt
+Illuminate\Contracts\Events\Dispatcher	Event
+Illuminate\Contracts\Filesystem\Cloud	Storage::cloud()
+Illuminate\Contracts\Filesystem\Factory	Storage
+Illuminate\Contracts\Filesystem\Filesystem	Storage::disk()
+Illuminate\Contrats\Fondation\Application	App
+Illuminate\Contracts\Hashing\Hasher	Hash
+Illuminate\Contracts\Http\Kernel	 
+Illuminate\Contrats\Mail\MailQueue	Mail::queue()
+Illuminate\Contrats\Mail\Envoyable	 
+Illuminate\Contrats\Mail\Mailer	Mail
+Illuminate\Contrats\Notifications\Dispatcher	Notification
+Illuminate\Contrats\Notifications\Usine	Notification
+Illuminate\Contracts\Pagination\LengthAwarePaginator	 
+Illuminate\Contrats\Pagination\Paginator	 
+Illuminate\Contrats\Pipeline\Hub	 
+Illuminate\Contrats\Pipeline\Pipeline	 
+Illuminate\Contracts\Queue\EntityResolver	 
+Illuminate\Contrats\File d'attente\Usine	Queue
+Illuminate\Contrats\File d'attente\Tâche	 
+Illuminate\Contrats\File d'attente\Moniteur	Queue
+Illuminate\Contrats\File d'attente\File d'attente	Queue::connection()
+Illuminate\Contracts\Queue\QueueableCollection	 
+Illuminate\Contracts\Queue\QueueableEntity	 
+Illuminate\Contracts\File d'attente\ShouldQueue	 
+Illuminate\Contrats\Redis\Factory	Redis
+Illuminate\Contracts\Routing\BindingRegistrar	Route
+Illuminate\Contracts\Routing\Registrar	Route
+Illuminate\Contracts\Routing\ResponseFactory	Response
+Illuminate\Contracts\Routing\UrlGenerator	URL
+Illuminate\Contracts\Routing\UrlRoutable	 
+Illuminate\Contrats\Session\Session	Session::driver()
+Illuminate\Contracts\Support\Arrayable	 
+Illuminate\Contrats\Support\Htmlable	 
+Illuminate\Contrats\Support\Jsonable	 
+Illuminate\Contrats\Support\MessageBag	 
+Illuminate\Contracts\Support\MessageProvider	 
+Illuminate\Contracts\Support\Renderable	 
+Illuminate\Contrats\Support\Responsable	 
+Illuminate\Contracts\Translation\Loader	 
+Illuminate\Contrats\Traduction\Traducteur	Lang
+Illuminate\Contrats\Validation\Usine	Validator
+Illuminate\Contracts\Validation\ImplicitRule	 
+Illuminate\Contrats\Validation\Règle	 
+Illuminate\Contracts\Validation\ValidatesWhenResolved	 
+Illuminate\Contrats\Validation\Validateur	Validator::make()
+Illuminate\Contracts\View\Engine	 
+Illuminate\Contracts\View\Factory	View
+Illuminate\Contrats\Afficher\Afficher	View::make()

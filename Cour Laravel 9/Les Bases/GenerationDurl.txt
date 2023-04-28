@@ -1,0 +1,210 @@
+Génération d'URL
+Introduction
+Les bases
+Génération d'URL
+Accéder à l'URL actuelle
+URL pour les routes nommées
+URL signées
+URL pour les actions du contrôleur
+Les valeurs par défaut
+Introduction
+Laravel fournit plusieurs assistants pour vous aider à générer des URL pour votre application. Ces aides sont principalement utiles lors de la création de liens dans vos modèles et réponses API, ou lors de la génération de réponses de redirection vers une autre partie de votre application.
+
+Les bases
+Génération d'URL
+L' urlassistant peut être utilisé pour générer des URL arbitraires pour votre application. L'URL générée utilisera automatiquement le schéma (HTTP ou HTTPS) et l'hôte de la requête en cours gérée par l'application :
+
+$post = App\Models\Post::find(1);
+ 
+echo url("/posts/{$post->id}");
+ 
+// http://example.com/posts/1
+
+Accéder à l'URL actuelle
+Si aucun chemin n'est fourni à l' urlassistant, une Illuminate\Routing\UrlGeneratorinstance est renvoyée, vous permettant d'accéder aux informations sur l'URL actuelle :
+
+// Get the current URL without the query string...
+echo url()->current();
+ 
+// Get the current URL including the query string...
+echo url()->full();
+ 
+// Get the full URL for the previous request...
+echo url()->previous();
+
+Chacune de ces méthodes est également accessible via la URL façade :
+
+use Illuminate\Support\Facades\URL;
+ 
+echo URL::current();
+
+URL pour les routes nommées
+L' routeassistant peut être utilisé pour générer des URL vers des routes nommées . Les routes nommées vous permettent de générer des URL sans être couplées à l'URL réelle définie sur la route. Par conséquent, si l'URL de la route change, aucune modification ne doit être apportée à vos appels à la routefonction. Par exemple, imaginez que votre application contient une route définie comme suit :
+
+Route::get('/post/{post}', function (Post $post) {
+    //
+})->name('post.show');
+
+Pour générer une URL vers cette route, vous pouvez utiliser l' routeassistant comme suit :
+
+echo route('post.show', ['post' => 1]);
+ 
+// http://example.com/post/1
+
+Bien sûr, le routehelper peut également être utilisé pour générer des URL pour des routes avec plusieurs paramètres :
+
+Route::get('/post/{post}/comment/{comment}', function (Post $post, Comment $comment) {
+    //
+})->name('comment.show');
+ 
+echo route('comment.show', ['post' => 1, 'comment' => 3]);
+ 
+// http://example.com/post/1/comment/3
+
+Tout élément de tableau supplémentaire qui ne correspond pas aux paramètres de définition de la route sera ajouté à la chaîne de requête de l'URL :
+
+echo route('post.show', ['post' => 1, 'search' => 'rocket']);
+ 
+// http://example.com/post/1?search=rocket
+
+Modèles éloquents
+Vous générerez souvent des URL à l'aide de la clé de route (généralement la clé primaire) des modèles Eloquent . Pour cette raison, vous pouvez passer des modèles Eloquent comme valeurs de paramètre. L' routeassistant extraira automatiquement la clé de route du modèle :
+
+echo route('post.show', ['post' => $post]);
+
+URL signées
+Laravel vous permet de créer facilement des URL "signées" vers des routes nommées. Ces URL ont un hachage "signature" ajouté à la chaîne de requête qui permet à Laravel de vérifier que l'URL n'a pas été modifiée depuis sa création. Les URL signées sont particulièrement utiles pour les routes accessibles au public mais nécessitant une couche de protection contre la manipulation d'URL.
+
+Par exemple, vous pouvez utiliser des URL signées pour implémenter un lien public de "désinscription" qui est envoyé par e-mail à vos clients. Pour créer une URL signée vers une route nommée, utilisez la signedRouteméthode de la URLfaçade :
+
+use Illuminate\Support\Facades\URL;
+ 
+return URL::signedRoute('unsubscribe', ['user' => 1]);
+
+Si vous souhaitez générer une URL de route signée temporaire qui expire après un laps de temps spécifié, vous pouvez utiliser la temporarySignedRouteméthode. Lorsque Laravel valide une URL de route signée temporaire, il s'assure que l'horodatage d'expiration encodé dans l'URL signée ne s'est pas écoulé :
+
+use Illuminate\Support\Facades\URL;
+ 
+return URL::temporarySignedRoute(
+    'unsubscribe', now()->addMinutes(30), ['user' => 1]
+);
+
+Validation des demandes de routage signées
+Pour vérifier qu'une requête entrante a une signature valide, vous devez appeler la hasValidSignatureméthode sur l' Illuminate\Http\Requestinstance entrante :
+
+use Illuminate\Http\Request;
+ 
+Route::get('/unsubscribe/{user}', function (Request $request) {
+    if (! $request->hasValidSignature()) {
+        abort(401);
+    }
+ 
+    // ...
+})->name('unsubscribe');
+
+Parfois, vous devrez peut-être autoriser l'interface de votre application à ajouter des données à une URL signée, par exemple lors de la pagination côté client. Par conséquent, vous pouvez spécifier des paramètres de requête de demande qui doivent être ignorés lors de la validation d'une URL signée à l'aide de la hasValidSignatureWhileIgnoringméthode. N'oubliez pas qu'ignorer les paramètres permet à n'importe qui de modifier ces paramètres sur la requête :
+
+if (! $request->hasValidSignatureWhileIgnoring(['page', 'order'])) {
+    abort(401);
+}
+
+Au lieu de valider les URL signées à l'aide de l'instance de demande entrante, vous pouvez attribuer le Illuminate\Routing\Middleware\ValidateSignature middleware à la route. S'il n'est pas déjà présent, vous devez attribuer à ce middleware une clé dans le routeMiddlewaretableau de votre noyau HTTP :
+
+/**
+ * The application's route middleware.
+ *
+ * These middleware may be assigned to groups or used individually.
+ *
+ * @var array
+ */
+protected $routeMiddleware = [
+    'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
+];
+
+Une fois que vous avez enregistré le middleware dans votre noyau, vous pouvez l'attacher à une route. Si la requête entrante n'a pas de signature valide, le middleware renverra automatiquement une 403réponse HTTP :
+
+Route::post('/unsubscribe/{user}', function (Request $request) {
+    // ...
+})->name('unsubscribe')->middleware('signed');
+
+Répondre aux itinéraires signés non valides
+Lorsqu'une personne visite une URL signée qui a expiré, elle reçoit une page d'erreur générique pour le 403code d'état HTTP. Cependant, vous pouvez personnaliser ce comportement en définissant une fermeture "rendue" personnalisée pour l' InvalidSignatureExceptionexception dans votre gestionnaire d'exceptions. Cette fermeture doit renvoyer une réponse HTTP :
+
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
+ 
+/**
+ * Register the exception handling callbacks for the application.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->renderable(function (InvalidSignatureException $e) {
+        return response()->view('error.link-expired', [], 403);
+    });
+}
+
+URL pour les actions du contrôleur
+La actionfonction génère une URL pour l'action de contrôleur donnée :
+
+use App\Http\Controllers\HomeController;
+ 
+$url = action([HomeController::class, 'index']);
+
+Si la méthode du contrôleur accepte les paramètres de route, vous pouvez passer un tableau associatif de paramètres de route comme deuxième argument à la fonction :
+
+$url = action([UserController::class, 'profile'], ['id' => 1]);
+
+Les valeurs par défaut
+Pour certaines applications, vous souhaiterez peut-être spécifier des valeurs par défaut à l'échelle de la demande pour certains paramètres d'URL. Par exemple, imaginez que plusieurs de vos itinéraires définissent un {locale}paramètre :
+
+Route::get('/{locale}/posts', function () {
+    //
+})->name('post.index');
+
+Il est encombrant de toujours passer le localechaque fois que vous appelez l' routeaide. Ainsi, vous pouvez utiliser la URL::defaultsméthode pour définir une valeur par défaut pour ce paramètre qui sera toujours appliquée lors de la requête en cours. Vous souhaiterez peut-être appeler cette méthode depuis un middleware de route afin d'avoir accès à la requête en cours :
+
+<?php
+ 
+namespace App\Http\Middleware;
+ 
+use Closure;
+use Illuminate\Support\Facades\URL;
+ 
+class SetDefaultLocaleForUrls
+{
+    /**
+     * Handle the incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return \Illuminate\Http\Response
+     */
+    public function handle($request, Closure $next)
+    {
+        URL::defaults(['locale' => $request->user()->locale]);
+ 
+        return $next($request);
+    }
+}
+
+Une fois la valeur par défaut du localeparamètre définie, vous n'êtes plus obligé de transmettre sa valeur lors de la génération d'URL via l' routeassistant.
+
+Valeurs par défaut des URL et priorité du middleware
+La définition des valeurs par défaut de l'URL peut interférer avec la gestion par Laravel des liaisons de modèle implicites. Par conséquent, vous devez donner la priorité à votre middleware qui définit les URL par défaut à exécuter avant le propre SubstituteBindingsmiddleware de Laravel. Vous pouvez y parvenir en vous assurant que votre middleware se produit avant le SubstituteBindingsmiddleware dans la $middlewarePrioritypropriété du noyau HTTP de votre application.
+
+La $middlewarePrioritypropriété est définie dans la Illuminate\Foundation\Http\Kernelclasse de base. Vous pouvez copier sa définition depuis cette classe et l'écraser dans le noyau HTTP de votre application afin de la modifier :
+
+/**
+ * The priority-sorted list of middleware.
+ *
+ * This forces non-global middleware to always be in the given order.
+ *
+ * @var array
+ */
+protected $middlewarePriority = [
+    // ...
+     \App\Http\Middleware\SetDefaultLocaleForUrls::class,
+     \Illuminate\Routing\Middleware\SubstituteBindings::class,
+     // ...
+];

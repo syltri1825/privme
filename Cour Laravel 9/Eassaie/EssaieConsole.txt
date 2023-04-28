@@ -1,0 +1,80 @@
+Essais de console
+Introduction
+Attentes de succès / échec
+Attentes d'entrée / de sortie
+Introduction
+En plus de simplifier les tests HTTP, Laravel fournit une API simple pour tester les commandes de console personnalisées de votre application .
+
+Attentes de succès / échec
+Pour commencer, explorons comment faire des assertions concernant le code de sortie d'une commande Artisan. Pour ce faire, nous utiliserons la artisanméthode pour invoquer une commande Artisan à partir de notre test. Ensuite, nous utiliserons la assertExitCodeméthode pour affirmer que la commande s'est terminée par un code de sortie donné :
+
+/**
+ * Test a console command.
+ *
+ * @return void
+ */
+public function test_console_command()
+{
+    $this->artisan('inspire')->assertExitCode(0);
+}
+
+Vous pouvez utiliser la assertNotExitCodeméthode pour affirmer que la commande ne s'est pas terminée avec un code de sortie donné :
+
+$this->artisan('inspire')->assertNotExitCode(1);
+
+Bien sûr, toutes les commandes de terminal se terminent généralement avec un code d'état 0lorsqu'elles réussissent et un code de sortie différent de zéro lorsqu'elles ne réussissent pas. Par conséquent, pour plus de commodité, vous pouvez utiliser les assertions assertSuccessfulet assertFailedpour affirmer qu'une commande donnée s'est terminée avec un code de sortie réussi ou non :
+
+$this->artisan('inspire')->assertSuccessful();
+ 
+$this->artisan('inspire')->assertFailed();
+
+Attentes d'entrée / de sortie
+Laravel vous permet de "simuler" facilement l'entrée de l'utilisateur pour les commandes de votre console à l'aide de la expectsQuestionméthode. De plus, vous pouvez spécifier le code de sortie et le texte que vous attendez de la commande de la console à l'aide des méthodes assertExitCodeet . expectsOutputPar exemple, considérez la commande de console suivante :
+
+Artisan::command('question', function () {
+    $name = $this->ask('What is your name?');
+ 
+    $language = $this->choice('Which language do you prefer?', [
+        'PHP',
+        'Ruby',
+        'Python',
+    ]);
+ 
+    $this->line('Your name is '.$name.' and you prefer '.$language.'.');
+});
+
+Vous pouvez tester cette commande avec le test suivant qui utilise les méthodes expectsQuestion, expectsOutput, doesntExpectOutputet :assertExitCode
+
+/**
+ * Test a console command.
+ *
+ * @return void
+ */
+public function test_console_command()
+{
+    $this->artisan('question')
+         ->expectsQuestion('What is your name?', 'Taylor Otwell')
+         ->expectsQuestion('Which language do you prefer?', 'PHP')
+         ->expectsOutput('Your name is Taylor Otwell and you prefer PHP.')
+         ->doesntExpectOutput('Your name is Taylor Otwell and you prefer Ruby.')
+         ->assertExitCode(0);
+}
+
+Attentes de confirmation
+Lorsque vous écrivez une commande qui attend une confirmation sous la forme d'une réponse "oui" ou "non", vous pouvez utiliser la expectsConfirmationméthode :
+
+$this->artisan('module:import')
+    ->expectsConfirmation('Do you really wish to run this command?', 'no')
+    ->assertExitCode(1);
+
+Attentes du tableau
+Si votre commande affiche un tableau d'informations à l'aide de la tableméthode d'Artisan, il peut être fastidieux d'écrire les attentes de sortie pour l'ensemble du tableau. Au lieu de cela, vous pouvez utiliser la expectsTableméthode. Cette méthode accepte les en-têtes de la table comme premier argument et les données de la table comme deuxième argument :
+
+$this->artisan('users:all')
+    ->expectsTable([
+        'ID',
+        'Email',
+    ], [
+        [1, 'taylor@example.com'],
+        [2, 'abigail@example.com'],
+    ]);

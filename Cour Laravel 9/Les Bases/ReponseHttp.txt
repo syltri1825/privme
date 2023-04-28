@@ -1,0 +1,535 @@
+Réponses HTTP
+Créer des réponses
+Attacher des en-têtes aux réponses
+Attacher des cookies aux réponses
+Cookies et cryptage
+Redirections
+Redirection vers des routes nommées
+Redirection vers les actions du contrôleur
+Redirection vers des domaines externes
+Redirection avec des données de session flashées
+Autres types de réponse
+Afficher les réponses
+Réponses JSON
+Téléchargements de fichiers
+Fichier de réponses
+Macros de réponse
+Créer des réponses
+Chaînes et tableaux
+Toutes les routes et tous les contrôleurs doivent 
+
+renvoyer une réponse à renvoyer au navigateur de l'utilisateur. 
+
+Laravel propose plusieurs façons différentes de renvoyer des 
+
+réponses. La réponse la plus basique consiste à renvoyer 
+
+une chaîne à partir d'une route ou d'un contrôleur. Le 
+
+framework convertira automatiquement la chaîne en une réponse 
+
+HTTP complète :
+
+Route::get('/', function () {
+    return 'Hello World';
+});
+
+En plus de renvoyer des chaînes à partir de vos routes et 
+
+de vos contrôleurs, vous pouvez également renvoyer 
+
+des tableaux. Le framework convertira automatiquement le 
+
+tableau en une réponse JSON :
+
+Route::get('/', function () {
+    return [1, 2, 3];
+});
+
+
+Saviez-vous que vous pouvez également renvoyer des collections 
+
+Eloquent à partir de vos routes ou 
+
+de vos contrôleurs ? Ils seront automatiquement convertis 
+
+en JSON. Donner un coup de feu!
+
+
+Objets de réponse
+En règle générale, vous ne renverrez pas simplement de simples 
+
+chaînes ou des tableaux à partir de vos actions 
+
+de routage. Au lieu de cela, vous renverrez des 
+
+Illuminate\Http\Response instances ou des vues complètes .
+
+Le renvoi d'une Response instance complète vous permet de 
+
+personnaliser le code d'état HTTP et les 
+
+en-têtes de la réponse. Une Response instance hérite 
+
+de la Symfony\Component\HttpFoundation\Responseclasse, 
+
+qui fournit diverses méthodes pour créer des réponses HTTP :
+
+Route::get('/home', function () {
+    return response('Hello World', 200)
+                  ->header('Content-Type', 'text/plain');
+});
+
+Modèles et collections éloquents
+Vous pouvez également renvoyer des modèles et des 
+
+collections ORM Eloquent directement à partir de vos routes 
+
+et de vos contrôleurs. Lorsque vous le faites, Laravel 
+
+convertira automatiquement les modèles et collections 
+
+en réponses JSON tout en respectant les attributs 
+
+cachés du modèle :
+
+use App\Models\User;
+ 
+Route::get('/user/{user}', function (User $user) {
+    return $user;
+});
+
+Attacher des en-têtes aux réponses
+Gardez à l'esprit que la plupart des méthodes de réponse 
+
+peuvent être chaînées, ce qui permet la construction fluide 
+
+d'instances de réponse. Par exemple, vous pouvez utiliser 
+
+la headerméthode pour ajouter une série d'en-têtes à la 
+
+réponse avant de la renvoyer à l'utilisateur :
+
+return response($content)
+            ->header('Content-Type', $type)
+            ->header('X-Header-One', 'Header Value')
+            ->header('X-Header-Two', 'Header Value');
+
+Ou, vous pouvez utiliser la withHeadersméthode pour spécifier 
+
+un tableau d'en-têtes à ajouter à la réponse :
+
+return response($content)
+            ->withHeaders([
+                'Content-Type' => $type,
+                'X-Header-One' => 'Header Value',
+                'X-Header-Two' => 'Header Value',
+            ]);
+
+Intergiciel de contrôle du cache
+Laravel inclut un cache.headersmiddleware, qui peut être 
+
+utilisé pour définir rapidement l'en- Cache-Controltête d'un 
+
+groupe de routes. Les directives doivent être fournies en 
+
+utilisant l'équivalent "snake case" de la directive 
+
+cache-control correspondante et doivent être séparées par un 
+
+point-virgule. Si etagest spécifié dans la liste des directives, 
+
+un hachage MD5 du contenu de la réponse sera automatiquement 
+
+défini comme identifiant ETag :
+
+Route::middleware('cache.headers:public;max_age=2628000;etag')->group(function () {
+    Route::get('/privacy', function () {
+        // ...
+    });
+ 
+    Route::get('/terms', function () {
+        // ...
+    });
+});
+
+Attacher des cookies aux réponses
+Vous pouvez attacher un cookie à une 
+
+Illuminate\Http\Responseinstance sortante à l'aide 
+
+de la cookieméthode. Vous devez transmettre le nom, 
+
+la valeur et le nombre de minutes pendant lesquelles le 
+
+cookie doit être considéré comme valide à cette méthode :
+
+return response('Hello World')->cookie(
+    'name', 'value', $minutes
+);
+
+La cookieméthode accepte également quelques arguments 
+
+supplémentaires qui sont utilisés moins fréquemment. 
+
+Généralement, ces arguments ont le même but et la même 
+
+signification que les arguments qui seraient donnés à la 
+
+méthode setcookie native de PHP :
+
+return response('Hello World')->cookie(
+    'name', 'value', $minutes, $path, $domain, $secure, $httpOnly
+);
+
+Si vous souhaitez vous assurer qu'un cookie est envoyé avec la 
+
+réponse sortante mais que vous n'avez pas encore d'instance 
+
+de cette réponse, vous pouvez utiliser la Cookiefaçade pour 
+
+"mettre en file d'attente" les cookies à attacher à la réponse 
+
+lorsqu'elle est envoyée. La queueméthode accepte les arguments 
+
+nécessaires pour créer une instance de cookie. Ces cookies 
+
+seront joints à la réponse sortante avant qu'elle ne soit 
+
+envoyée au navigateur :
+
+use Illuminate\Support\Facades\Cookie;
+ 
+Cookie::queue('name', 'value', $minutes);
+
+Génération d'instances de cookies
+Si vous souhaitez générer une 
+
+Symfony\Component\HttpFoundation\Cookieinstance 
+
+pouvant être attachée à une instance de réponse ultérieurement, 
+
+vous pouvez utiliser l' cookieassistant global. Ce cookie ne 
+
+sera pas renvoyé au client sauf s'il est attaché à une 
+
+instance de réponse :
+
+$cookie = cookie('name', 'value', $minutes);
+ 
+return response('Hello World')->cookie($cookie);
+
+Expiration anticipée des cookies
+Vous pouvez supprimer un cookie en le faisant expirer 
+
+via la withoutCookieméthode d'une réponse sortante :
+
+return response('Hello World')->withoutCookie('name');
+
+Si vous n'avez pas encore d'instance de la réponse sortante, 
+
+vous pouvez utiliser la méthode de la Cookiefaçade pour 
+
+expirefaire expirer un cookie :
+
+Cookie::expire('name');
+
+Cookies et cryptage
+Par défaut, tous les cookies générés par Laravel sont 
+
+cryptés et signés afin qu'ils ne puissent pas être modifiés 
+
+ou lus par le client. Si vous souhaitez désactiver le chiffrement 
+
+pour un sous-ensemble de cookies générés par votre application, 
+
+vous pouvez utiliser la $exceptpropriété du 
+
+App\Http\Middleware\EncryptCookiesmiddleware, 
+
+qui se trouve dans le app/Http/Middlewarerépertoire :
+
+/**
+ * The names of the cookies that should not be encrypted.
+ *
+ * @var array
+ */
+protected $except = [
+    'cookie_name',
+];
+
+Redirections
+Les réponses de redirection sont des instances de la 
+
+Illuminate\Http\RedirectResponseclasse et contiennent 
+
+les en-têtes appropriés nécessaires pour rediriger 
+
+l'utilisateur vers une autre URL. Il existe plusieurs 
+
+façons de générer une RedirectResponseinstance. La méthode 
+
+la plus simple consiste à utiliser l' redirectassistant global :
+
+Route::get('/dashboard', function () {
+    return redirect('home/dashboard');
+});
+
+Parfois, vous souhaiterez peut-être rediriger l'utilisateur 
+
+vers son emplacement précédent, par exemple lorsqu'un 
+
+formulaire soumis n'est pas valide. Vous pouvez le faire en 
+
+utilisant la backfonction d'assistance globale. Étant donné 
+
+que cette fonctionnalité utilise la session , assurez-vous 
+
+que la route appelant la backfonction utilise le webgroupe middleware :
+
+Route::post('/user/profile', function () {
+    // Validate the request...
+ 
+    return back()->withInput();
+});
+
+Redirection vers des routes nommées
+Lorsque vous appelez l' redirectassistant sans paramètre, une instance de Illuminate\Routing\Redirectorest renvoyée, vous permettant d'appeler n'importe quelle méthode sur l' Redirectorinstance. Par exemple, pour générer un RedirectResponsevers une route nommée, vous pouvez utiliser la routeméthode :
+
+return redirect()->route('login');
+
+Si votre route a des paramètres, vous pouvez les passer 
+
+comme deuxième argument à la routeméthode :
+
+// For a route with the following URI: /profile/{id}
+ 
+return redirect()->route('profile', ['id' => 1]);
+
+Remplir les paramètres via des modèles éloquents
+Si vous redirigez vers une route avec un paramètre "ID" 
+
+qui est renseigné à partir d'un modèle Eloquent, vous 
+
+pouvez transmettre le modèle lui-même. L'ID sera extrait automatiquement :
+
+// For a route with the following URI: /profile/{id}
+ 
+return redirect()->route('profile', [$user]);
+
+Si vous souhaitez personnaliser la valeur placée dans le 
+
+paramètre route, vous pouvez spécifier la colonne dans la 
+
+définition du paramètre route ( /profile/{id:slug}) ou vous 
+
+pouvez remplacer la getRouteKeyméthode sur votre modèle Eloquent :
+
+/**
+ * Get the value of the model's route key.
+ *
+ * @return mixed
+ */
+public function getRouteKey()
+{
+    return $this->slug;
+}
+
+Redirection vers les actions du contrôleur
+Vous pouvez également générer des redirections vers 
+
+les actions du contrôleur . Pour ce faire, passez 
+
+le contrôleur et le nom de l'action à la actionméthode :
+
+use App\Http\Controllers\UserController;
+ 
+return redirect()->action([UserController::class, 'index']);
+
+Si votre route de contrôleur nécessite des paramètres, 
+
+vous pouvez les passer comme deuxième argument à la actionméthode :
+
+return redirect()->action(
+    [UserController::class, 'profile'], ['id' => 1]
+);
+
+Redirection vers des domaines externes
+Parfois, vous devrez peut-être rediriger vers un domaine en dehors de votre application. Vous pouvez le faire en appelant la awayméthode, qui crée un RedirectResponsesans aucun codage, validation ou vérification d'URL supplémentaire :
+
+return redirect()->away('https://www.google.com');
+
+Redirection avec des données de session flashées
+La redirection vers une nouvelle URL et le flashage des 
+
+données vers la session sont généralement effectués en même temps. 
+
+En règle générale, cela se fait après avoir effectué une action 
+
+avec succès lorsque vous envoyez un message de réussite à la 
+
+session. Pour plus de commodité, vous pouvez créer une 
+
+RedirectResponseinstance et envoyer des données flash à 
+
+la session dans une seule chaîne de méthodes fluide :
+
+Route::post('/user/profile', function () {
+    // ...
+ 
+    return redirect('dashboard')->with('status', 'Profile updated!');
+});
+
+Une fois l'utilisateur redirigé, vous pouvez afficher le 
+
+message flashé de la session . Par exemple, en utilisant 
+
+la syntaxe Blade :
+
+@if (session('status'))
+    <div class="alert alert-success">
+        {{ session('status') }}
+    </div>
+@endif
+
+Redirection avec entrée
+Vous pouvez utiliser la withInputméthode fournie par 
+
+l' RedirectResponseinstance pour flasher les données 
+
+d'entrée de la demande actuelle dans la session avant 
+
+de rediriger l'utilisateur vers un nouvel emplacement. Cela se fait généralement si l'utilisateur a rencontré une erreur de validation. Une fois l'entrée flashée à la session, vous pourrez facilement la récupérer lors de la prochaine requête pour repeupler le formulaire :
+
+return back()->withInput();
+
+Autres types de réponse
+L' responseassistant peut être utilisé pour générer 
+
+d'autres types d'instances de réponse. Lorsque 
+
+l' responseassistant est appelé sans arguments, une 
+
+implémentation du Illuminate\Contracts\Routing\ResponseFactory 
+
+contrat est renvoyée. Ce contrat fournit plusieurs méthodes 
+
+utiles pour générer des réponses.
+
+Afficher les réponses
+Si vous avez besoin de contrôler le statut et les en-têtes 
+
+de la réponse, mais que vous devez également renvoyer une 
+
+vue comme contenu de la réponse, vous devez utiliser la viewméthode :
+
+return response()
+            ->view('hello', $data, 200)
+            ->header('Content-Type', $type);
+
+Bien entendu, si vous n'avez pas besoin de transmettre 
+
+un code d'état HTTP personnalisé ou des en-têtes personnalisés, 
+
+vous pouvez utiliser la viewfonction d'assistance globale.
+
+Réponses JSON
+La jsonméthode définira automatiquement l'en- Content-Typetête 
+
+sur application/json, ainsi que convertira le tableau donné en 
+
+JSON à l'aide de la json_encodefonction PHP :
+
+return response()->json([
+    'name' => 'Abigail',
+    'state' => 'CA',
+]);
+
+Si vous souhaitez créer une réponse JSONP, vous pouvez 
+
+utiliser la jsonméthode en combinaison avec la withCallbackméthode :
+
+return response()
+            ->json(['name' => 'Abigail', 'state' => 'CA'])
+            ->withCallback($request->input('callback'));
+
+Téléchargements de fichiers
+Le downloadprocédé peut être utilisé pour générer une 
+
+réponse qui force le navigateur de l'utilisateur à télécharger 
+
+le fichier sur le chemin donné. La downloadméthode accepte 
+
+un nom de fichier comme deuxième argument de la méthode, 
+
+qui déterminera le nom de fichier qui est vu par l'utilisateur 
+
+téléchargeant le fichier. Enfin, vous pouvez passer un tableau 
+
+d'en-têtes HTTP comme troisième argument à la méthode :
+
+return response()->download($pathToFile);
+ 
+return response()->download($pathToFile, $name, $headers);
+
+
+Symfony HttpFoundation, qui gère les téléchargements de fichiers, 
+
+exige que le fichier en cours de téléchargement ait un nom de 
+
+fichier ASCII.
+
+
+Téléchargements en streaming
+Parfois, vous souhaiterez peut-être transformer la réponse de chaîne d'une opération donnée en une réponse téléchargeable sans avoir à écrire le contenu de l'opération sur le disque. Vous pouvez utiliser la streamDownloadméthode dans ce scénario. Cette méthode accepte un rappel, un nom de fichier et un tableau facultatif d'en-têtes comme arguments :
+
+use App\Services\GitHub;
+ 
+return response()->streamDownload(function () {
+    echo GitHub::api('repo')
+                ->contents()
+                ->readme('laravel', 'laravel')['contents'];
+}, 'laravel-readme.md');
+
+Fichier de réponses
+Le fileprocédé peut être utilisé pour afficher un fichier, tel qu'une image ou un PDF, directement dans le navigateur de l'utilisateur au lieu de lancer un téléchargement. Cette méthode accepte le chemin d'accès au fichier comme premier argument et un tableau d'en-têtes comme deuxième argument :
+
+return response()->file($pathToFile);
+ 
+return response()->file($pathToFile, $headers);
+
+Macros de réponse
+Si vous souhaitez définir une réponse personnalisée que vous pouvez réutiliser dans une variété de vos routes et contrôleurs, vous pouvez utiliser la macrométhode sur la Responsefaçade. En règle générale, vous devez appeler cette méthode à partir de la méthode de l'un des fournisseurs de servicesboot de votre application , tel que le fournisseur de services :App\Providers\AppServiceProvider
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Response::macro('caps', function ($value) {
+            return Response::make(strtoupper($value));
+        });
+    }
+}
+
+La macrofonction accepte un nom comme premier argument et une 
+
+fermeture comme second argument. La fermeture de la macro sera 
+
+exécutée lors de l'appel du nom de la macro depuis une 
+
+ResponseFactoryimplémentation ou le responsehelper :
+
+return response()->caps('foo');
+

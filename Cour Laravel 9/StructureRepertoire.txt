@@ -1,0 +1,138 @@
+Structure du répertoire
+Introduction
+Le répertoire racine
+Le appRépertoire
+Le bootstrapRépertoire
+Le configRépertoire
+Le databaseRépertoire
+Le langRépertoire
+Le publicRépertoire
+Le resourcesRépertoire
+Le routesRépertoire
+Le storageRépertoire
+Le testsRépertoire
+Le vendorRépertoire
+Le répertoire des applications
+Le BroadcastingRépertoire
+Le ConsoleRépertoire
+Le EventsRépertoire
+Le ExceptionsRépertoire
+Le HttpRépertoire
+Le JobsRépertoire
+Le ListenersRépertoire
+Le MailRépertoire
+Le ModelsRépertoire
+Le NotificationsRépertoire
+Le PoliciesRépertoire
+Le ProvidersRépertoire
+Le RulesRépertoire
+Introduction
+La structure d'application par défaut de Laravel est destinée à fournir un excellent point de départ pour les grandes et les petites applications. Mais vous êtes libre d'organiser votre candidature comme bon vous semble. Laravel n'impose presque aucune restriction sur l'emplacement d'une classe donnée - tant que Composer peut charger automatiquement la classe.
+
+Le répertoire racine
+Le répertoire des applications
+Le apprépertoire contient le code principal de votre application. Nous explorerons ce 
+
+répertoire plus en détail bientôt ; cependant, presque toutes les classes 
+
+de votre application se trouveront dans ce répertoire.
+
+Le répertoire Bootstrap
+Le bootstraprépertoire contient le app.phpfichier qui démarre le framework. 
+
+Ce répertoire contient également un cacherépertoire qui contient des fichiers 
+
+générés par le framework pour l'optimisation des performances, tels que les fichiers 
+
+de cache de route et de services. Vous ne devriez généralement pas avoir besoin de modifier 
+
+les fichiers de ce répertoire.
+
+Le répertoire de configuration
+Le configrépertoire, comme son nom l'indique, contient tous les fichiers de configuration de votre application. C'est une bonne idée de lire tous ces fichiers et de vous familiariser avec toutes les options qui s'offrent à vous.
+
+Le répertoire de la base de données
+Le databaserépertoire contient vos migrations de base de données, vos fabriques de modèles et vos graines. Si vous le souhaitez, vous pouvez également utiliser ce répertoire pour contenir une base de données SQLite.
+
+L'Annuaire Lang
+Le langrépertoire contient tous les fichiers de langue de votre application.
+
+L'annuaire public
+Le publicrépertoire contient le index.phpfichier, qui est le point d'entrée pour toutes les demandes entrant dans votre application et configure le chargement automatique. Ce répertoire héberge également vos actifs tels que les images, JavaScript et CSS.
+
+Le répertoire des ressources
+Le resourcesrépertoire contient vos vues ainsi que vos actifs bruts non compilés tels que CSS ou JavaScript.
+
+L'annuaire des itinéraires
+Le routesrépertoire contient toutes les définitions de route pour votre application. Par défaut, plusieurs fichiers de route sont inclus avec Laravel : web.php, api.php, console.phpet channels.php.
+
+Le web.phpfichier contient des itinéraires RouteServiceProviderplacés dans le webgroupe middleware, qui fournit l'état de la session, la protection CSRF et le cryptage des cookies. Si votre application n'offre pas d'API RESTful sans état, il est probable que toutes vos routes seront très probablement définies dans le web.phpfichier.
+
+Le api.phpfichier contient des itinéraires que les RouteServiceProviderplace dans le apigroupe middleware. Ces routes sont destinées à être sans état, de sorte que les demandes entrant dans l'application via ces routes sont destinées à être authentifiées via des jetons et n'auront pas accès à l'état de la session.
+
+Le console.phpfichier est l'endroit où vous pouvez définir toutes vos commandes de console basées sur la fermeture. Chaque fermeture est liée à une instance de commande permettant une approche simple pour interagir avec les méthodes IO de chaque commande. Même si ce fichier ne définit pas les routes HTTP, il définit les points d'entrée (routes) basés sur la console dans votre application.
+
+Le channels.phpfichier est l'endroit où vous pouvez enregistrer tous les canaux de diffusion d'événements pris en charge par votre application.
+
+Le répertoire de stockage
+Le storagerépertoire contient vos journaux, modèles de lame compilés, sessions basées sur des fichiers, caches de fichiers et autres fichiers générés par le framework. Ce répertoire est divisé en répertoires app, frameworket logs. Le apprépertoire peut être utilisé pour stocker tous les fichiers générés par votre application. Le frameworkrépertoire est utilisé pour stocker les fichiers et les caches générés par le framework. Enfin, le logsrépertoire contient les fichiers journaux de votre application.
+
+Le storage/app/publicrépertoire peut être utilisé pour stocker des fichiers générés par l'utilisateur, tels que des avatars de profil, qui doivent être accessibles au public. Vous devez créer un lien symbolique pointant public/storagevers ce répertoire. Vous pouvez créer le lien à l'aide de la php artisan storage:linkcommande Artisan.
+
+Le répertoire des tests
+Le testsrépertoire contient vos tests automatisés. Des exemples de tests unitaires PHPUnit et de tests de fonctionnalités sont fournis prêts à l'emploi. Chaque classe de test doit être suffixée par le mot Test. Vous pouvez exécuter vos tests à l'aide des commandes phpunitou php vendor/bin/phpunit. Ou, si vous souhaitez une représentation plus détaillée et plus belle de vos résultats de test, vous pouvez exécuter vos tests à l'aide de la php artisan testcommande Artisan.
+
+Le répertoire des fournisseurs
+Le vendorrépertoire contient vos dépendances Composer .
+
+Le répertoire des applications
+La majorité de votre application est hébergée dans le apprépertoire. Par défaut, ce répertoire a un espace de noms sous Appet est chargé automatiquement par Composer à l'aide de la norme de chargement automatique PSR-4 .
+
+Le apprépertoire contient une variété de répertoires supplémentaires tels que Console, Httpet Providers. Considérez les répertoires Consoleet Httpcomme fournissant une API au cœur de votre application. Le protocole HTTP et l'interface de ligne de commande sont tous deux des mécanismes permettant d'interagir avec votre application, mais ne contiennent pas réellement de logique d'application. En d'autres termes, ce sont deux manières d'envoyer des commandes à votre application. Le Consolerépertoire contient toutes vos commandes Artisan, tandis que le Httprépertoire contient vos contrôleurs, intergiciels et requêtes.
+
+Une variété d'autres répertoires seront générés à l'intérieur du apprépertoire lorsque vous utiliserez les makecommandes Artisan pour générer des classes. Ainsi, par exemple, le app/Jobsrépertoire n'existera pas tant que vous n'aurez pas exécuté la make:jobcommande Artisan pour générer une classe de travail.
+
+
+De nombreuses classes du apprépertoire peuvent être générées par Artisan via des commandes. Pour passer en revue les commandes disponibles, exécutez la php artisan list makecommande dans votre terminal.
+
+
+L'annuaire de la radiodiffusion
+Le Broadcastingrépertoire contient toutes les classes de canaux de diffusion pour votre application. Ces classes sont générées à l'aide de la make:channelcommande. Ce répertoire n'existe pas par défaut, mais sera créé pour vous lors de la création de votre première chaîne. Pour en savoir plus sur les chaînes, consultez la documentation sur la diffusion d'événements .
+
+Le répertoire de la console
+Le Consolerépertoire contient toutes les commandes Artisan personnalisées pour votre application. Ces commandes peuvent être générées à l'aide de la make:commandcommande. Ce répertoire héberge également le noyau de votre console, où vos commandes Artisan personnalisées sont enregistrées et vos tâches planifiées sont définies.
+
+Le répertoire des événements
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous par les commandes event:generateet make:eventArtisan. Le Eventsrépertoire héberge les classes d'événements . Les événements peuvent être utilisés pour alerter d'autres parties de votre application qu'une action donnée s'est produite, offrant une grande flexibilité et un découplage.
+
+Le répertoire des exceptions
+Le Exceptionsrépertoire contient le gestionnaire d'exceptions de votre application et est également un bon endroit pour placer toutes les exceptions levées par votre application. Si vous souhaitez personnaliser la façon dont vos exceptions sont consignées ou rendues, vous devez modifier la Handlerclasse dans ce répertoire.
+
+Le répertoire HTTP
+Le Httprépertoire contient vos contrôleurs, middleware et demandes de formulaire. La quasi-totalité de la logique de gestion des requêtes entrant dans votre application sera placée dans ce répertoire.
+
+L'annuaire des métiers
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez la make:jobcommande Artisan. Le Jobsrépertoire héberge les travaux en file d'attente pour votre application. Les travaux peuvent être mis en file d'attente par votre application ou exécutés de manière synchrone dans le cycle de vie de la demande en cours. Les tâches qui s'exécutent de manière synchrone pendant la requête en cours sont parfois appelées "commandes" car elles sont une implémentation du modèle de commande .
+
+L'annuaire des auditeurs
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez les commandes event:generateou make:listenerArtisan. Le Listenersrépertoire contient les classes qui gèrent vos événements . Les écouteurs d'événement reçoivent une instance d'événement et exécutent une logique en réponse à l'événement déclenché. Par exemple, un UserRegisteredévénement peut être géré par un SendWelcomeEmailécouteur.
+
+Le répertoire de messagerie
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez la make:mailcommande Artisan. Le Mailrépertoire contient toutes vos classes qui représentent les e-mails envoyés par votre application. Les objets mail vous permettent d'encapsuler toute la logique de création d'un e-mail dans une seule classe simple qui peut être envoyée à l'aide de la Mail::sendméthode.
+
+Le répertoire des modèles
+Le Modelsrépertoire contient toutes vos classes de modèle Eloquent . L'ORM Eloquent inclus avec Laravel fournit une belle et simple implémentation ActiveRecord pour travailler avec votre base de données. Chaque table de base de données a un "modèle" correspondant qui est utilisé pour interagir avec cette table. Les modèles vous permettent d'interroger des données dans vos tables, ainsi que d'insérer de nouveaux enregistrements dans la table.
+
+Le répertoire des notifications
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez la make:notificationcommande Artisan. Le répertoire contient toutes les notificationsNotifications "transactionnelles" qui sont envoyées par votre application, telles que de simples notifications sur les événements qui se produisent au sein de votre application. La fonction de notification de Laravel résume l'envoi de notifications via une variété de pilotes tels que les e-mails, Slack, SMS ou stockés dans une base de données.
+
+Le répertoire des politiques
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez la make:policycommande Artisan. Le Policiesrépertoire contient les classes de règles d'autorisation pour votre application. Les politiques sont utilisées pour déterminer si un utilisateur peut effectuer une action donnée sur une ressource.
+
+L'annuaire des fournisseurs
+Le Providersrépertoire contient tous les fournisseurs de services pour votre application. Les fournisseurs de services démarrent votre application en liant des services dans le conteneur de services, en enregistrant des événements ou en effectuant toute autre tâche pour préparer votre application aux demandes entrantes.
+
+Dans une nouvelle application Laravel, ce répertoire contiendra déjà plusieurs fournisseurs. Vous êtes libre d'ajouter vos propres fournisseurs à ce répertoire selon vos besoins.
+
+Le répertoire des règles
+Ce répertoire n'existe pas par défaut, mais sera créé pour vous si vous exécutez la make:rulecommande Artisan. Le Rulesrépertoire contient les objets de règles de validation personnalisées pour votre application. Les règles sont utilisées pour encapsuler une logique de validation compliquée dans un objet simple. Pour plus d'informations, consultez la documentation de validation .

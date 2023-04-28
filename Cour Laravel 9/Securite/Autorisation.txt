@@ -1,0 +1,824 @@
+Autorisation
+Introduction
+portes
+Portes d'écriture
+Autorisation d'actions
+Réponses de porte
+Intercepter les contrôles de porte
+Autorisation en ligne
+Création de politiques
+Génération de politiques
+Enregistrement des politiques
+Rédaction de politiques
+Méthodes de politique
+Réponses politiques
+Méthodes sans modèles
+Utilisateurs invités
+Filtres de politique
+Autorisation d'actions à l'aide de stratégies
+Via le modèle utilisateur
+Via les assistants du contrôleur
+Via l'intergiciel
+Via des modèles de lame
+Fournir un contexte supplémentaire
+Introduction
+En plus de fournir des services d' authentification intégrés, 
+
+Laravel fournit également un moyen simple d'autoriser les 
+
+actions des utilisateurs sur une ressource donnée. 
+
+Par exemple, même si un utilisateur est authentifié, il 
+
+se peut qu'il ne soit pas autorisé à mettre à jour ou à 
+
+supprimer certains modèles Eloquent ou enregistrements de base 
+
+de données gérés par votre application. Les fonctionnalités 
+
+d'autorisation de Laravel offrent un moyen simple et organisé 
+
+de gérer ces types de vérifications d'autorisation.
+
+Laravel fournit deux manières principales d'autoriser les actions : 
+
+les portes et les stratégies . Pensez aux portes et aux politiques 
+
+comme les routes et les contrôleurs. Les portes fournissent une 
+
+approche simple et basée sur la fermeture de l'autorisation tandis 
+
+que les politiques, comme les contrôleurs, regroupent la logique autour 
+
+d'un modèle ou d'une ressource particulière. Dans cette documentation, 
+
+nous allons d'abord explorer les portes, puis examiner les politiques.
+
+Vous n'avez pas besoin de choisir entre l'utilisation exclusive de portes 
+
+ou l'utilisation exclusive de stratégies lors de la création d'une 
+
+application. La plupart des applications contiendront très probablement 
+
+un mélange de portes et de politiques, et c'est parfaitement bien ! 
+
+Les portes sont plus applicables aux actions qui ne sont liées à aucun 
+
+modèle ou ressource, telles que l'affichage d'un tableau de bord 
+
+d'administrateur. En revanche, les stratégies doivent être utilisées 
+
+lorsque vous souhaitez autoriser une action pour un modèle ou une 
+
+ressource particulière.
+
+portes
+Portes d'écriture
+
+Les portails sont un excellent moyen d'apprendre les bases des 
+
+fonctionnalités d'autorisation de Laravel ; cependant, lors de la 
+
+création d'applications Laravel robustes, vous devez envisager 
+
+d'utiliser des politiques pour organiser vos règles d'autorisation.
+
+
+Les portes sont simplement des fermetures qui déterminent si un 
+
+utilisateur est autorisé à effectuer une action donnée. En règle générale, 
+
+les portes sont définies dans la bootméthode de la 
+
+App\Providers\AuthServiceProviderclasse utilisant la Gatefaçade. 
+
+Gates reçoit toujours une instance d'utilisateur comme premier argument 
+
+et peut éventuellement recevoir des arguments supplémentaires tels 
+
+qu'un modèle Eloquent pertinent.
+
+Dans cet exemple, nous allons définir une porte pour déterminer 
+
+si un utilisateur peut mettre à jour un App\Models\Postmodèle donné. 
+
+Le portail accomplira cela en comparant l'utilisateur idà celui 
+
+user_idde l'utilisateur qui a créé le message :
+
+use App\Models\Post;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+ 
+/**
+ * Register any authentication / authorization services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->registerPolicies();
+ 
+    Gate::define('update-post', function (User $user, Post $post) {
+        return $user->id === $post->user_id;
+    });
+}
+
+Comme les contrôleurs, les portes peuvent également être définies à l'aide d'un tableau de rappel de classe :
+
+use App\Policies\PostPolicy;
+use Illuminate\Support\Facades\Gate;
+ 
+/**
+ * Register any authentication / authorization services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->registerPolicies();
+ 
+    Gate::define('update-post', [PostPolicy::class, 'update']);
+}
+
+Autorisation d'actions
+Pour autoriser une action utilisant des gates, il faut utiliser les méthodes allowsou deniesfournies par la Gatefaçade. Notez que vous n'êtes pas obligé de transmettre l'utilisateur actuellement authentifié à ces méthodes. Laravel se chargera automatiquement de faire passer l'utilisateur dans la fermeture du portail. Il est courant d'appeler les méthodes d'autorisation de porte dans les contrôleurs de votre application avant d'effectuer une action nécessitant une autorisation :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\Post;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+ 
+class PostController extends Controller
+{
+    /**
+     * Update the given post.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, Post $post)
+    {
+        if (! Gate::allows('update-post', $post)) {
+            abort(403);
+        }
+ 
+        // Update the post...
+    }
+}
+
+Si vous souhaitez déterminer si un utilisateur autre que l'utilisateur actuellement authentifié est autorisé à effectuer une action, vous pouvez utiliser la forUserméthode sur la Gatefaçade :
+
+if (Gate::forUser($user)->allows('update-post', $post)) {
+    // The user can update the post...
+}
+ 
+if (Gate::forUser($user)->denies('update-post', $post)) {
+    // The user can't update the post...
+}
+
+Vous pouvez autoriser plusieurs actions à la fois en utilisant les méthodes anyou :none
+
+if (Gate::any(['update-post', 'delete-post'], $post)) {
+    // The user can update or delete the post...
+}
+ 
+if (Gate::none(['update-post', 'delete-post'], $post)) {
+    // The user can't update or delete the post...
+}
+
+Autoriser ou lancer des exceptions
+Si vous souhaitez tenter d'autoriser une action et lancer automatiquement un Illuminate\Auth\Access\AuthorizationExceptionsi l'utilisateur n'est pas autorisé à effectuer l'action donnée, vous pouvez utiliser la méthode Gatede la façade authorize. Les instances de AuthorizationExceptionsont automatiquement converties en une réponse HTTP 403 par le gestionnaire d'exceptions de Laravel :
+
+Gate::authorize('update-post', $post);
+ 
+// The action is authorized...
+
+Fournir un contexte supplémentaire
+Les méthodes gate pour autoriser les capacités ( allows, denies, check, any, none, authorize, can, ) et les directives Bladecannot d' autorisation ( , , ) peuvent recevoir un tableau comme second argument. Ces éléments de tableau sont transmis en tant que paramètres à la fermeture de la porte et peuvent être utilisés pour un contexte supplémentaire lors de la prise de décisions d'autorisation :@can@cannot@canany
+
+use App\Models\Category;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::define('create-post', function (User $user, Category $category, $pinned) {
+    if (! $user->canPublishToGroup($category->group)) {
+        return false;
+    } elseif ($pinned && ! $user->canPinPosts()) {
+        return false;
+    }
+ 
+    return true;
+});
+ 
+if (Gate::check('create-post', [$category, $pinned])) {
+    // The user can create the post...
+}
+
+Réponses de porte
+Jusqu'à présent, nous n'avons examiné que les portes qui renvoient des valeurs booléennes simples. Cependant, vous souhaiterez peut-être parfois renvoyer une réponse plus détaillée, y compris un message d'erreur. Pour ce faire, vous pouvez retourner un Illuminate\Auth\Access\Responsede votre porte :
+
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::define('edit-settings', function (User $user) {
+    return $user->isAdmin
+                ? Response::allow()
+                : Response::deny('You must be an administrator.');
+});
+
+Même lorsque vous renvoyez une réponse d'autorisation de votre porte, la Gate::allowsméthode renverra toujours une simple valeur booléenne ; cependant, vous pouvez utiliser la Gate::inspectméthode pour obtenir la réponse d'autorisation complète renvoyée par la porte :
+
+$response = Gate::inspect('edit-settings');
+ 
+if ($response->allowed()) {
+    // The action is authorized...
+} else {
+    echo $response->message();
+}
+
+Lors de l'utilisation de la Gate::authorizeméthode, qui lève un AuthorizationExceptionsi l'action n'est pas autorisée, le message d'erreur fourni par la réponse d'autorisation sera propagé à la réponse HTTP :
+
+Gate::authorize('edit-settings');
+ 
+// The action is authorized...
+
+Personnalisation de l'état de la réponse HTTP
+Lorsqu'une action est refusée via une porte, une 403réponse HTTP est renvoyée ; cependant, il peut parfois être utile de renvoyer un autre code d'état HTTP. Vous pouvez personnaliser le code d'état HTTP renvoyé pour un échec de vérification d'autorisation à l'aide du denyWithStatusconstructeur statique de la Illuminate\Auth\Access\Responseclasse :
+
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::define('edit-settings', function (User $user) {
+    return $user->isAdmin
+                ? Response::allow()
+                : Response::denyWithStatus(404);
+});
+
+Étant donné que le masquage de ressources via une 404réponse est un modèle si courant pour les applications Web, la denyAsNotFoundméthode est proposée pour plus de commodité :
+
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::define('edit-settings', function (User $user) {
+    return $user->isAdmin
+                ? Response::allow()
+                : Response::denyAsNotFound();
+});
+
+Intercepter les contrôles de porte
+Parfois, vous souhaiterez peut-être accorder toutes les capacités à un utilisateur spécifique. Vous pouvez utiliser la beforeméthode pour définir une clôture qui est exécutée avant tous les autres contrôles d'autorisation :
+
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::before(function ($user, $ability) {
+    if ($user->isAdministrator()) {
+        return true;
+    }
+});
+
+Si la beforefermeture renvoie un résultat non nul, ce résultat sera considéré comme le résultat du contrôle d'autorisation.
+
+Vous pouvez utiliser la afterméthode pour définir une clôture à exécuter après tous les autres contrôles d'autorisation :
+
+Gate::after(function ($user, $ability, $result, $arguments) {
+    if ($user->isAdministrator()) {
+        return true;
+    }
+});
+
+Semblable à la beforeméthode, si la afterfermeture renvoie un résultat non nul, ce résultat sera considéré comme le résultat du contrôle d'autorisation.
+
+Autorisation en ligne
+Occasionnellement, vous pouvez souhaiter déterminer si l'utilisateur actuellement authentifié est autorisé à effectuer une action donnée sans écrire une porte dédiée qui correspond à l'action. Laravel vous permet d'effectuer ces types de vérifications d'autorisation "en ligne" via les méthodes Gate::allowIfet :Gate::denyIf
+
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::allowIf(fn ($user) => $user->isAdministrator());
+ 
+Gate::denyIf(fn ($user) => $user->banned());
+
+Si l'action n'est pas autorisée ou si aucun utilisateur n'est actuellement authentifié, Laravel lèvera automatiquement une Illuminate\Auth\Access\AuthorizationExceptionexception. Les instances de AuthorizationExceptionsont automatiquement converties en une réponse HTTP 403 par le gestionnaire d'exceptions de Laravel.
+
+Création de politiques
+Génération de politiques
+Les stratégies sont des classes qui organisent la logique d'autorisation autour d'un modèle ou d'une ressource particulière. Par exemple, si votre application est un blog, vous pouvez avoir un App\Models\Postmodèle et un correspondant App\Policies\PostPolicypour autoriser les actions de l'utilisateur telles que la création ou la mise à jour de publications.
+
+Vous pouvez générer une stratégie à l'aide de la make:policycommande Artisan. La politique générée sera placée dans le app/Policiesrépertoire. Si ce répertoire n'existe pas dans votre application, Laravel le créera pour vous :
+
+php artisan make:policy PostPolicy
+
+La make:policycommande générera une classe de stratégie vide. Si vous souhaitez générer une classe avec des exemples de méthodes de stratégie liées à l'affichage, à la création, à la mise à jour et à la suppression de la ressource, vous pouvez fournir une --modeloption lors de l'exécution de la commande :
+
+php artisan make:policy PostPolicy --model=Post
+
+Enregistrement des politiques
+Une fois la classe de stratégie créée, elle doit être enregistrée. L'enregistrement des politiques est la façon dont nous pouvons informer Laravel de la politique à utiliser lors de l'autorisation d'actions contre un type de modèle donné.
+
+Les App\Providers\AuthServiceProvidernouvelles applications Laravel incluses contiennent une policiespropriété qui mappe vos modèles Eloquent à leurs politiques correspondantes. L'enregistrement d'une politique indiquera à Laravel quelle politique utiliser lors de l'autorisation d'actions contre un modèle Eloquent donné :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Models\Post;
+use App\Policies\PostPolicy;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+ 
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The policy mappings for the application.
+     *
+     * @var array
+     */
+    protected $policies = [
+        Post::class => PostPolicy::class,
+    ];
+ 
+    /**
+     * Register any application authentication / authorization services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        $this->registerPolicies();
+ 
+        //
+    }
+}
+
+Découverte automatique des politiques
+Au lieu d'enregistrer manuellement les politiques de modèle, Laravel peut découvrir automatiquement les politiques tant que le modèle et la politique suivent les conventions de dénomination standard de Laravel. Plus précisément, les stratégies doivent se trouver dans un Policiesrépertoire au niveau ou au-dessus du répertoire qui contient vos modèles. Ainsi, par exemple, les modèles peuvent être placés dans le app/Modelsrépertoire tandis que les politiques peuvent être placées dans le app/Policiesrépertoire. Dans cette situation, Laravel vérifiera les politiques dans app/Models/Policiesthen app/Policies. De plus, le nom de la stratégie doit correspondre au nom du modèle et avoir un Policysuffixe. Ainsi, un Usermodèle correspondrait à une UserPolicyclasse de politique.
+
+Si vous souhaitez définir votre propre logique de découverte de stratégie, vous pouvez enregistrer un rappel de découverte de stratégie personnalisé à l'aide de la Gate::guessPolicyNamesUsingméthode . Typiquement, cette méthode doit être appelée depuis la bootméthode de votre application AuthServiceProvider:
+
+use Illuminate\Support\Facades\Gate;
+ 
+Gate::guessPolicyNamesUsing(function ($modelClass) {
+    // Return the name of the policy class for the given model...
+});
+
+
+Toutes les stratégies qui sont explicitement mappées dans votre AuthServiceProviderseront prioritaires sur toutes les stratégies potentiellement découvertes automatiquement.
+
+
+Rédaction de politiques
+Méthodes de politique
+Une fois la classe de stratégie enregistrée, vous pouvez ajouter des méthodes pour chaque action qu'elle autorise. Par exemple, définissons une updateméthode sur our PostPolicyqui détermine si un donné App\Models\Userpeut mettre à jour une App\Models\Postinstance donnée.
+
+La updateméthode recevra a Useret une Postinstance comme arguments, et devrait retourner trueor falseindiquant si l'utilisateur est autorisé à mettre à jour le Post. Ainsi, dans cet exemple, nous allons vérifier que l'utilisateur idcorrespond à la user_idsur la publication :
+
+<?php
+ 
+namespace App\Policies;
+ 
+use App\Models\Post;
+use App\Models\User;
+ 
+class PostPolicy
+{
+    /**
+     * Determine if the given post can be updated by the user.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Post  $post
+     * @return bool
+     */
+    public function update(User $user, Post $post)
+    {
+        return $user->id === $post->user_id;
+    }
+}
+
+Vous pouvez continuer à définir des méthodes supplémentaires sur la stratégie selon les besoins pour les différentes actions qu'elle autorise. Par exemple, vous pouvez définir viewou deletedes méthodes pour autoriser diverses Postactions connexes, mais n'oubliez pas que vous êtes libre de donner à vos méthodes de stratégie le nom que vous souhaitez.
+
+Si vous avez utilisé l' --modeloption lors de la génération de votre stratégie via la console Artisan, elle contiendra déjà des méthodes pour les actions viewAny, view, create, update, delete, restore, et .forceDelete
+
+
+Toutes les politiques sont résolues via le conteneur de service Laravel , ce qui vous permet d'indiquer toutes les dépendances nécessaires dans le constructeur de la politique pour qu'elles soient automatiquement injectées.
+
+
+Réponses politiques
+Jusqu'à présent, nous n'avons examiné que les méthodes de politique qui renvoient de simples valeurs booléennes. Cependant, vous souhaiterez peut-être parfois renvoyer une réponse plus détaillée, y compris un message d'erreur. Pour ce faire, vous pouvez renvoyer une Illuminate\Auth\Access\Responseinstance à partir de votre méthode de stratégie :
+
+use App\Models\Post;
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+ 
+/**
+ * Determine if the given post can be updated by the user.
+ *
+ * @param  \App\Models\User  $user
+ * @param  \App\Models\Post  $post
+ * @return \Illuminate\Auth\Access\Response
+ */
+public function update(User $user, Post $post)
+{
+    return $user->id === $post->user_id
+                ? Response::allow()
+                : Response::deny('You do not own this post.');
+}
+
+Lors du renvoi d'une réponse d'autorisation à partir de votre stratégie, la Gate::allowsméthode renverra toujours une simple valeur booléenne ; cependant, vous pouvez utiliser la Gate::inspectméthode pour obtenir la réponse d'autorisation complète renvoyée par la porte :
+
+use Illuminate\Support\Facades\Gate;
+ 
+$response = Gate::inspect('update', $post);
+ 
+if ($response->allowed()) {
+    // The action is authorized...
+} else {
+    echo $response->message();
+}
+
+Lors de l'utilisation de la Gate::authorizeméthode, qui lève un AuthorizationExceptionsi l'action n'est pas autorisée, le message d'erreur fourni par la réponse d'autorisation sera propagé à la réponse HTTP :
+
+Gate::authorize('update', $post);
+ 
+// The action is authorized...
+
+Personnalisation de l'état de la réponse HTTP
+Lorsqu'une action est refusée via une méthode de stratégie, une 403réponse HTTP est renvoyée ; cependant, il peut parfois être utile de renvoyer un autre code d'état HTTP. Vous pouvez personnaliser le code d'état HTTP renvoyé pour un échec de vérification d'autorisation à l'aide du denyWithStatusconstructeur statique de la Illuminate\Auth\Access\Responseclasse :
+
+use App\Models\Post;
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+ 
+/**
+ * Determine if the given post can be updated by the user.
+ *
+ * @param  \App\Models\User  $user
+ * @param  \App\Models\Post  $post
+ * @return \Illuminate\Auth\Access\Response
+ */
+public function update(User $user, Post $post)
+{
+    return $user->id === $post->user_id
+                ? Response::allow()
+                : Response::denyWithStatus(404);
+}
+
+Étant donné que le masquage de ressources via une 404réponse est un modèle si courant pour les applications Web, la denyAsNotFoundméthode est proposée pour plus de commodité :
+
+use App\Models\Post;
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+ 
+/**
+ * Determine if the given post can be updated by the user.
+ *
+ * @param  \App\Models\User  $user
+ * @param  \App\Models\Post  $post
+ * @return \Illuminate\Auth\Access\Response
+ */
+public function update(User $user, Post $post)
+{
+    return $user->id === $post->user_id
+                ? Response::allow()
+                : Response::denyAsNotFound();
+}
+
+Méthodes sans modèles
+Certaines méthodes de stratégie reçoivent uniquement une instance de l'utilisateur actuellement authentifié. Cette situation est plus courante lors de l'autorisation d' createactions. Par exemple, si vous créez un blog, vous souhaiterez peut-être déterminer si un utilisateur est autorisé à créer des publications. Dans ces situations, votre méthode de stratégie doit uniquement s'attendre à recevoir une instance d'utilisateur :
+
+/**
+ * Determine if the given user can create posts.
+ *
+ * @param  \App\Models\User  $user
+ * @return bool
+ */
+public function create(User $user)
+{
+    return $user->role == 'writer';
+}
+
+Utilisateurs invités
+Par défaut, toutes les portes et politiques reviennent automatiquement falsesi la requête HTTP entrante n'a pas été initiée par un utilisateur authentifié. Cependant, vous pouvez autoriser ces vérifications d'autorisation à passer par vos portes et politiques en déclarant un indice de type "facultatif" ou en fournissant une nullvaleur par défaut pour la définition d'argument utilisateur :
+
+<?php
+ 
+namespace App\Policies;
+ 
+use App\Models\Post;
+use App\Models\User;
+ 
+class PostPolicy
+{
+    /**
+     * Determine if the given post can be updated by the user.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Post  $post
+     * @return bool
+     */
+    public function update(?User $user, Post $post)
+    {
+        return optional($user)->id === $post->user_id;
+    }
+}
+
+Filtres de politique
+Pour certains utilisateurs, vous souhaiterez peut-être autoriser toutes les actions dans le cadre d'une stratégie donnée. Pour ce faire, définissez une beforeméthode sur la stratégie. La beforeméthode sera exécutée avant toute autre méthode sur la stratégie, vous donnant la possibilité d'autoriser l'action avant que la méthode de stratégie prévue ne soit réellement appelée. Cette fonctionnalité est le plus souvent utilisée pour autoriser les administrateurs d'application à effectuer n'importe quelle action :
+
+use App\Models\User;
+ 
+/**
+ * Perform pre-authorization checks.
+ *
+ * @param  \App\Models\User  $user
+ * @param  string  $ability
+ * @return void|bool
+ */
+public function before(User $user, $ability)
+{
+    if ($user->isAdministrator()) {
+        return true;
+    }
+}
+
+Si vous souhaitez refuser tous les contrôles d'autorisation pour un type d'utilisateur particulier, vous pouvez revenir falseà la beforeméthode. Si nullest renvoyé, le contrôle d'autorisation passera par la méthode de stratégie.
+
+
+La beforeméthode d'une classe de stratégie ne sera pas appelée si la classe ne contient pas de méthode dont le nom correspond au nom de la capacité vérifiée.
+
+
+Autorisation d'actions à l'aide de stratégies
+Via le modèle utilisateur
+Le App\Models\Usermodèle fourni avec votre application Laravel comprend deux méthodes utiles pour autoriser les actions : canet cannot. Les méthodes canet cannotreçoivent le nom de l'action que vous souhaitez autoriser et le modèle concerné. Par exemple, déterminons si un utilisateur est autorisé à mettre à jour un App\Models\Postmodèle donné. En règle générale, cela se fera dans une méthode de contrôleur :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\Post;
+use Illuminate\Http\Request;
+ 
+class PostController extends Controller
+{
+    /**
+     * Update the given post.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, Post $post)
+    {
+        if ($request->user()->cannot('update', $post)) {
+            abort(403);
+        }
+ 
+        // Update the post...
+    }
+}
+
+Si une politique est enregistrée pour le modèle donné, la canméthode appellera automatiquement la politique appropriée et renverra le résultat booléen. Si aucune politique n'est enregistrée pour le modèle, la canméthode tentera d'appeler la porte basée sur la fermeture correspondant au nom d'action donné.
+
+Actions qui ne nécessitent pas de modèles
+N'oubliez pas que certaines actions peuvent correspondre à des méthodes de stratégie telles createque celles qui ne nécessitent pas d'instance de modèle. Dans ces situations, vous pouvez passer un nom de classe à la canméthode. Le nom de la classe sera utilisé pour déterminer la stratégie à utiliser lors de l'autorisation de l'action :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\Post;
+use Illuminate\Http\Request;
+ 
+class PostController extends Controller
+{
+    /**
+     * Create a post.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        if ($request->user()->cannot('create', Post::class)) {
+            abort(403);
+        }
+ 
+        // Create the post...
+    }
+}
+
+Via les assistants du contrôleur
+En plus des méthodes utiles fournies au App\Models\Usermodèle, Laravel fournit une authorizeméthode utile à tous vos contrôleurs qui étendent la App\Http\Controllers\Controllerclasse de base.
+
+Comme la canméthode, cette méthode accepte le nom de l'action que vous souhaitez autoriser et le modèle concerné. Si l'action n'est pas autorisée, la authorizeméthode lèvera une Illuminate\Auth\Access\AuthorizationExceptionexception que le gestionnaire d'exceptions Laravel convertira automatiquement en une réponse HTTP avec un code d'état 403 :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\Post;
+use Illuminate\Http\Request;
+ 
+class PostController extends Controller
+{
+    /**
+     * Update the given blog post.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     *
+     * @throws \Illuminate\Auth\Access\AuthorizationException
+     */
+    public function update(Request $request, Post $post)
+    {
+        $this->authorize('update', $post);
+ 
+        // The current user can update the blog post...
+    }
+}
+
+Actions qui ne nécessitent pas de modèles
+Comme indiqué précédemment, certaines méthodes de stratégie telles createque ne nécessitent pas d'instance de modèle. Dans ces situations, vous devez transmettre un nom de classe à la authorizeméthode. Le nom de la classe sera utilisé pour déterminer la stratégie à utiliser lors de l'autorisation de l'action :
+
+use App\Models\Post;
+use Illuminate\Http\Request;
+ 
+/**
+ * Create a new blog post.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return \Illuminate\Http\Response
+ *
+ * @throws \Illuminate\Auth\Access\AuthorizationException
+ */
+public function create(Request $request)
+{
+    $this->authorize('create', Post::class);
+ 
+    // The current user can create blog posts...
+}
+
+Autorisation des contrôleurs de ressources
+Si vous utilisez des contrôleurs de ressources , vous pouvez utiliser la authorizeResourceméthode dans le constructeur de votre contrôleur. Cette méthode attache les candéfinitions de middleware appropriées aux méthodes du contrôleur de ressources.
+
+La authorizeResourceméthode accepte le nom de la classe du modèle comme premier argument, et le nom du paramètre route/demande qui contiendra l'ID du modèle comme deuxième argument. Vous devez vous assurer que votre contrôleur de ressources est créé à l'aide de l' --modelindicateur afin qu'il ait les signatures de méthode et les indications de type requises :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\Post;
+use Illuminate\Http\Request;
+ 
+class PostController extends Controller
+{
+    /**
+     * Create the controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->authorizeResource(Post::class, 'post');
+    }
+}
+
+Les méthodes de contrôleur suivantes seront mappées à leur méthode de stratégie correspondante. Lorsque les requêtes sont acheminées vers la méthode de contrôleur donnée, la méthode de stratégie correspondante sera automatiquement invoquée avant l'exécution de la méthode de contrôleur :
+
+Méthode du contrôleur	Méthode de politique
+indice	afficherAny
+Afficher	voir
+créer	créer
+boutique	créer
+Éditer	mettre à jour
+mettre à jour	mettre à jour
+détruire	effacer
+
+Vous pouvez utiliser la make:policycommande avec l' --modeloption permettant de générer rapidement une classe de stratégie pour un modèle donné : php artisan make:policy PostPolicy --model=Post.
+
+
+Via l'intergiciel
+Laravel inclut un middleware qui peut autoriser des actions avant même que la demande entrante n'atteigne vos routes ou vos contrôleurs. Par défaut, le Illuminate\Auth\Middleware\Authorizemiddleware se voit attribuer la canclé dans votre App\Http\Kernelclasse. Explorons un exemple d'utilisation du canmiddleware pour autoriser un utilisateur à mettre à jour une publication :
+
+use App\Models\Post;
+ 
+Route::put('/post/{post}', function (Post $post) {
+    // The current user may update the post...
+})->middleware('can:update,post');
+
+Dans cet exemple, nous passons candeux arguments au middleware. Le premier est le nom de l'action que nous souhaitons autoriser et le second est le paramètre de route que nous souhaitons passer à la méthode de politique. Dans ce cas, puisque nous utilisons une liaison de modèle implicite , un App\Models\Postmodèle sera transmis à la méthode de stratégie. Si l'utilisateur n'est pas autorisé à effectuer l'action donnée, une réponse HTTP avec un code d'état 403 sera renvoyée par le middleware.
+
+Pour plus de commodité, vous pouvez également attacher le canmiddleware à votre route en utilisant la canméthode :
+
+use App\Models\Post;
+ 
+Route::put('/post/{post}', function (Post $post) {
+    // The current user may update the post...
+})->can('update', 'post');
+
+Actions qui ne nécessitent pas de modèles
+Encore une fois, certaines méthodes de stratégie telles createque ne nécessitent pas d'instance de modèle. Dans ces situations, vous pouvez transmettre un nom de classe au middleware. Le nom de la classe sera utilisé pour déterminer la stratégie à utiliser lors de l'autorisation de l'action :
+
+Route::post('/post', function () {
+    // The current user may create posts...
+})->middleware('can:create,App\Models\Post');
+
+Spécifier le nom de classe complet dans une définition de middleware de chaîne peut devenir fastidieux. Pour cette raison, vous pouvez choisir d'attacher le canmiddleware à votre route en utilisant la canméthode :
+
+use App\Models\Post;
+ 
+Route::post('/post', function () {
+    // The current user may create posts...
+})->can('create', Post::class);
+
+Via des modèles de lame
+Lors de l'écriture de modèles Blade, vous pouvez souhaiter n'afficher une partie de la page que si l'utilisateur est autorisé à effectuer une action donnée. Par exemple, vous souhaiterez peut-être afficher un formulaire de mise à jour pour un article de blog uniquement si l'utilisateur peut réellement mettre à jour l'article. Dans cette situation, vous pouvez utiliser les directives @canet :@cannot
+
+@can('update', $post)
+    <!-- The current user can update the post... -->
+@elsecan('create', App\Models\Post::class)
+    <!-- The current user can create new posts... -->
+@else
+    <!-- ... -->
+@endcan
+ 
+@cannot('update', $post)
+    <!-- The current user cannot update the post... -->
+@elsecannot('create', App\Models\Post::class)
+    <!-- The current user cannot create new posts... -->
+@endcannot
+
+Ces directives sont des raccourcis pratiques pour l'écriture @ifet les @unlessinstructions. Les déclarations @canet @cannotci-dessus sont équivalentes aux déclarations suivantes :
+
+@if (Auth::user()->can('update', $post))
+    <!-- The current user can update the post... -->
+@endif
+ 
+@unless (Auth::user()->can('update', $post))
+    <!-- The current user cannot update the post... -->
+@endunless
+
+Vous pouvez également déterminer si un utilisateur est autorisé à effectuer une action parmi un ensemble d'actions donné. Pour ce faire, utilisez la @cananydirective :
+
+@canany(['update', 'view', 'delete'], $post)
+    <!-- The current user can update, view, or delete the post... -->
+@elsecanany(['create'], \App\Models\Post::class)
+    <!-- The current user can create a post... -->
+@endcanany
+
+Actions qui ne nécessitent pas de modèles
+Comme la plupart des autres méthodes d'autorisation, vous pouvez passer un nom de classe aux directives @canet @cannotsi l'action ne nécessite pas d'instance de modèle :
+
+@can('create', App\Models\Post::class)
+    <!-- The current user can create posts... -->
+@endcan
+ 
+@cannot('create', App\Models\Post::class)
+    <!-- The current user can't create posts... -->
+@endcannot
+
+Fournir un contexte supplémentaire
+Lorsque vous autorisez des actions à l'aide de stratégies, vous pouvez transmettre un tableau comme deuxième argument aux différentes fonctions d'autorisation et assistants. Le premier élément du tableau sera utilisé pour déterminer quelle stratégie doit être invoquée, tandis que les autres éléments du tableau sont passés en tant que paramètres à la méthode de stratégie et peuvent être utilisés pour un contexte supplémentaire lors de la prise de décisions d'autorisation. Par exemple, considérez la PostPolicydéfinition de méthode suivante qui contient un $categoryparamètre supplémentaire :
+
+/**
+ * Determine if the given post can be updated by the user.
+ *
+ * @param  \App\Models\User  $user
+ * @param  \App\Models\Post  $post
+ * @param  int  $category
+ * @return bool
+ */
+public function update(User $user, Post $post, int $category)
+{
+    return $user->id === $post->user_id &&
+           $user->canUpdateCategory($category);
+}
+
+Lorsque nous tentons de déterminer si l'utilisateur authentifié peut mettre à jour une publication donnée, nous pouvons invoquer cette méthode de politique comme suit :
+
+/**
+ * Update the given blog post.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @param  \App\Models\Post  $post
+ * @return \Illuminate\Http\Response
+ *
+ * @throws \Illuminate\Auth\Access\AuthorizationException
+ */
+public function update(Request $request, Post $post)
+{
+    $this->authorize('update', [$post, $request->category]);
+ 
+    // The current user can update the blog post...
+}

@@ -1,0 +1,296 @@
+La gestion des erreurs
+Introduction
+Configuration
+Le gestionnaire d'exceptions
+Signaler des exceptions
+Niveaux de journalisation des exceptions
+Ignorer les exceptions par type
+Exceptions de rendu
+Exceptions à signaler et à rendre
+Exception HTTP
+Pages d'erreur HTTP personnalisées
+Introduction
+Lorsque vous démarrez un nouveau projet Laravel, la gestion des erreurs et des exceptions est déjà configurée pour vous. La App\Exceptions\Handlerclasse est l'endroit où toutes les exceptions levées par votre application sont enregistrées puis rendues à l'utilisateur. Nous approfondirons cette classe tout au long de cette documentation.
+
+Configuration
+L' debugoption de votre config/app.phpfichier de configuration détermine la quantité d'informations sur une erreur qui est réellement affichée à l'utilisateur. Par défaut, cette option est définie pour respecter la valeur de la APP_DEBUGvariable d'environnement, qui est stockée dans votre .envfichier.
+
+Lors du développement local, vous devez définir la APP_DEBUGvariable d'environnement sur true. Dans votre environnement de production, cette valeur doit toujours être false. Si la valeur est définie sur trueen production, vous risquez d'exposer des valeurs de configuration sensibles aux utilisateurs finaux de votre application.
+
+Le gestionnaire d'exceptions
+Signaler des exceptions
+Toutes les exceptions sont gérées par la App\Exceptions\Handlerclasse. Cette classe contient une registerméthode dans laquelle vous pouvez enregistrer des rapports d'exception personnalisés et des rappels de rendu. Nous allons examiner chacun de ces concepts en détail. Le rapport d'exception est utilisé pour enregistrer les exceptions ou les envoyer à un service externe comme Flare , Bugsnag ou Sentry . Par défaut, les exceptions seront consignées en fonction de votre configuration de journalisation . Cependant, vous êtes libre de consigner les exceptions comme vous le souhaitez.
+
+Par exemple, si vous devez signaler différents types d'exceptions de différentes manières, vous pouvez utiliser la reportableméthode pour enregistrer une fermeture qui doit être exécutée lorsqu'une exception d'un type donné doit être signalée. Laravel déduira quel type d'exception la fermeture signale en examinant l'indice de type de la fermeture :
+
+use App\Exceptions\InvalidOrderException;
+ 
+/**
+ * Register the exception handling callbacks for the application.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->reportable(function (InvalidOrderException $e) {
+        //
+    });
+}
+
+Lorsque vous enregistrez un rappel de rapport d'exception personnalisé à l'aide de la reportableméthode, Laravel enregistre toujours l'exception à l'aide de la configuration de journalisation par défaut de l'application. Si vous souhaitez arrêter la propagation de l'exception à la pile de journalisation par défaut, vous pouvez utiliser la stopméthode lors de la définition de votre rappel de rapport ou du retour falsedu rappel :
+
+$this->reportable(function (InvalidOrderException $e) {
+    //
+})->stop();
+ 
+$this->reportable(function (InvalidOrderException $e) {
+    return false;
+});
+
+
+Pour personnaliser le rapport d'exception pour une exception donnée, vous pouvez également utiliser des exceptions à signaler .
+
+
+Contexte global du journal
+Si disponible, Laravel ajoute automatiquement l'ID de l'utilisateur actuel au message de journal de chaque exception en tant que données contextuelles. Vous pouvez définir vos propres données contextuelles globales en remplaçant la contextméthode de la App\Exceptions\Handlerclasse de votre application. Ces informations seront incluses dans chaque message de journal d'exception écrit par votre application :
+
+/**
+ * Get the default context variables for logging.
+ *
+ * @return array
+ */
+protected function context()
+{
+    return array_merge(parent::context(), [
+        'foo' => 'bar',
+    ]);
+}
+
+Contexte du journal des exceptions
+Bien qu'il puisse être utile d'ajouter du contexte à chaque message de journal, une exception particulière peut parfois avoir un contexte unique que vous souhaitez inclure dans vos journaux. En définissant une contextméthode sur l'une des exceptions personnalisées de votre application, vous pouvez spécifier toutes les données pertinentes pour cette exception qui doivent être ajoutées à l'entrée de journal de l'exception :
+
+<?php
+ 
+namespace App\Exceptions;
+ 
+use Exception;
+ 
+class InvalidOrderException extends Exception
+{
+    // ...
+ 
+    /**
+     * Get the exception's context information.
+     *
+     * @return array
+     */
+    public function context()
+    {
+        return ['order_id' => $this->orderId];
+    }
+}
+
+L' reportaide
+Parfois, vous devrez peut-être signaler une exception 
+
+tout en continuant à traiter la demande en cours. La 
+
+reportfonction d'assistance vous permet de signaler 
+
+rapidement une exception via le gestionnaire d'exceptions 
+
+sans afficher une page d'erreur à l'utilisateur :
+
+public function isValid($value)
+{
+    try {
+        // Validate the value...
+    } catch (Throwable $e) {
+        report($e);
+ 
+        return false;
+    }
+}
+
+Niveaux de journalisation des exceptions
+Lorsque des messages sont écrits dans les journaux de votre 
+
+application , les messages sont écrits à un niveau de 
+
+journalisation spécifié , qui indique la gravité ou l'importance du message consigné.
+
+Comme indiqué ci-dessus, même lorsque vous enregistrez un rappel de rapport d'exception personnalisé à l'aide de la reportableméthode, Laravel enregistrera toujours l'exception à l'aide de la configuration de journalisation par défaut de l'application. cependant, étant donné que le niveau de journalisation peut parfois influencer les canaux sur lesquels un message est enregistré, vous souhaiterez peut-être configurer le niveau de journalisation auquel certaines exceptions sont enregistrées.
+
+Pour ce faire, vous pouvez définir un tableau de types d'exceptions et leurs niveaux de journalisation associés dans la $levelspropriété du gestionnaire d'exceptions de votre application :
+
+use PDOException;
+use Psr\Log\LogLevel;
+ 
+/**
+ * A list of exception types with their corresponding custom log levels.
+ *
+ * @var array<class-string<\Throwable>, \Psr\Log\LogLevel::*>
+ */
+protected $levels = [
+    PDOException::class => LogLevel::CRITICAL,
+];
+
+Ignorer les exceptions par type
+Lors de la création de votre application, il y aura certains types d'exceptions que vous voudrez simplement ignorer et ne jamais signaler. Le gestionnaire d'exceptions de votre application contient une $dontReportpropriété initialisée sur un tableau vide. Les classes que vous ajoutez à cette propriété ne seront jamais signalées ; cependant, ils peuvent toujours avoir une logique de rendu personnalisée :
+
+use App\Exceptions\InvalidOrderException;
+ 
+/**
+ * A list of the exception types that are not reported.
+ *
+ * @var array<int, class-string<\Throwable>>
+ */
+protected $dontReport = [
+    InvalidOrderException::class,
+];
+
+
+Dans les coulisses, Laravel ignore déjà certains types d'erreurs pour vous, telles que les exceptions résultant d'erreurs HTTP 404 "introuvables" ou de réponses HTTP 419 générées par des jetons CSRF invalides.
+
+
+Exceptions de rendu
+Par défaut, le gestionnaire d'exceptions Laravel convertira les exceptions en une réponse HTTP pour vous. Cependant, vous êtes libre d'enregistrer une fermeture de rendu personnalisée pour les exceptions d'un type donné. Vous pouvez accomplir cela via la renderableméthode de votre gestionnaire d'exceptions.
+
+La fermeture passée à la renderableméthode doit renvoyer une instance de Illuminate\Http\Response, qui peut être générée via l' responseassistant. Laravel déduira quel type d'exception la fermeture rend en examinant l'indice de type de la fermeture :
+
+use App\Exceptions\InvalidOrderException;
+ 
+/**
+ * Register the exception handling callbacks for the application.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->renderable(function (InvalidOrderException $e, $request) {
+        return response()->view('errors.invalid-order', [], 500);
+    });
+}
+
+Vous pouvez également utiliser la renderableméthode pour remplacer le comportement de rendu des exceptions Laravel ou Symfony intégrées telles que NotFoundHttpException. Si la fermeture donnée à la renderableméthode ne renvoie pas de valeur, le rendu d'exception par défaut de Laravel sera utilisé :
+
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+ 
+/**
+ * Register the exception handling callbacks for the application.
+ *
+ * @return void
+ */
+public function register()
+{
+    $this->renderable(function (NotFoundHttpException $e, $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => 'Record not found.'
+            ], 404);
+        }
+    });
+}
+
+Exceptions à signaler et à rendre
+Au lieu de vérifier le type des exceptions dans la registerméthode du gestionnaire d'exceptions, vous pouvez définir des méthodes reportet renderdirectement sur vos exceptions personnalisées. Lorsque ces méthodes existent, elles seront automatiquement appelées par le framework :
+
+<?php
+ 
+namespace App\Exceptions;
+ 
+use Exception;
+ 
+class InvalidOrderException extends Exception
+{
+    /**
+     * Report the exception.
+     *
+     * @return bool|null
+     */
+    public function report()
+    {
+        //
+    }
+ 
+    /**
+     * Render the exception into an HTTP response.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function render($request)
+    {
+        return response(/* ... */);
+    }
+}
+
+Si votre exception étend une exception qui est déjà affichable, telle qu'une exception Laravel ou Symfony intégrée, vous pouvez revenir falsede la renderméthode de l'exception pour afficher la réponse HTTP par défaut de l'exception :
+
+/**
+ * Render the exception into an HTTP response.
+ *
+ * @param  \Illuminate\Http\Request  $request
+ * @return \Illuminate\Http\Response
+ */
+public function render($request)
+{
+    // Determine if the exception needs custom rendering...
+ 
+    return false;
+}
+
+Si votre exception contient une logique de rapport personnalisée qui n'est nécessaire que lorsque certaines conditions sont remplies, vous devrez peut-être demander à Laravel de signaler parfois l'exception à l'aide de la configuration de gestion des exceptions par défaut. Pour ce faire, vous pouvez revenir falsede la méthode de l'exceptionreport :
+
+/**
+ * Report the exception.
+ *
+ * @return bool|null
+ */
+public function report()
+{
+    // Determine if the exception needs custom reporting...
+ 
+    return false;
+}
+
+
+Vous pouvez saisir toutes les dépendances requises de la reportméthode et elles seront automatiquement injectées dans la méthode par le conteneur de service de Laravel .
+
+
+Exception HTTP
+Certaines exceptions décrivent les codes d'erreur HTTP du serveur. Par exemple, il peut s'agir d'une erreur "page introuvable" (404), d'une "erreur non autorisée" (401) ou même d'une erreur 500 générée par le développeur. Afin de générer une telle réponse depuis n'importe où dans votre application, vous pouvez utiliser l' abortassistant :
+
+abort(404);
+
+Pages d'erreur HTTP personnalisées
+Laravel facilite l'affichage de pages d'erreur personnalisées pour 
+
+divers codes d'état HTTP. Par exemple, si vous souhaitez 
+
+personnaliser la page d'erreur pour les codes d'état HTTP 404, 
+
+créez un resources/views/errors/404.blade.phpmodèle de vue. 
+
+Cette vue sera rendue sur toutes les erreurs 404 générées par 
+
+votre application. Les vues de ce répertoire doivent être nommées pour correspondre au code d'état HTTP auquel elles correspondent. L' Symfony\Component\HttpKernel\Exception\HttpExceptioninstance déclenchée par la abortfonction sera passée à la vue en tant que $exceptionvariable :
+
+<h2>{{ $exception->getMessage() }}</h2>
+
+Vous pouvez publier les modèles de page d'erreur par défaut de Laravel à l'aide de la vendor:publishcommande Artisan. Une fois les modèles publiés, vous pouvez les personnaliser à votre guise :
+
+php artisan vendor:publish --tag=laravel-errors
+
+Pages d'erreur HTTP de secours
+Vous pouvez également définir une page d'erreur "de secours" pour 
+
+une série donnée de codes d'état HTTP. Cette page sera rendue 
+
+s'il n'y a pas de page correspondante pour le code d'état HTTP 
+
+spécifique qui s'est produit. Pour ce faire, définissez 
+
+un 4xx.blade.phpmodèle et un 5xx.blade.phpmodèle dans le 
+
+répertoire de votre application resources/views/errors.

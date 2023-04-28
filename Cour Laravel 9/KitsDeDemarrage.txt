@@ -1,0 +1,221 @@
+Kits de démarrage
+Introduction
+Brise de Laravel
+Installation
+Brise et Lame
+Breeze & React / Vue
+Breeze & Next.js / API
+Jetstream de Laravel
+Introduction
+Pour vous donner une longueur d'avance dans la construction de votre nouvelle application 
+
+Laravel, nous sommes heureux de vous proposer des kits de démarrage d'authentification et 
+
+d'application. Ces kits structurent automatiquement votre application avec les routes, 
+
+les contrôleurs et les vues dont vous avez besoin pour enregistrer et authentifier les 
+
+utilisateurs de votre application.
+
+Bien que vous puissiez utiliser ces kits de démarrage, ils ne sont pas obligatoires. 
+
+Vous êtes libre de créer votre propre application à partir de zéro en installant 
+
+simplement une nouvelle copie de Laravel. Quoi qu'il en soit, nous savons que vous 
+
+construirez quelque chose de génial !
+
+Brise de Laravel
+Laravel Breeze est une implémentation minimale et simple de toutes 
+
+les fonctionnalités 
+
+d'authentification de Laravel , y compris la connexion, 
+
+l'enregistrement, la réinitialisation 
+
+
+du mot de passe, la vérification des e-mails et la confirmation du 
+
+mot de passe. 
+
+La couche de vue par défaut de Laravel Breeze est composée de simples 
+
+modèles de lame 
+
+stylisés avec Tailwind CSS . Ou, Breeze peut échafauder votre application en utilisant 
+
+Vue ou React et Inertia .
+
+Breeze fournit un excellent point de départ pour démarrer une nouvelle application Laravel 
+
+et constitue également un excellent choix pour les projets qui envisagent de faire passer 
+
+leurs modèles Blade au niveau supérieur avec Laravel Livewire .
+
+
+Installation
+Tout d'abord, vous devez créer une nouvelle application Laravel , 
+
+configurer votre base de données et exécuter vos migrations de base de données . 
+
+Une fois que vous avez créé une nouvelle application Laravel, vous pouvez installer 
+
+Laravel Breeze en utilisant Composer :
+
+composer require laravel/breeze --dev
+
+Une fois Breeze installé, vous pouvez échafauder votre application en utilisant l'une des 
+
+"piles" Breeze décrites dans la documentation ci-dessous.
+
+Brise et Lame
+Une fois que Composer a installé le package Laravel Breeze, vous pouvez exécuter la 
+
+breeze:installcommande Artisan. Cette commande publie les vues d'authentification, 
+
+les routes, les contrôleurs et d'autres ressources dans votre application. 
+
+Laravel Breeze publie tout son code dans votre application afin que vous ayez un 
+
+contrôle total et une visibilité sur ses fonctionnalités et sa mise en œuvre.
+
+La "pile" Breeze par défaut est la pile Blade, qui utilise des modèles Blade simples 
+
+pour rendre l'interface de votre application. La pile Blade peut être installée en 
+
+appelant la breeze:installcommande sans autre argument supplémentaire. Une fois 
+
+l'échafaudage de Breeze installé, vous devez également compiler les ressources frontales 
+
+de votre application :
+
+php artisan breeze:install
+ 
+npm install
+npm run dev
+php artisan migrate
+
+Ensuite, vous pouvez accéder à vos applications /loginou /registerURL dans votre 
+
+navigateur Web. Tous les itinéraires de Breeze sont définis dans le routes/auth.phpfichier.
+
+
+Pour en savoir plus sur la compilation du CSS et du JavaScript de votre application, 
+
+consultez la documentation Vite de Laravel .
+
+
+Breeze & React / Vue
+Laravel Breeze propose également des échafaudages React et Vue via une implémentation 
+
+frontale Inertia . Inertia vous permet de créer des applications React et Vue modernes 
+
+d'une seule page à l'aide d'un routage et de contrôleurs classiques côté serveur.
+
+Inertia vous permet de profiter de la puissance frontale de React et Vue combinée 
+
+à l'incroyable productivité backend de Laravel et de la compilation Vite ultra-rapide. 
+
+Pour utiliser une pile d'inertie, spécifiez vueou reactcomme pile souhaitée lors de 
+
+l'exécution de la breeze:installcommande Artisan. Une fois l'échafaudage de Breeze installé, 
+
+vous devez également compiler les ressources frontales de votre application :
+
+php artisan breeze:install vue
+ 
+# Or...
+ 
+php artisan breeze:install react
+ 
+npm install
+npm run dev
+php artisan migrate
+
+Ensuite, vous pouvez accéder à vos applications /loginou /registerURL dans votre navigateur Web. Tous les itinéraires de Breeze sont définis dans le routes/auth.phpfichier.
+
+Rendu côté serveur
+Si vous souhaitez que Breeze échafaude la prise en charge d' Inertia SSR , 
+
+vous pouvez fournir l' ssroption lors de l'appel de la breeze:installcommande :
+
+php artisan breeze:install vue --ssr
+php artisan breeze:install react --ssr
+
+Breeze & Next.js / API
+Laravel Breeze peut également échafauder une API d'authentification prête à 
+
+authentifier les applications JavaScript modernes telles que celles alimentées par 
+
+Next , Nuxt et autres. Pour commencer, spécifiez la apipile comme pile souhaitée 
+
+lors de l'exécution de la breeze:installcommande Artisan :
+
+php artisan breeze:install api
+ 
+php artisan migrate
+
+Lors de l'installation, Breeze ajoutera une FRONTEND_URLvariable 
+
+d'environnement au .envfichier de votre application. Cette URL doit être 
+
+l'URL de votre application JavaScript. Ce sera généralement http://localhost:3000pendant 
+
+le développement local. De plus, vous devez vous assurer que votre APP_URLest défini sur 
+
+http://localhost:8000, 
+
+qui est l'URL par défaut utilisée par la servecommande Artisan.
+
+Implémentation de référence Next.js
+Enfin, vous êtes prêt à coupler ce backend avec le frontend de 
+
+votre choix. Une implémentation de référence Next de 
+
+l'interface Breeze est disponible sur GitHub . Cette interface 
+
+est maintenue par Laravel et contient la même interface utilisateur 
+
+que les piles traditionnelles Blade et Inertia fournies par Breeze.
+
+Jetstream de Laravel
+Alors que Laravel Breeze fournit un point de départ simple et minimal 
+
+pour créer 
+
+une application Laravel, Jetstream augmente cette fonctionnalité avec 
+
+des fonctionnalités 
+
+plus robustes et des piles technologiques frontales supplémentaires. 
+
+Pour ceux qui 
+
+découvrent Laravel, nous recommandons d'apprendre les ficelles du 
+
+métier avec Laravel 
+
+Breeze avant de passer à Laravel Jetstream.
+
+Jetstream fournit un échafaudage d'applications magnifiquement 
+
+conçu pour Laravel 
+
+et comprend la connexion, l'enregistrement, la vérification des e-mails, 
+
+l'authentification 
+
+à deux facteurs, la gestion des sessions, la prise en charge de l'API 
+
+via Laravel Sanctum et 
+
+la gestion d'équipe en option. Jetstream est conçu à l'aide de 
+
+Tailwind CSS et offre votre 
+
+choix d' échafaudages frontaux Livewire ou Inertia .
+
+Une documentation complète pour l'installation de Laravel 
+
+Jetstream se trouve dans la documentation officielle de Jetstream .

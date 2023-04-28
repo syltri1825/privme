@@ -1,0 +1,1815 @@
+Queues
+Introduction
+Connexions Vs. Files d'attente
+Notes du conducteur et prérequis
+Création d'emplois
+Génération de classes d'emploi
+Structure de classe
+Emplois uniques
+Intergiciel de travail
+Limitation de débit
+Empêcher les chevauchements de tâches
+Limitation des exceptions
+Répartition des tâches
+Expédition retardée
+Distribution synchrone
+Tâches et transactions de base de données
+Enchaînement des tâches
+Personnalisation de la file d'attente et de la connexion
+Spécification du nombre maximal de tentatives de tâche/valeurs d'expiration
+La gestion des erreurs
+Regroupement de tâches
+Définir des travaux batchables
+Expédition de lots
+Ajout de tâches à des lots
+Inspection des lots
+Annulation de lots
+Échecs de lot
+Lots d'élagage
+Fermetures de file d'attente
+Exécution de la file d'attente Worker
+La queue:workcommande
+Priorités de la file d'attente
+Travailleurs de la file d'attente et déploiement
+Expirations et délais d'attente des tâches
+Configuration du superviseur
+Traiter les travaux échoués
+Nettoyage après les échecs de travaux
+Nouvelle tentative de travaux ayant échoué
+Ignorer les modèles manquants
+Élagage des tâches ayant échoué
+Stockage des tâches ayant échoué dans DynamoDB
+Désactivation du stockage des tâches ayant échoué
+Échec des événements de travail
+Effacement des travaux des files d'attente
+Surveillance de vos files d'attente
+Événements d'emploi
+Introduction
+Lors de la création de votre application Web, certaines tâches, telles que l'analyse et le stockage d'un fichier CSV téléchargé, peuvent prendre trop de temps lors d'une requête Web typique. Heureusement, Laravel vous permet de créer facilement des tâches en file d'attente qui peuvent être traitées en arrière-plan. En déplaçant les tâches chronophages vers une file d'attente, votre application peut répondre aux requêtes Web à une vitesse fulgurante et offrir une meilleure expérience utilisateur à vos clients.
+
+Les files d'attente Laravel fournissent une API de mise en file d'attente unifiée sur une variété de backends de file d'attente différents, tels qu'Amazon SQS , Redis ou même une base de données relationnelle.
+
+Les options de configuration de la file d'attente de Laravel sont stockées dans le config/queue.phpfichier de configuration de votre application. Dans ce fichier, vous trouverez des configurations de connexion pour chacun des pilotes de file d'attente inclus dans le framework, y compris la base de données, les pilotes Amazon SQS , Redis et Beanstalkd , ainsi qu'un pilote synchrone qui exécutera les tâches immédiatement (à utiliser pendant développement local). Un nullpilote de file d'attente est également inclus qui supprime les travaux en file d'attente.
+
+
+Laravel propose désormais Horizon, un magnifique tableau de bord et un système de configuration pour vos files d'attente alimentées par Redis. Consultez la documentation complète d'Horizon pour plus d'informations.
+
+
+Connexions Vs. Files d'attente
+Avant de commencer avec les files d'attente Laravel, il est important de comprendre la distinction entre "connexions" et "files d'attente". Dans votre config/queue.phpfichier de configuration, il y a un connectionstableau de configuration. Cette option définit les connexions aux services de file d'attente principaux tels qu'Amazon SQS, Beanstalk ou Redis. Cependant, toute connexion de file d'attente donnée peut avoir plusieurs "files d'attente" qui peuvent être considérées comme différentes piles ou piles de travaux en file d'attente.
+
+Notez que chaque exemple de configuration de connexion dans le queuefichier de configuration contient un queueattribut. Il s'agit de la file d'attente par défaut vers laquelle les travaux seront répartis lorsqu'ils sont envoyés à une connexion donnée. En d'autres termes, si vous répartissez un travail sans définir explicitement à quelle file d'attente il doit être réparti, le travail sera placé dans la file d'attente définie dans l' queueattribut de la configuration de la connexion :
+
+use App\Jobs\ProcessPodcast;
+ 
+// This job is sent to the default connection's default queue...
+ProcessPodcast::dispatch();
+ 
+// This job is sent to the default connection's "emails" queue...
+ProcessPodcast::dispatch()->onQueue('emails');
+
+Certaines applications peuvent ne pas avoir besoin de pousser les travaux sur plusieurs files d'attente, préférant plutôt avoir une seule file d'attente. Cependant, pousser les tâches vers plusieurs files d'attente peut être particulièrement utile pour les applications qui souhaitent hiérarchiser ou segmenter la manière dont les tâches sont traitées, car le travailleur de la file d'attente Laravel vous permet de spécifier les files d'attente qu'il doit traiter par priorité. Par exemple, si vous poussez des tâches vers une highfile d'attente, vous pouvez exécuter un agent qui leur donne une priorité de traitement plus élevée :
+
+php artisan queue:work --queue=high,default
+
+Notes du conducteur et prérequis
+Base de données
+Pour utiliser le databasepilote de file d'attente, vous aurez besoin d'une table de base de données pour contenir les travaux. Pour générer une migration qui crée cette table, exécutez la queue:tablecommande Artisan. Une fois la migration créée, vous pouvez migrer votre base de données à l'aide de la migratecommande :
+
+php artisan queue:table
+ 
+php artisan migrate
+
+Enfin, n'oubliez pas d'indiquer à votre application d'utiliser le databasepilote en mettant à jour la QUEUE_CONNECTIONvariable dans le .envfichier de votre application :
+
+QUEUE_CONNECTION=database
+
+Redis
+Pour utiliser le redispilote de file d'attente, vous devez configurer une connexion à la base de données Redis dans votre config/database.phpfichier de configuration.
+
+Grappe Redis
+
+Si votre connexion à la file d'attente Redis utilise un cluster Redis, vos noms de file d'attente doivent contenir une balise de hachage de clé . Ceci est nécessaire pour garantir que toutes les clés Redis d'une file d'attente donnée sont placées dans le même emplacement de hachage :
+
+'redis' => [
+    'driver' => 'redis',
+    'connection' => 'default',
+    'queue' => '{default}',
+    'retry_after' => 90,
+],
+
+Blocage
+
+Lorsque vous utilisez la file d'attente Redis, vous pouvez utiliser l' block_foroption de configuration pour spécifier combien de temps le pilote doit attendre qu'une tâche soit disponible avant de parcourir la boucle de travail et de réinterroger la base de données Redis.
+
+Ajuster cette valeur en fonction de la charge de votre file d'attente peut être plus efficace que d'interroger continuellement la base de données Redis pour de nouvelles tâches. Par exemple, vous pouvez définir la valeur sur 5pour indiquer que le pilote doit se bloquer pendant cinq secondes en attendant qu'une tâche soit disponible :
+
+'redis' => [
+    'driver' => 'redis',
+    'connection' => 'default',
+    'queue' => 'default',
+    'retry_after' => 90,
+    'block_for' => 5,
+],
+
+
+Le réglage block_forsur 0entraînera le blocage indéfini des travailleurs de la file d'attente jusqu'à ce qu'un travail soit disponible. Cela empêchera également les signaux tels que SIGTERMd'être traités jusqu'à ce que le travail suivant ait été traité.
+
+
+Autres prérequis du pilote
+Les dépendances suivantes sont nécessaires pour les pilotes de file d'attente répertoriés. Ces dépendances peuvent être installées via le gestionnaire de packages Composer :
+
+SQS d'Amazon :aws/aws-sdk-php ~3.0
+Haricot magique :pda/pheanstalk ~4.0
+Redis : predis/predis ~1.0ou extension PHP phpredis
+Création d'emplois
+Génération de classes d'emploi
+Par défaut, tous les travaux en file d'attente pour votre application sont stockés dans le app/Jobsrépertoire. Si le app/Jobsrépertoire n'existe pas, il sera créé lorsque vous exécuterez la make:jobcommande Artisan :
+
+php artisan make:job ProcessPodcast
+
+La classe générée implémentera l' Illuminate\Contracts\Queue\ShouldQueueinterface, indiquant à Laravel que le travail doit être poussé dans la file d'attente pour s'exécuter de manière asynchrone.
+
+
+Les talons de travail peuvent être personnalisés à l'aide de la publication de talons .
+
+
+Structure de classe
+Les classes de travaux sont très simples et ne contiennent normalement qu'une handleméthode appelée lorsque le travail est traité par la file d'attente. Pour commencer, examinons un exemple de classe d'emploi. Dans cet exemple, nous supposerons que nous gérons un service de publication de podcasts et que nous devons traiter les fichiers de podcast téléchargés avant qu'ils ne soient publiés :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+use App\Models\Podcast;
+use App\Services\AudioProcessor;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+ 
+    /**
+     * The podcast instance.
+     *
+     * @var \App\Models\Podcast
+     */
+    public $podcast;
+ 
+    /**
+     * Create a new job instance.
+     *
+     * @param  App\Models\Podcast  $podcast
+     * @return void
+     */
+    public function __construct(Podcast $podcast)
+    {
+        $this->podcast = $podcast;
+    }
+ 
+    /**
+     * Execute the job.
+     *
+     * @param  App\Services\AudioProcessor  $processor
+     * @return void
+     */
+    public function handle(AudioProcessor $processor)
+    {
+        // Process uploaded podcast...
+    }
+}
+
+Dans cet exemple, notez que nous avons pu passer un modèle Eloquent directement dans le constructeur du travail en file d'attente. En raison du SerializesModelstrait utilisé par le travail, les modèles Eloquent et leurs relations chargées seront sérialisés et non sérialisés avec élégance lors du traitement du travail.
+
+Si votre tâche en file d'attente accepte un modèle Eloquent dans son constructeur, seul l'identifiant du modèle sera sérialisé dans la file d'attente. Lorsque le travail est réellement traité, le système de file d'attente récupère automatiquement l'instance complète du modèle et ses relations chargées à partir de la base de données. Cette approche de la sérialisation des modèles permet d'envoyer des charges utiles de travail beaucoup plus petites à votre pilote de file d'attente.
+
+handleInjection de dépendance de méthode
+La handleméthode est invoquée lorsque le travail est traité par la file d'attente. Notez que nous sommes en mesure de taper des dépendances sur la handleméthode du travail. Le conteneur de service Laravel injecte automatiquement ces dépendances.
+
+Si vous souhaitez contrôler totalement la manière dont le conteneur injecte des dépendances dans la handleméthode, vous pouvez utiliser la bindMethodméthode du conteneur. La bindMethodméthode accepte un rappel qui reçoit le travail et le conteneur. Dans le rappel, vous êtes libre d'invoquer la handleméthode comme vous le souhaitez. Typiquement, vous devez appeler cette méthode depuis la bootméthode de votre App\Providers\AppServiceProvider fournisseur de service :
+
+use App\Jobs\ProcessPodcast;
+use App\Services\AudioProcessor;
+ 
+$this->app->bindMethod([ProcessPodcast::class, 'handle'], function ($job, $app) {
+    return $job->handle($app->make(AudioProcessor::class));
+});
+
+
+Les données binaires, telles que le contenu brut de l'image, doivent être transmises via la base64_encodefonction avant d'être transmises à une tâche en file d'attente. Sinon, la tâche risque de ne pas être correctement sérialisée en JSON lorsqu'elle est placée dans la file d'attente.
+
+
+Relations en file d'attente
+Étant donné que les relations chargées sont également sérialisées, la chaîne de travail sérialisée peut parfois devenir assez volumineuse. Pour empêcher la sérialisation des relations, vous pouvez appeler la withoutRelationsméthode sur le modèle lors de la définition d'une valeur de propriété. Cette méthode renverra une instance du modèle sans ses relations chargées :
+
+/**
+ * Create a new job instance.
+ *
+ * @param  \App\Models\Podcast  $podcast
+ * @return void
+ */
+public function __construct(Podcast $podcast)
+{
+    $this->podcast = $podcast->withoutRelations();
+}
+
+De plus, lorsqu'un travail est désérialisé et que les relations de modèle sont récupérées de la base de données, elles seront récupérées dans leur intégralité. Toutes les contraintes de relation précédentes qui ont été appliquées avant la sérialisation du modèle pendant le processus de mise en file d'attente des travaux ne seront pas appliquées lorsque le travail est désérialisé. Par conséquent, si vous souhaitez travailler avec un sous-ensemble d'une relation donnée, vous devez recontraindre cette relation dans votre travail en file d'attente.
+
+Emplois uniques
+
+Les tâches uniques nécessitent un pilote de cache qui prend en charge les verrous . Actuellement, les pilotes de cache memcached, redis, dynamodb, database, fileet de arraycache prennent en charge les verrous atomiques. De plus, les contraintes de travail unique ne s'appliquent pas aux travaux dans les lots.
+
+
+Parfois, vous souhaiterez peut-être vous assurer qu'une seule instance d'un travail spécifique se trouve dans la file d'attente à un moment donné. Vous pouvez le faire en implémentant l' ShouldBeUniqueinterface sur votre classe de travail. Cette interface ne nécessite pas que vous définissiez des méthodes supplémentaires sur votre classe :
+
+<?php
+ 
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+ 
+class UpdateSearchIndex implements ShouldQueue, ShouldBeUnique
+{
+    ...
+}
+
+Dans l'exemple ci-dessus, le UpdateSearchIndextravail est unique. Ainsi, le travail ne sera pas distribué si une autre instance du travail est déjà dans la file d'attente et n'a pas terminé le traitement.
+
+Dans certains cas, vous pouvez définir une « clé » spécifique qui rend le travail unique ou vous pouvez spécifier un délai au-delà duquel le travail ne reste plus unique. Pour ce faire, vous pouvez définir uniqueIddes uniqueForpropriétés ou des méthodes sur votre classe de travail :
+
+<?php
+ 
+use App\Product;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+ 
+class UpdateSearchIndex implements ShouldQueue, ShouldBeUnique
+{
+    /**
+     * The product instance.
+     *
+     * @var \App\Product
+     */
+    public $product;
+ 
+    /**
+     * The number of seconds after which the job's unique lock will be released.
+     *
+     * @var int
+     */
+    public $uniqueFor = 3600;
+ 
+    /**
+     * The unique ID of the job.
+     *
+     * @return string
+     */
+    public function uniqueId()
+    {
+        return $this->product->id;
+    }
+}
+
+Dans l'exemple ci-dessus, le UpdateSearchIndextravail est unique par un ID de produit. Ainsi, toute nouvelle expédition du travail avec le même ID de produit sera ignorée jusqu'à ce que le travail existant ait terminé le traitement. De plus, si le travail existant n'est pas traité dans l'heure, le verrou unique sera libéré et un autre travail avec la même clé unique pourra être envoyé dans la file d'attente.
+
+
+Si votre application distribue des tâches à partir de plusieurs serveurs Web ou conteneurs, vous devez vous assurer que tous vos serveurs communiquent avec le même serveur de cache central afin que Laravel puisse déterminer avec précision si une tâche est unique.
+
+
+Garder les tâches uniques jusqu'au début du traitement
+Par défaut, les travaux uniques sont « déverrouillés » après qu'un travail a terminé son traitement ou échoué à toutes ses nouvelles tentatives. Cependant, il peut arriver que vous souhaitiez que votre travail soit déverrouillé juste avant qu'il ne soit traité. Pour ce faire, votre travail doit mettre en œuvre le ShouldBeUniqueUntilProcessingcontrat au lieu du ShouldBeUniquecontrat :
+
+<?php
+ 
+use App\Product;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
+ 
+class UpdateSearchIndex implements ShouldQueue, ShouldBeUniqueUntilProcessing
+{
+    // ...
+}
+
+Verrous de tâche uniques
+Dans les coulisses, lorsqu'un ShouldBeUniquetravail est expédié, Laravel tente d'acquérir une serrure avec la uniqueIdclé. Si le verrou n'est pas acquis, le travail n'est pas distribué. Ce verrou est libéré lorsque le travail se termine ou échoue à toutes ses nouvelles tentatives. Par défaut, Laravel utilisera le pilote de cache par défaut pour obtenir ce verrou. Cependant, si vous souhaitez utiliser un autre pilote pour acquérir le verrou, vous pouvez définir une uniqueViaméthode renvoyant le pilote de cache à utiliser :
+
+use Illuminate\Support\Facades\Cache;
+ 
+class UpdateSearchIndex implements ShouldQueue, ShouldBeUnique
+{
+    ...
+ 
+    /**
+     * Get the cache driver for the unique job lock.
+     *
+     * @return \Illuminate\Contracts\Cache\Repository
+     */
+    public function uniqueVia()
+    {
+        return Cache::driver('redis');
+    }
+}
+
+
+Si vous avez seulement besoin de limiter le traitement simultané d'un travail, utilisez WithoutOverlappingplutôt le middleware du travail.
+
+
+Intergiciel de travail
+L'intergiciel de travail vous permet d'envelopper une logique personnalisée autour de l'exécution des travaux en file d'attente, réduisant ainsi les tâches standard dans les travaux eux-mêmes. Par exemple, considérez la handleméthode suivante qui exploite les fonctionnalités de limitation de débit Redis de Laravel pour autoriser le traitement d'un seul travail toutes les cinq secondes :
+
+use Illuminate\Support\Facades\Redis;
+ 
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    Redis::throttle('key')->block(0)->allow(1)->every(5)->then(function () {
+        info('Lock obtained...');
+ 
+        // Handle job...
+    }, function () {
+        // Could not obtain lock...
+ 
+        return $this->release(5);
+    });
+}
+
+Tant que ce code est valide, l'implémentation de la handleméthode devient bruyante car elle est encombrée de logique de limitation de débit Redis. De plus, cette logique de limitation de débit doit être dupliquée pour tous les autres travaux que nous souhaitons limiter.
+
+Au lieu de limiter le débit dans la méthode de gestion, nous pourrions définir un middleware de travail qui gère la limitation du débit. Laravel n'a pas d'emplacement par défaut pour le middleware de travail, vous pouvez donc placer le middleware de travail n'importe où dans votre application. Dans cet exemple, nous placerons le middleware dans un app/Jobs/Middlewarerépertoire :
+
+<?php
+ 
+namespace App\Jobs\Middleware;
+ 
+use Illuminate\Support\Facades\Redis;
+ 
+class RateLimited
+{
+    /**
+     * Process the queued job.
+     *
+     * @param  mixed  $job
+     * @param  callable  $next
+     * @return mixed
+     */
+    public function handle($job, $next)
+    {
+        Redis::throttle('key')
+                ->block(0)->allow(1)->every(5)
+                ->then(function () use ($job, $next) {
+                    // Lock obtained...
+ 
+                    $next($job);
+                }, function () use ($job) {
+                    // Could not obtain lock...
+ 
+                    $job->release(5);
+                });
+    }
+}
+
+Comme vous pouvez le voir, comme le middleware de route, le middleware de travail reçoit le travail en cours de traitement et un rappel qui doit être invoqué pour continuer à traiter le travail.
+
+Après avoir créé un middleware de travail, ils peuvent être attachés à un travail en les renvoyant de la middlewareméthode du travail. Cette méthode n'existe pas sur les travaux échafaudés par la make:jobcommande Artisan, vous devrez donc l'ajouter manuellement à votre classe de travail :
+
+use App\Jobs\Middleware\RateLimited;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [new RateLimited];
+}
+
+
+Le middleware de travail peut également être affecté à des écouteurs d'événements, des mailables et des notifications pouvant être mis en file d'attente.
+
+
+Limitation de débit
+Bien que nous venons de montrer comment écrire votre propre middleware de limitation de débit, Laravel inclut en fait un middleware de limitation de débit que vous pouvez utiliser pour limiter les tâches. Comme les limiteurs de taux de routage , les limiteurs de taux de travail sont définis à l'aide de la méthode RateLimiterde la façade for.
+
+Par exemple, vous souhaiterez peut-être autoriser les utilisateurs à sauvegarder leurs données une fois par heure sans imposer une telle limite aux clients premium. Pour ce faire, vous pouvez définir a RateLimiterdans la bootméthode de votre AppServiceProvider:
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    RateLimiter::for('backups', function ($job) {
+        return $job->user->vipCustomer()
+                    ? Limit::none()
+                    : Limit::perHour(1)->by($job->user->id);
+    });
+}
+
+Dans l'exemple ci-dessus, nous avons défini une limite de taux horaire ; cependant, vous pouvez facilement définir une limite de débit basée sur les minutes à l'aide de la perMinuteméthode. De plus, vous pouvez passer n'importe quelle valeur que vous souhaitez à la byméthode de la limite de débit ; cependant, cette valeur est le plus souvent utilisée pour segmenter les limites de débit par client :
+
+return Limit::perMinute(50)->by($job->user->id);
+
+Une fois que vous avez défini votre limite de débit, vous pouvez attacher le limiteur de débit à votre tâche de sauvegarde à l'aide du Illuminate\Queue\Middleware\RateLimitedmiddleware. Chaque fois que le travail dépasse la limite de débit, ce middleware remet le travail dans la file d'attente avec un délai approprié en fonction de la durée de la limite de débit.
+
+use Illuminate\Queue\Middleware\RateLimited;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [new RateLimited('backups')];
+}
+
+La libération d'un travail à débit limité dans la file d'attente incrémentera toujours le nombre total de attempts. Vous souhaiterez peut-être ajuster vos propriétés trieset maxExceptionssur votre classe d'emploi en conséquence. Ou, vous souhaiterez peut-être utiliser la retryUntilméthode pour définir la durée jusqu'à ce que la tâche ne soit plus tentée.
+
+Si vous ne souhaitez pas qu'un travail soit réessayé lorsqu'il est limité en débit, vous pouvez utiliser la dontReleaseméthode :
+
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new RateLimited('backups'))->dontRelease()];
+}
+
+
+Si vous utilisez Redis, vous pouvez utiliser le Illuminate\Queue\Middleware\RateLimitedWithRedismiddleware, qui est affiné pour Redis et plus efficace que le middleware de limitation de débit de base.
+
+
+Empêcher les chevauchements de tâches
+Laravel inclut un Illuminate\Queue\Middleware\WithoutOverlappingmiddleware qui vous permet d'empêcher les chevauchements de tâches en fonction d'une clé arbitraire. Cela peut être utile lorsqu'un travail en file d'attente modifie une ressource qui ne doit être modifiée que par un travail à la fois.
+
+Par exemple, imaginons que vous ayez une tâche en file d'attente qui met à jour la cote de solvabilité d'un utilisateur et que vous souhaitiez empêcher les chevauchements de tâches de mise à jour de la cote de crédit pour le même ID utilisateur. Pour ce faire, vous pouvez renvoyer le WithoutOverlappingmiddleware à partir de la middlewareméthode de votre travail :
+
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [new WithoutOverlapping($this->user->id)];
+}
+
+Tous les travaux qui se chevauchent seront renvoyés dans la file d'attente. Vous pouvez également spécifier le nombre de secondes qui doivent s'écouler avant que la tâche libérée ne soit à nouveau tentée :
+
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new WithoutOverlapping($this->order->id))->releaseAfter(60)];
+}
+
+Si vous souhaitez supprimer immédiatement les tâches qui se chevauchent afin qu'elles ne soient pas réessayées, vous pouvez utiliser la dontReleaseméthode :
+
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new WithoutOverlapping($this->order->id))->dontRelease()];
+}
+
+Le WithoutOverlappingmiddleware est alimenté par la fonction de verrouillage atomique de Laravel. Parfois, votre travail peut échouer de manière inattendue ou expirer de manière à ce que le verrou ne soit pas libéré. Par conséquent, vous pouvez définir explicitement un délai d'expiration de verrouillage à l'aide de la expireAfterméthode. Par exemple, l'exemple ci-dessous demandera à Laravel de libérer le WithoutOverlappingverrou trois minutes après le début du traitement :
+
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new WithoutOverlapping($this->order->id))->expireAfter(180)];
+}
+
+
+Le WithoutOverlappingmiddleware nécessite un pilote de cache prenant en charge les verrous . Actuellement, les pilotes de cache memcached, redis, dynamodb, database, fileet de arraycache prennent en charge les verrous atomiques.
+
+
+Limitation des exceptions
+Laravel inclut un Illuminate\Queue\Middleware\ThrottlesExceptionsmiddleware qui vous permet de limiter les exceptions. Une fois que le travail lève un nombre donné d'exceptions, toutes les autres tentatives d'exécution du travail sont retardées jusqu'à ce qu'un intervalle de temps spécifié se soit écoulé. Ce middleware est particulièrement utile pour les tâches qui interagissent avec des services tiers instables.
+
+Par exemple, imaginons une tâche en file d'attente qui interagit avec une API tierce qui commence à lever des exceptions. Pour limiter les exceptions, vous pouvez renvoyer le ThrottlesExceptionsmiddleware à partir de la middlewareméthode de votre travail. Typiquement, ce middleware doit être associé à un job qui implémente des tentatives basées sur le temps :
+
+use Illuminate\Queue\Middleware\ThrottlesExceptions;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [new ThrottlesExceptions(10, 5)];
+}
+ 
+/**
+ * Determine the time at which the job should timeout.
+ *
+ * @return \DateTime
+ */
+public function retryUntil()
+{
+    return now()->addMinutes(5);
+}
+
+Le premier argument du constructeur accepté par le middleware est le nombre d'exceptions que le travail peut lancer avant d'être limité, tandis que le deuxième argument du constructeur est le nombre de minutes qui doivent s'écouler avant que le travail ne soit réessayé une fois qu'il a été limité. Dans l'exemple de code ci-dessus, si le travail lève 10 exceptions en 5 minutes, nous attendrons 5 minutes avant de réessayer le travail.
+
+Lorsqu'un travail lève une exception mais que le seuil d'exception n'a pas encore été atteint, le travail est généralement réessayé immédiatement. Cependant, vous pouvez spécifier le nombre de minutes pendant lesquelles un tel travail doit être retardé en appelant la backoffméthode lors de l'attachement du middleware au travail :
+
+use Illuminate\Queue\Middleware\ThrottlesExceptions;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new ThrottlesExceptions(10, 5))->backoff(5)];
+}
+
+En interne, ce middleware utilise le système de cache de Laravel pour implémenter la limitation de débit, et le nom de classe du travail est utilisé comme "clé" de cache. Vous pouvez remplacer cette clé en appelant la byméthode lors de l'attachement du middleware à votre travail. Cela peut être utile si vous avez plusieurs tâches qui interagissent avec le même service tiers et que vous souhaitez qu'elles partagent un "seau" de limitation commun :
+
+use Illuminate\Queue\Middleware\ThrottlesExceptions;
+ 
+/**
+ * Get the middleware the job should pass through.
+ *
+ * @return array
+ */
+public function middleware()
+{
+    return [(new ThrottlesExceptions(10, 10))->by('key')];
+}
+
+
+Si vous utilisez Redis, vous pouvez utiliser le Illuminate\Queue\Middleware\ThrottlesExceptionsWithRedismiddleware, qui est affiné pour Redis et plus efficace que le middleware de limitation des exceptions de base.
+
+
+Répartition des tâches
+Une fois que vous avez écrit votre classe de travail, vous pouvez l'envoyer en utilisant la dispatchméthode sur le travail lui-même. Les arguments passés à la dispatchméthode seront donnés au constructeur du travail :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessPodcast;
+use App\Models\Podcast;
+use Illuminate\Http\Request;
+ 
+class PodcastController extends Controller
+{
+    /**
+     * Store a new podcast.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $podcast = Podcast::create(/* ... */);
+ 
+        // ...
+ 
+        ProcessPodcast::dispatch($podcast);
+    }
+}
+
+Si vous souhaitez répartir conditionnellement un travail, vous pouvez utiliser les méthodes dispatchIfet :dispatchUnless
+
+ProcessPodcast::dispatchIf($accountActive, $podcast);
+ 
+ProcessPodcast::dispatchUnless($accountSuspended, $podcast);
+
+Expédition retardée
+Si vous souhaitez spécifier qu'un travail ne doit pas être immédiatement disponible pour être traité par un travailleur de la file d'attente, vous pouvez utiliser la delayméthode lors de la répartition du travail. Par exemple, spécifions qu'une tâche ne doit pas être disponible pour traitement avant 10 minutes après son envoi :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessPodcast;
+use App\Models\Podcast;
+use Illuminate\Http\Request;
+ 
+class PodcastController extends Controller
+{
+    /**
+     * Store a new podcast.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $podcast = Podcast::create(/* ... */);
+ 
+        // ...
+ 
+        ProcessPodcast::dispatch($podcast)
+                    ->delay(now()->addMinutes(10));
+    }
+}
+
+
+Le service de file d'attente Amazon SQS a un délai maximum de 15 minutes.
+
+
+Envoi après l'envoi de la réponse au navigateur
+Alternativement, la dispatchAfterResponseméthode retarde l'envoi d'un travail jusqu'à ce que la réponse HTTP soit envoyée au navigateur de l'utilisateur. Cela permettra toujours à l'utilisateur de commencer à utiliser l'application même si un travail en file d'attente est toujours en cours d'exécution. Cela ne devrait généralement être utilisé que pour les tâches qui prennent environ une seconde, comme l'envoi d'un e-mail. Étant donné qu'ils sont traités dans la requête HTTP actuelle, les travaux distribués de cette manière ne nécessitent pas l'exécution d'un exécuteur de file d'attente pour qu'ils soient traités :
+
+use App\Jobs\SendNotification;
+ 
+SendNotification::dispatchAfterResponse();
+
+Vous pouvez également effectuer dispatchune fermeture et enchaîner la afterResponseméthode sur l' dispatchassistant pour exécuter une fermeture après que la réponse HTTP a été envoyée au navigateur :
+
+use App\Mail\WelcomeMessage;
+use Illuminate\Support\Facades\Mail;
+ 
+dispatch(function () {
+    Mail::to('taylor@example.com')->send(new WelcomeMessage);
+})->afterResponse();
+
+Distribution synchrone
+Si vous souhaitez envoyer un travail immédiatement (de manière synchrone), vous pouvez utiliser la dispatchSyncméthode. Lorsque vous utilisez cette méthode, le travail ne sera pas mis en file d'attente et sera exécuté immédiatement dans le processus en cours :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessPodcast;
+use App\Models\Podcast;
+use Illuminate\Http\Request;
+ 
+class PodcastController extends Controller
+{
+    /**
+     * Store a new podcast.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $podcast = Podcast::create(/* ... */);
+ 
+        // Create podcast...
+ 
+        ProcessPodcast::dispatchSync($podcast);
+    }
+}
+
+Tâches et transactions de base de données
+Bien qu'il soit parfaitement acceptable de répartir des travaux dans des transactions de base de données, vous devez faire particulièrement attention à vous assurer que votre travail pourra réellement s'exécuter avec succès. Lors de la répartition d'un travail dans une transaction, il est possible que le travail soit traité par un travailleur avant que la transaction parent ne soit validée. Lorsque cela se produit, les mises à jour que vous avez apportées aux modèles ou aux enregistrements de base de données pendant la ou les transactions de base de données peuvent ne pas encore être reflétées dans la base de données. De plus, tous les modèles ou enregistrements de base de données créés dans la ou les transactions peuvent ne pas exister dans la base de données.
+
+Heureusement, Laravel propose plusieurs méthodes pour contourner ce problème. Tout d'abord, vous pouvez définir l' after_commitoption de connexion dans le tableau de configuration de votre connexion de file d'attente :
+
+'redis' => [
+    'driver' => 'redis',
+    // ...
+    'after_commit' => true,
+],
+
+Lorsque l' after_commitoption est true, vous pouvez répartir les travaux dans les transactions de base de données ; cependant, Laravel attendra que les transactions de la base de données parente ouverte aient été validées avant de réellement envoyer le travail. Bien sûr, si aucune transaction de base de données n'est actuellement ouverte, le travail sera envoyé immédiatement.
+
+Si une transaction est annulée en raison d'une exception qui se produit pendant la transaction, les travaux qui ont été distribués pendant cette transaction seront ignorés.
+
+
+La définition de l' after_commitoption de configuration sur trueentraînera également la distribution de tous les écouteurs d'événements, e-mails, notifications et événements de diffusion en file d'attente après la validation de toutes les transactions de base de données ouvertes.
+
+
+Spécification du comportement de distribution de validation en ligne
+Si vous ne définissez pas l' after_commitoption de configuration de connexion à la file d'attente sur true, vous pouvez toujours indiquer qu'un travail spécifique doit être distribué après que toutes les transactions de base de données ouvertes ont été validées. Pour ce faire, vous pouvez enchaîner la afterCommitméthode sur votre opération de répartition :
+
+use App\Jobs\ProcessPodcast;
+ 
+ProcessPodcast::dispatch($podcast)->afterCommit();
+
+De même, si l' after_commitoption de configuration est définie sur true, vous pouvez indiquer qu'un travail spécifique doit être distribué immédiatement sans attendre la validation des transactions de base de données ouvertes :
+
+ProcessPodcast::dispatch($podcast)->beforeCommit();
+
+Enchaînement des tâches
+Le chaînage de travaux vous permet de spécifier une liste de travaux en file d'attente qui doivent être exécutés dans l'ordre après l'exécution réussie du travail principal. Si une tâche de la séquence échoue, les autres tâches ne seront pas exécutées. Pour exécuter une chaîne de tâches en file d'attente, vous pouvez utiliser la chainméthode fournie par la Busfaçade. Le bus de commande de Laravel est un composant de niveau inférieur sur lequel la répartition des tâches en file d'attente est construite :
+
+use App\Jobs\OptimizePodcast;
+use App\Jobs\ProcessPodcast;
+use App\Jobs\ReleasePodcast;
+use Illuminate\Support\Facades\Bus;
+ 
+Bus::chain([
+    new ProcessPodcast,
+    new OptimizePodcast,
+    new ReleasePodcast,
+])->dispatch();
+
+En plus d'enchaîner les instances de classe d'emploi, vous pouvez également enchaîner les fermetures :
+
+Bus::chain([
+    new ProcessPodcast,
+    new OptimizePodcast,
+    function () {
+        Podcast::update(/* ... */);
+    },
+])->dispatch();
+
+
+La suppression de travaux à l'aide de la $this->delete()méthode dans le travail n'empêchera pas le traitement des travaux chaînés. La chaîne ne cessera de s'exécuter qu'en cas d'échec d'une tâche de la chaîne.
+
+
+Connexion en chaîne et file d'attente
+Si vous souhaitez spécifier la connexion et la file d'attente à utiliser pour les travaux chaînés, vous pouvez utiliser les méthodes onConnectionet . onQueueCes méthodes spécifient la connexion à la file d'attente et le nom de la file d'attente qui doivent être utilisés à moins que le travail en file d'attente ne soit explicitement affecté à une connexion/file d'attente différente :
+
+Bus::chain([
+    new ProcessPodcast,
+    new OptimizePodcast,
+    new ReleasePodcast,
+])->onConnection('redis')->onQueue('podcasts')->dispatch();
+
+Échecs de la chaîne
+Lorsque vous enchaînez des tâches, vous pouvez utiliser la catchméthode pour spécifier une fermeture qui doit être invoquée si une tâche de la chaîne échoue. Le rappel donné recevra l' Throwableinstance qui a provoqué l'échec de la tâche :
+
+use Illuminate\Support\Facades\Bus;
+use Throwable;
+ 
+Bus::chain([
+    new ProcessPodcast,
+    new OptimizePodcast,
+    new ReleasePodcast,
+])->catch(function (Throwable $e) {
+    // A job within the chain has failed...
+})->dispatch();
+
+Personnalisation de la file d'attente et de la connexion
+Répartition vers une file d'attente particulière
+En poussant les tâches vers différentes files d'attente, vous pouvez "catégoriser" vos tâches en file d'attente et même hiérarchiser le nombre de travailleurs que vous affectez à différentes files d'attente. Gardez à l'esprit que cela ne pousse pas les travaux vers différentes "connexions" de file d'attente telles que définies par votre fichier de configuration de file d'attente, mais uniquement vers des files d'attente spécifiques au sein d'une même connexion. Pour spécifier la file d'attente, utilisez la onQueueméthode lors de la distribution de la tâche :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessPodcast;
+use App\Models\Podcast;
+use Illuminate\Http\Request;
+ 
+class PodcastController extends Controller
+{
+    /**
+     * Store a new podcast.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $podcast = Podcast::create(/* ... */);
+ 
+        // Create podcast...
+ 
+        ProcessPodcast::dispatch($podcast)->onQueue('processing');
+    }
+}
+
+Vous pouvez également spécifier la file d'attente du travail en appelant la onQueueméthode dans le constructeur du travail :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+ use Illuminate\Bus\Queueable;
+ use Illuminate\Contracts\Queue\ShouldQueue;
+ use Illuminate\Foundation\Bus\Dispatchable;
+ use Illuminate\Queue\InteractsWithQueue;
+ use Illuminate\Queue\SerializesModels;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+ 
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->onQueue('processing');
+    }
+}
+
+Envoi à une connexion particulière
+Si votre application interagit avec plusieurs connexions de file d'attente, vous pouvez spécifier la connexion vers laquelle envoyer un travail en utilisant la onConnectionméthode :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessPodcast;
+use App\Models\Podcast;
+use Illuminate\Http\Request;
+ 
+class PodcastController extends Controller
+{
+    /**
+     * Store a new podcast.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $podcast = Podcast::create(/* ... */);
+ 
+        // Create podcast...
+ 
+        ProcessPodcast::dispatch($podcast)->onConnection('sqs');
+    }
+}
+
+Vous pouvez enchaîner les méthodes onConnectionet onQueuepour spécifier la connexion et la file d'attente d'un travail :
+
+ProcessPodcast::dispatch($podcast)
+              ->onConnection('sqs')
+              ->onQueue('processing');
+
+Vous pouvez également spécifier la connexion du travail en appelant la onConnectionméthode dans le constructeur du travail :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+ use Illuminate\Bus\Queueable;
+ use Illuminate\Contracts\Queue\ShouldQueue;
+ use Illuminate\Foundation\Bus\Dispatchable;
+ use Illuminate\Queue\InteractsWithQueue;
+ use Illuminate\Queue\SerializesModels;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+ 
+    /**
+     * Create a new job instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->onConnection('sqs');
+    }
+}
+
+Spécification du nombre maximal de tentatives de tâche/valeurs d'expiration
+Nombre maximal de tentatives
+Si l'un de vos travaux en file d'attente rencontre une erreur, vous ne souhaitez probablement pas qu'il recommence indéfiniment. Par conséquent, Laravel propose différentes manières de spécifier combien de fois ou pendant combien de temps une tâche peut être tentée.
+
+Une approche pour spécifier le nombre maximum de fois qu'une tâche peut être tentée consiste à utiliser le --triescommutateur sur la ligne de commande Artisan. Cela s'appliquera à tous les travaux traités par le travailleur à moins que le travail en cours de traitement spécifie un nombre plus spécifique de tentatives :
+
+php artisan queue:work --tries=3
+
+Si un travail dépasse son nombre maximum de tentatives, il sera considéré comme un travail "échoué". Pour plus d'informations sur la gestion des travaux ayant échoué, consultez la documentation des travaux ayant échoué .
+
+Vous pouvez adopter une approche plus granulaire en définissant le nombre maximal de fois qu'un travail peut être tenté sur la classe de travail elle-même. Si le nombre maximal de tentatives est spécifié sur le travail, il prévaudra sur la --triesvaleur fournie sur la ligne de commande :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    /**
+     * The number of times the job may be attempted.
+     *
+     * @var int
+     */
+    public $tries = 5;
+}
+
+Tentatives basées sur le temps
+Au lieu de définir le nombre de fois qu'une tâche peut être tentée avant qu'elle n'échoue, vous pouvez définir une heure à laquelle la tâche ne doit plus être tentée. Cela permet à un travail d'être tenté un nombre quelconque de fois dans un laps de temps donné. Pour définir l'heure à laquelle une tâche ne doit plus être tentée, ajoutez une retryUntilméthode à votre classe de tâches. Cette méthode doit renvoyer une DateTimeinstance :
+
+/**
+ * Determine the time at which the job should timeout.
+ *
+ * @return \DateTime
+ */
+public function retryUntil()
+{
+    return now()->addMinutes(10);
+}
+
+
+Vous pouvez également définir une triespropriété ou une retryUntilméthode sur vos écouteurs d'événements en file d'attente .
+
+
+Nombre maximal d'exceptions
+Parfois, vous souhaiterez peut-être spécifier qu'un travail peut être tenté plusieurs fois, mais devrait échouer si les tentatives sont déclenchées par un nombre donné d'exceptions non gérées (au lieu d'être libérées releasedirectement par la méthode). Pour ce faire, vous pouvez définir une maxExceptionspropriété sur votre classe d'emploi :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+use Illuminate\Support\Facades\Redis;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    /**
+     * The number of times the job may be attempted.
+     *
+     * @var int
+     */
+    public $tries = 25;
+ 
+    /**
+     * The maximum number of unhandled exceptions to allow before failing.
+     *
+     * @var int
+     */
+    public $maxExceptions = 3;
+ 
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        Redis::throttle('key')->allow(10)->every(60)->then(function () {
+            // Lock obtained, process the podcast...
+        }, function () {
+            // Unable to obtain lock...
+            return $this->release(10);
+        });
+    }
+}
+
+Dans cet exemple, la tâche est libérée pendant dix secondes si l'application ne parvient pas à obtenir un verrou Redis et continuera d'être réessayée jusqu'à 25 fois. Cependant, le travail échouera si trois exceptions non gérées sont levées par le travail.
+
+Temps libre
+
+L' pcntlextension PHP doit être installée afin de spécifier les délais d'expiration des travaux.
+
+
+Souvent, vous savez à peu près combien de temps vous attendez pour vos tâches en file d'attente. Pour cette raison, Laravel vous permet de spécifier une valeur "timeout". Par défaut, la valeur du délai d'attente est de 60 secondes. Si un travail est en cours de traitement pendant plus longtemps que le nombre de secondes spécifié par la valeur du délai d'attente, le travailleur traitant le travail se terminera avec une erreur. Typiquement, le worker sera redémarré automatiquement par un gestionnaire de processus configuré sur votre serveur .
+
+Le nombre maximal de secondes pendant lesquelles les tâches peuvent s'exécuter peut être spécifié à l'aide du --timeoutcommutateur sur la ligne de commande Artisan :
+
+php artisan queue:work --timeout=30
+
+Si le travail dépasse son nombre maximal de tentatives en continuant à expirer, il sera marqué comme ayant échoué.
+
+Vous pouvez également définir le nombre maximal de secondes pendant lesquelles un travail doit être autorisé à s'exécuter sur la classe de travail elle-même. Si le délai d'attente est spécifié sur le travail, il prévaudra sur tout délai d'attente spécifié sur la ligne de commande :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    /**
+     * The number of seconds the job can run before timing out.
+     *
+     * @var int
+     */
+    public $timeout = 120;
+}
+
+Parfois, les processus de blocage d'E/S tels que les sockets ou les connexions HTTP sortantes peuvent ne pas respecter le délai d'expiration spécifié. Par conséquent, lorsque vous utilisez ces fonctionnalités, vous devez toujours essayer de spécifier également un délai d'expiration à l'aide de leurs API. Par exemple, lorsque vous utilisez Guzzle, vous devez toujours spécifier une connexion et demander une valeur de délai d'attente.
+
+Échec du délai d'attente
+Si vous souhaitez indiquer qu'un travail doit être marqué comme ayant échoué à l'expiration du délai, vous pouvez définir la $failOnTimeoutpropriété sur la classe de travail :
+
+/**
+ * Indicate if the job should be marked as failed on timeout.
+ *
+ * @var bool
+ */
+public $failOnTimeout = true;
+
+La gestion des erreurs
+Si une exception est levée pendant le traitement du travail, le travail sera automatiquement remis dans la file d'attente afin qu'il puisse être tenté à nouveau. Le travail continuera d'être libéré jusqu'à ce qu'il ait été tenté le nombre maximum de fois autorisé par votre application. Le nombre maximum de tentatives est défini par le --triescommutateur utilisé sur la queue:workcommande Artisan. Alternativement, le nombre maximum de tentatives peut être défini sur la classe de travail elle-même. Vous trouverez plus d'informations sur l'exécution de l'agent de file d'attente ci- dessous .
+
+Libération manuelle d'un travail
+Parfois, vous souhaiterez peut-être remettre manuellement un travail dans la file d'attente afin qu'il puisse être réessayé ultérieurement. Vous pouvez accomplir cela en appelant la releaseméthode :
+
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    // ...
+ 
+    $this->release();
+}
+
+Par défaut, la releaseméthode remettra le travail dans la file d'attente pour un traitement immédiat. Cependant, en transmettant un entier à la releaseméthode, vous pouvez ordonner à la file d'attente de ne pas rendre le travail disponible pour le traitement avant qu'un nombre donné de secondes ne se soit écoulé :
+
+$this->release(10);
+
+Échec manuel d'une tâche
+Parfois, vous devrez peut-être marquer manuellement un travail comme "échoué". Pour ce faire, vous pouvez appeler la failméthode :
+
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    // ...
+ 
+    $this->fail();
+}
+
+Si vous souhaitez marquer votre tâche comme ayant échoué à cause d'une exception que vous avez interceptée, vous pouvez transmettre l'exception à la failméthode :
+
+$this->fail($exception);
+
+
+Pour plus d'informations sur les tâches ayant échoué, consultez la documentation sur la gestion des échecs de tâche .
+
+
+Regroupement de tâches
+La fonction de traitement par lot de travaux de Laravel vous permet d'exécuter facilement un lot de travaux, puis d'effectuer une action lorsque le lot de travaux est terminé. Avant de commencer, vous devez créer une migration de base de données pour créer une table contenant des méta-informations sur vos lots de tâches, telles que leur pourcentage d'achèvement. Cette migration peut être générée à l'aide de la queue:batches-tablecommande Artisan :
+
+php artisan queue:batches-table
+ 
+php artisan migrate
+
+Définir des travaux batchables
+Pour définir une tâche batchable, vous devez créer une tâche pouvant être mise en file d'attente comme d'habitude ; cependant, vous devez ajouter le Illuminate\Bus\Batchabletrait à la classe d'emplois. Ce trait donne accès à une batchméthode qui peut être utilisée pour récupérer le lot actuel dans lequel le travail s'exécute :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+use Illuminate\Bus\Batchable;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+ 
+class ImportCsv implements ShouldQueue
+{
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+ 
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
+    public function handle()
+    {
+        if ($this->batch()->cancelled()) {
+            // Determine if the batch has been cancelled...
+ 
+            return;
+        }
+ 
+        // Import a portion of the CSV file...
+    }
+}
+
+Expédition de lots
+Pour dispatcher un lot de jobs, il faut utiliser la batchméthode de la Busfaçade. Bien sûr, le traitement par lots est principalement utile lorsqu'il est combiné avec des rappels d'achèvement. Ainsi, vous pouvez utiliser les méthodes then, catchet finallypour définir des rappels d'achèvement pour le lot. Chacun de ces rappels recevra une Illuminate\Bus\Batchinstance lorsqu'il sera invoqué. Dans cet exemple, nous imaginons que nous mettons en file d'attente un lot de tâches qui traitent chacune un nombre donné de lignes d'un fichier CSV :
+
+use App\Jobs\ImportCsv;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
+use Throwable;
+ 
+$batch = Bus::batch([
+    new ImportCsv(1, 100),
+    new ImportCsv(101, 200),
+    new ImportCsv(201, 300),
+    new ImportCsv(301, 400),
+    new ImportCsv(401, 500),
+])->then(function (Batch $batch) {
+    // All jobs completed successfully...
+})->catch(function (Batch $batch, Throwable $e) {
+    // First batch job failure detected...
+})->finally(function (Batch $batch) {
+    // The batch has finished executing...
+})->dispatch();
+ 
+return $batch->id;
+
+L'ID du lot, accessible via la $batch->idpropriété, peut être utilisé pour interroger le bus de commande Laravel afin d'obtenir des informations sur le lot après son envoi.
+
+
+Étant donné que les rappels par lots sont sérialisés et exécutés ultérieurement par la file d'attente Laravel, vous ne devez pas utiliser la $thisvariable dans les rappels.
+
+
+Nommer les lots
+Certains outils tels que Laravel Horizon et Laravel Telescope peuvent fournir des informations de débogage plus conviviales pour les lots si les lots sont nommés. Pour attribuer un nom arbitraire à un lot, vous pouvez appeler la nameméthode lors de la définition du lot :
+
+$batch = Bus::batch([
+    // ...
+])->then(function (Batch $batch) {
+    // All jobs completed successfully...
+})->name('Import CSV')->dispatch();
+
+Connexion par lots et file d'attente
+Si vous souhaitez spécifier la connexion et la file d'attente à utiliser pour les travaux par lots, vous pouvez utiliser les méthodes onConnectionet . onQueueToutes les tâches par lots doivent s'exécuter dans la même connexion et file d'attente :
+
+$batch = Bus::batch([
+    // ...
+])->then(function (Batch $batch) {
+    // All jobs completed successfully...
+})->onConnection('redis')->onQueue('imports')->dispatch();
+
+Chaînes dans les lots
+Vous pouvez définir un ensemble de travaux chaînés dans un lot en plaçant les travaux chaînés dans un tableau. Par exemple, nous pouvons exécuter deux chaînes de travail en parallèle et exécuter un rappel lorsque les deux chaînes de travail ont terminé le traitement :
+
+use App\Jobs\ReleasePodcast;
+use App\Jobs\SendPodcastReleaseNotification;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
+ 
+Bus::batch([
+    [
+        new ReleasePodcast(1),
+        new SendPodcastReleaseNotification(1),
+    ],
+    [
+        new ReleasePodcast(2),
+        new SendPodcastReleaseNotification(2),
+    ],
+])->then(function (Batch $batch) {
+    // ...
+})->dispatch();
+
+Ajout de tâches à des lots
+Parfois, il peut être utile d'ajouter des travaux supplémentaires à un lot à partir d'un travail par lots. Ce modèle peut être utile lorsque vous devez regrouper des milliers de travaux dont l'envoi peut prendre trop de temps lors d'une requête Web. Ainsi, à la place, vous souhaiterez peut-être envoyer un lot initial de tâches "loader" qui hydratent le lot avec encore plus de tâches :
+
+$batch = Bus::batch([
+    new LoadImportBatch,
+    new LoadImportBatch,
+    new LoadImportBatch,
+])->then(function (Batch $batch) {
+    // All jobs completed successfully...
+})->name('Import Contacts')->dispatch();
+
+Dans cet exemple, nous utiliserons le LoadImportBatchtravail pour hydrater le lot avec des travaux supplémentaires. Pour ce faire, nous pouvons utiliser la addméthode sur l'instance batch accessible via la batchméthode du travail :
+
+use App\Jobs\ImportContacts;
+use Illuminate\Support\Collection;
+ 
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    if ($this->batch()->cancelled()) {
+        return;
+    }
+ 
+    $this->batch()->add(Collection::times(1000, function () {
+        return new ImportContacts;
+    }));
+}
+
+
+Vous ne pouvez ajouter des tâches à un lot qu'à partir d'une tâche appartenant au même lot.
+
+
+Inspection des lots
+L' Illuminate\Bus\Batchinstance qui est fournie aux rappels d'achèvement par lots possède une variété de propriétés et de méthodes pour vous aider à interagir avec et à inspecter un lot de tâches donné :
+
+// The UUID of the batch...
+$batch->id;
+ 
+// The name of the batch (if applicable)...
+$batch->name;
+ 
+// The number of jobs assigned to the batch...
+$batch->totalJobs;
+ 
+// The number of jobs that have not been processed by the queue...
+$batch->pendingJobs;
+ 
+// The number of jobs that have failed...
+$batch->failedJobs;
+ 
+// The number of jobs that have been processed thus far...
+$batch->processedJobs();
+ 
+// The completion percentage of the batch (0-100)...
+$batch->progress();
+ 
+// Indicates if the batch has finished executing...
+$batch->finished();
+ 
+// Cancel the execution of the batch...
+$batch->cancel();
+ 
+// Indicates if the batch has been cancelled...
+$batch->cancelled();
+
+Retourner des lots à partir de routes
+Toutes les Illuminate\Bus\Batchinstances sont sérialisables JSON, ce qui signifie que vous pouvez les renvoyer directement à partir de l'une des routes de votre application pour récupérer une charge utile JSON contenant des informations sur le lot, y compris sa progression. Cela facilite l'affichage des informations sur la progression de l'achèvement du lot dans l'interface utilisateur de votre application.
+
+Pour récupérer un lot par son ID, vous pouvez utiliser la méthode Busde la façadefindBatch :
+
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Route;
+ 
+Route::get('/batch/{batchId}', function (string $batchId) {
+    return Bus::findBatch($batchId);
+});
+
+Annulation de lots
+Parfois, vous devrez peut-être annuler l'exécution d'un lot donné. Cela peut être accompli en appelant la cancelméthode sur l' Illuminate\Bus\Batchinstance :
+
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    if ($this->user->exceedsImportLimit()) {
+        return $this->batch()->cancel();
+    }
+ 
+    if ($this->batch()->cancelled()) {
+        return;
+    }
+}
+
+Comme vous l'avez peut-être remarqué dans les exemples précédents, les tâches par lots doivent généralement vérifier si le lot a été annulé au début de leur handleméthode :
+
+/**
+ * Execute the job.
+ *
+ * @return void
+ */
+public function handle()
+{
+    if ($this->batch()->cancelled()) {
+        return;
+    }
+ 
+    // Continue processing...
+}
+
+Échecs de lot
+Lorsqu'un travail par lots échoue, le catchrappel (s'il est affecté) sera appelé. Ce rappel n'est appelé que pour la première tâche qui échoue dans le lot.
+
+Autoriser les échecs
+Lorsqu'une tâche dans un lot échoue, Laravel marque automatiquement le lot comme "annulé". Si vous le souhaitez, vous pouvez désactiver ce comportement afin qu'un échec de travail ne marque pas automatiquement le lot comme annulé. Cela peut être accompli en appelant la allowFailuresméthode lors de l'envoi du lot :
+
+$batch = Bus::batch([
+    // ...
+])->then(function (Batch $batch) {
+    // All jobs completed successfully...
+})->allowFailures()->dispatch();
+
+Nouvelle tentative de travaux par lots ayant échoué
+Pour plus de commodité, Laravel fournit une queue:retry-batchcommande Artisan qui vous permet de réessayer facilement toutes les tâches ayant échoué pour un lot donné. La queue:retry-batchcommande accepte l'UUID du lot dont les travaux ayant échoué doivent être réessayés :
+
+php artisan queue:retry-batch 32dbc76c-4f82-4749-b610-a639fe0099b5
+
+Lots d'élagage
+Sans élagage, la job_batchestable peut accumuler des enregistrements très rapidement. Pour atténuer cela, vous devez planifier l' queue:prune-batchesexécution quotidienne de la commande Artisan :
+
+$schedule->command('queue:prune-batches')->daily();
+
+Par défaut, tous les lots finis datant de plus de 24 heures seront élagués. Vous pouvez utiliser l' hoursoption lors de l'appel de la commande pour déterminer la durée de conservation des données de lot. Par exemple, la commande suivante supprimera tous les lots terminés il y a plus de 48 heures :
+
+$schedule->command('queue:prune-batches --hours=48')->daily();
+
+Parfois, votre jobs_batchestable peut accumuler des enregistrements de lot pour des lots qui ne se sont jamais terminés avec succès, tels que des lots où un travail a échoué et ce travail n'a jamais été réessayé avec succès. Vous pouvez demander à la queue:prune-batchescommande d'élaguer ces enregistrements de lots inachevés à l'aide de l' unfinishedoption :
+
+$schedule->command('queue:prune-batches --hours=48 --unfinished=72')->daily();
+
+Fermetures de file d'attente
+Au lieu de répartir une classe de travail dans la file d'attente, vous pouvez également répartir une fermeture. C'est idéal pour les tâches simples et rapides qui doivent être exécutées en dehors du cycle de demande actuel. Lors de l'envoi de fermetures à la file d'attente, le contenu du code de la fermeture est signé de manière cryptographique afin qu'il ne puisse pas être modifié en transit :
+
+$podcast = App\Podcast::find(1);
+ 
+dispatch(function () use ($podcast) {
+    $podcast->publish();
+});
+
+En utilisant la catchméthode, vous pouvez fournir une fermeture qui doit être exécutée si la fermeture en file d'attente échoue après avoir épuisé toutes les nouvelles tentatives configurées de votre file d'attente :
+
+use Throwable;
+ 
+dispatch(function () use ($podcast) {
+    $podcast->publish();
+})->catch(function (Throwable $e) {
+    // This job has failed...
+});
+
+Exécution de la file d'attente Worker
+La queue:workcommande
+Laravel inclut une commande Artisan qui démarre un travailleur de file d'attente et traite les nouveaux travaux au fur et à mesure qu'ils sont poussés dans la file d'attente. Vous pouvez exécuter le travailleur à l'aide de la queue:workcommande Artisan. Notez qu'une fois la queue:workcommande lancée, elle continuera à s'exécuter jusqu'à ce qu'elle soit arrêtée manuellement ou que vous fermiez votre terminal :
+
+php artisan queue:work
+
+
+Pour que le queue:workprocessus s'exécute en permanence en arrière-plan, vous devez utiliser un moniteur de processus tel que Superviseur pour vous assurer que le travailleur de la file d'attente n'arrête pas de s'exécuter.
+
+
+N'oubliez pas que les travailleurs de la file d'attente sont des processus de longue durée et stockent l'état de l'application démarrée en mémoire. Par conséquent, ils ne remarqueront pas les changements dans votre base de code après leur démarrage. Ainsi, lors de votre processus de déploiement, assurez-vous de redémarrer vos files d'attente workers . De plus, n'oubliez pas que tout état statique créé ou modifié par votre application ne sera pas automatiquement réinitialisé entre les travaux.
+
+Alternativement, vous pouvez exécuter la queue:listencommande. Lorsque vous utilisez la queue:listencommande, vous n'avez pas besoin de redémarrer manuellement le travailleur lorsque vous souhaitez recharger votre code mis à jour ou réinitialiser l'état de l'application ; cependant, cette commande est nettement moins efficace que la queue:workcommande :
+
+php artisan queue:listen
+
+Exécution de plusieurs nœuds de calcul de file d'attente
+Pour affecter plusieurs travailleurs à une file d'attente et traiter des tâches simultanément, vous devez simplement démarrer plusieurs queue:workprocessus. Cela peut être fait localement via plusieurs onglets dans votre terminal ou en production en utilisant les paramètres de configuration de votre gestionnaire de processus. Lorsque vous utilisez Supervisor , vous pouvez utiliser la numprocsvaleur de configuration.
+
+Spécification de la connexion et de la file d'attente
+Vous pouvez également spécifier la connexion de file d'attente que le travailleur doit utiliser. Le nom de connexion passé à la workcommande doit correspondre à l'une des connexions définies dans votre config/queue.phpfichier de configuration :
+
+php artisan queue:work redis
+
+Par défaut, la queue:workcommande traite uniquement les travaux de la file d'attente par défaut sur une connexion donnée. Cependant, vous pouvez personnaliser davantage votre gestionnaire de file d'attente en ne traitant que des files d'attente particulières pour une connexion donnée. Par exemple, si tous vos e-mails sont traités dans une emailsfile d'attente sur votre redisconnexion à la file d'attente, vous pouvez émettre la commande suivante pour démarrer un agent qui traite uniquement cette file d'attente :
+
+php artisan queue:work redis --queue=emails
+
+Traitement d'un nombre spécifié de tâches
+L' --onceoption peut être utilisée pour indiquer au travailleur de ne traiter qu'un seul travail de la file d'attente :
+
+php artisan queue:work --once
+
+L' --max-jobsoption peut être utilisée pour demander au travailleur de traiter le nombre donné de travaux, puis de quitter. Cette option peut être utile lorsqu'elle est combinée avec Superviseur afin que vos travailleurs soient automatiquement redémarrés après avoir traité un nombre donné de travaux, libérant toute mémoire qu'ils auraient pu accumuler :
+
+php artisan queue:work --max-jobs=1000
+
+Traitement de tous les travaux en file d'attente, puis sortie
+L' --stop-when-emptyoption peut être utilisée pour demander au travailleur de traiter tous les travaux, puis de quitter normalement. Cette option peut être utile lors du traitement des files d'attente Laravel dans un conteneur Docker si vous souhaitez arrêter le conteneur une fois la file d'attente vide :
+
+php artisan queue:work --stop-when-empty
+
+Traitement des tâches pendant un nombre donné de secondes
+L' --max-timeoption peut être utilisée pour demander au travailleur de traiter les travaux pendant le nombre de secondes donné, puis de quitter. Cette option peut être utile lorsqu'elle est combinée avec Superviseur afin que vos travailleurs soient automatiquement redémarrés après avoir traité des travaux pendant une durée donnée, libérant toute mémoire qu'ils auraient pu accumuler :
+
+# Process jobs for one hour and then exit...
+php artisan queue:work --max-time=3600
+
+Durée du sommeil des travailleurs
+Lorsque des travaux sont disponibles dans la file d'attente, le travailleur continuera à traiter les travaux sans délai entre eux. Cependant, l' sleepoption détermine le nombre de secondes pendant lesquelles le travailleur "s'endormira" s'il n'y a pas de nouvelles tâches disponibles. Pendant son sommeil, le travailleur ne traitera aucun nouveau travail - les travaux seront traités après le réveil du travailleur.
+
+php artisan queue:work --sleep=3
+
+Considérations sur les ressources
+Les travailleurs de la file d'attente démon ne "redémarrent" pas le framework avant de traiter chaque travail. Par conséquent, vous devez libérer toutes les ressources lourdes après la fin de chaque travail. Par exemple, si vous manipulez des images avec la bibliothèque GD, vous devez libérer de la mémoire imagedestroylorsque vous avez terminé de traiter l'image.
+
+Priorités de la file d'attente
+Parfois, vous souhaiterez peut-être hiérarchiser le traitement de vos files d'attente. Par exemple, dans votre config/queue.phpfichier de configuration, vous pouvez définir la valeur par défaut queuede votre redisconnexion sur low. Cependant, vous souhaiterez peut-être parfois pousser un travail vers une highfile d'attente prioritaire comme ceci :
+
+dispatch((new Job)->onQueue('high'));
+
+Pour démarrer un agent qui vérifie que tous les hightravaux de la file d'attente sont traités avant de poursuivre les travaux de la lowfile d'attente, transmettez une liste de noms de file d'attente séparés par des virgules à la workcommande :
+
+php artisan queue:work --queue=high,low
+
+Travailleurs de la file d'attente et déploiement
+Étant donné que les travailleurs de la file d'attente sont des processus de longue durée, ils ne remarqueront pas les modifications apportées à votre code sans être redémarrés. Ainsi, le moyen le plus simple de déployer une application à l'aide des agents de file d'attente consiste à redémarrer les agents pendant votre processus de déploiement. Vous pouvez redémarrer gracieusement tous les nœuds de calcul en exécutant la queue:restartcommande :
+
+php artisan queue:restart
+
+Cette commande demandera à tous les travailleurs de la file d'attente de quitter normalement après avoir terminé le traitement de leur travail en cours afin qu'aucun travail existant ne soit perdu. Étant donné que les travailleurs de la file d'attente se fermeront lorsque la queue:restartcommande sera exécutée, vous devez exécuter un gestionnaire de processus tel que Supervisor pour redémarrer automatiquement les travailleurs de la file d'attente.
+
+
+La file d'attente utilise le cache pour stocker les signaux de redémarrage, vous devez donc vérifier qu'un pilote de cache est correctement configuré pour votre application avant d'utiliser cette fonctionnalité.
+
+
+Expirations et délais d'attente des tâches
+Expiration du travail
+Dans votre config/queue.phpfichier de configuration, chaque connexion de file d'attente définit une retry_afteroption. Cette option spécifie le nombre de secondes pendant lesquelles la connexion à la file d'attente doit attendre avant de réessayer un travail en cours de traitement. Par exemple, si la valeur de retry_afterest définie sur 90, le travail sera relâché dans la file d'attente s'il a été traité pendant 90 secondes sans être relâché ou supprimé. En règle générale, vous devez définir la retry_aftervaleur sur le nombre maximal de secondes que vos tâches doivent raisonnablement prendre pour terminer le traitement.
+
+
+La seule connexion de file d'attente qui ne contient pas de retry_aftervaleur est Amazon SQS. SQS réessayera la tâche en fonction du délai de visibilité par défaut qui est géré dans la console AWS.
+
+
+Délais d'attente des travailleurs
+La queue:workcommande Artisan expose une --timeoutoption. Par défaut, la --timeoutvaleur est de 60 secondes. Si un travail est en cours de traitement pendant plus longtemps que le nombre de secondes spécifié par la valeur du délai d'attente, le travailleur traitant le travail se terminera avec une erreur. Typiquement, le worker sera redémarré automatiquement par un gestionnaire de processus configuré sur votre serveur :
+
+php artisan queue:work --timeout=60
+
+L' retry_afteroption de configuration et l' --timeoutoption CLI sont différentes, mais fonctionnent ensemble pour garantir que les travaux ne sont pas perdus et qu'ils ne sont traités qu'une seule fois avec succès.
+
+
+La --timeoutvaleur doit toujours être au moins plusieurs secondes plus courte que votre retry_aftervaleur de configuration. Cela garantira qu'un travailleur traitant un travail gelé est toujours terminé avant que le travail ne soit réessayé. Si votre --timeoutoption est plus longue que votre retry_aftervaleur de configuration, vos travaux peuvent être traités deux fois.
+
+
+Configuration du superviseur
+En production, vous avez besoin d'un moyen de maintenir vos queue:workprocessus en cours d'exécution. Un queue:workprocessus peut cesser de s'exécuter pour diverses raisons, telles qu'un dépassement du délai d'attente du travailleur ou l'exécution de la queue:restartcommande.
+
+Pour cette raison, vous devez configurer un moniteur de processus capable de détecter la fin de vos queue:workprocessus et de les redémarrer automatiquement. De plus, les moniteurs de processus peuvent vous permettre de spécifier le nombre de queue:workprocessus que vous souhaitez exécuter simultanément. Supervisor est un moniteur de processus couramment utilisé dans les environnements Linux et nous expliquerons comment le configurer dans la documentation suivante.
+
+Installation du superviseur
+Supervisor est un moniteur de processus pour le système d'exploitation Linux et redémarrera automatiquement vos queue:workprocessus en cas d'échec. Pour installer Supervisor sur Ubuntu, vous pouvez utiliser la commande suivante :
+
+sudo apt-get install supervisor
+
+
+Si configurer et gérer vous-même Supervisor vous semble écrasant, envisagez d'utiliser Laravel Forge , qui installera et configurera automatiquement Supervisor pour vos projets de production Laravel.
+
+
+Configuration du superviseur
+Les fichiers de configuration du superviseur sont généralement stockés dans le /etc/supervisor/conf.drépertoire. Dans ce répertoire, vous pouvez créer n'importe quel nombre de fichiers de configuration qui indiquent au superviseur comment vos processus doivent être surveillés. Par exemple, créons un laravel-worker.conffichier qui démarre et surveille queue:workles processus :
+
+[program:laravel-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /home/forge/app.com/artisan queue:work sqs --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=forge
+numprocs=8
+redirect_stderr=true
+stdout_logfile=/home/forge/app.com/worker.log
+stopwaitsecs=3600
+
+Dans cet exemple, la numprocsdirective demandera à Supervisor d'exécuter huit queue:workprocessus et de les surveiller tous, en les redémarrant automatiquement en cas d'échec. Vous devez modifier la commanddirective de la configuration pour refléter la connexion à la file d'attente et les options de travail souhaitées.
+
+
+Vous devez vous assurer que la valeur de stopwaitsecsest supérieure au nombre de secondes consommées par votre tâche la plus longue. Sinon, Supervisor peut arrêter le travail avant la fin du traitement.
+
+
+Superviseur débutant
+Une fois le fichier de configuration créé, vous pouvez mettre à jour la configuration du superviseur et lancer les processus à l'aide des commandes suivantes :
+
+sudo supervisorctl reread
+ 
+sudo supervisorctl update
+ 
+sudo supervisorctl start laravel-worker:*
+
+Pour plus d'informations sur le Superviseur, consultez la documentation du Superviseur .
+
+Traiter les travaux échoués
+Parfois, vos tâches en file d'attente échouent. Ne vous inquiétez pas, les choses ne se passent pas toujours comme prévu ! Laravel inclut un moyen pratique de spécifier le nombre maximum de fois qu'un travail doit être tenté . Lorsqu'un travail asynchrone a dépassé ce nombre de tentatives, il est inséré dans la failed_jobstable de la base de données. Les travaux distribués de manière synchrone qui échouent ne sont pas stockés dans cette table et leurs exceptions sont immédiatement gérées par l'application.
+
+Une migration pour créer la failed_jobstable est généralement déjà présente dans les nouvelles applications Laravel. Cependant, si votre application ne contient pas de migration pour cette table, vous pouvez utiliser la queue:failed-tablecommande pour créer la migration :
+
+php artisan queue:failed-table
+ 
+php artisan migrate
+
+Lors de l'exécution d'un processus de travail de file d'attente , vous pouvez spécifier le nombre maximal de tentatives de travail à l'aide du --triescommutateur de la queue:workcommande. Si vous ne spécifiez pas de valeur pour l' --triesoption, les travaux ne seront tentés qu'une seule fois ou autant de fois que spécifié par la $triespropriété de la classe de travail :
+
+php artisan queue:work redis --tries=3
+
+À l'aide de l' --backoffoption, vous pouvez spécifier le nombre de secondes que Laravel doit attendre avant de réessayer une tâche qui a rencontré une exception. Par défaut, un travail est immédiatement relâché dans la file d'attente afin qu'il puisse être réessayé :
+
+php artisan queue:work redis --tries=3 --backoff=3
+
+Si vous souhaitez configurer le nombre de secondes que Laravel doit attendre avant de réessayer un travail qui a rencontré une exception sur une base par travail, vous pouvez le faire en définissant une backoffpropriété sur votre classe de travail :
+
+/**
+ * The number of seconds to wait before retrying the job.
+ *
+ * @var int
+ */
+public $backoff = 3;
+
+Si vous avez besoin d'une logique plus complexe pour déterminer le délai d'attente du travail, vous pouvez définir une backoffméthode sur votre classe de travail :
+
+/**
+* Calculate the number of seconds to wait before retrying the job.
+*
+* @return int
+*/
+public function backoff()
+{
+    return 3;
+}
+
+Vous pouvez facilement configurer des interruptions "exponentielles" en renvoyant un tableau de valeurs d'interruption à partir de la backoffméthode. Dans cet exemple, le délai de nouvelle tentative sera de 1 seconde pour la première tentative, de 5 secondes pour la deuxième et de 10 secondes pour la troisième :
+
+/**
+* Calculate the number of seconds to wait before retrying the job.
+*
+* @return array
+*/
+public function backoff()
+{
+    return [1, 5, 10];
+}
+
+Nettoyage après les échecs de travaux
+Lorsqu'une tâche particulière échoue, vous pouvez envoyer une alerte à vos utilisateurs ou annuler toute action qui a été partiellement effectuée par la tâche. Pour ce faire, vous pouvez définir une failedméthode sur votre classe de travail. L' Throwableinstance qui a provoqué l'échec de la tâche sera transmise à la failedméthode :
+
+<?php
+ 
+namespace App\Jobs;
+ 
+use App\Models\Podcast;
+use App\Services\AudioProcessor;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Throwable;
+ 
+class ProcessPodcast implements ShouldQueue
+{
+    use InteractsWithQueue, Queueable, SerializesModels;
+ 
+    /**
+     * The podcast instance.
+     *
+     * @var \App\Podcast
+     */
+    public $podcast;
+ 
+    /**
+     * Create a new job instance.
+     *
+     * @param  \App\Models\Podcast  $podcast
+     * @return void
+     */
+    public function __construct(Podcast $podcast)
+    {
+        $this->podcast = $podcast;
+    }
+ 
+    /**
+     * Execute the job.
+     *
+     * @param  \App\Services\AudioProcessor  $processor
+     * @return void
+     */
+    public function handle(AudioProcessor $processor)
+    {
+        // Process uploaded podcast...
+    }
+ 
+    /**
+     * Handle a job failure.
+     *
+     * @param  \Throwable  $exception
+     * @return void
+     */
+    public function failed(Throwable $exception)
+    {
+        // Send user notification of failure, etc...
+    }
+}
+
+
+Une nouvelle instance du travail est instanciée avant d'invoquer la failedméthode ; par conséquent, toutes les modifications de propriété de classe qui peuvent avoir eu lieu dans la handleméthode seront perdues.
+
+
+Nouvelle tentative de travaux ayant échoué
+Pour afficher tous les travaux ayant échoué qui ont été insérés dans votre failed_jobstable de base de données, vous pouvez utiliser la queue:failedcommande Artisan :
+
+php artisan queue:failed
+
+La queue:failedcommande répertorie l'ID du travail, la connexion, la file d'attente, l'heure de l'échec et d'autres informations sur le travail. L'ID de travail peut être utilisé pour relancer le travail ayant échoué. Par exemple, pour réessayer une tâche ayant échoué dont l'ID est ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece, exécutez la commande suivante :
+
+php artisan queue:retry ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece
+
+Si nécessaire, vous pouvez transmettre plusieurs ID à la commande :
+
+php artisan queue:retry ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece 91401d2c-0784-4f43-824c-34f94a33c24d
+
+Vous pouvez également réessayer toutes les tâches ayant échoué pour une file d'attente particulière :
+
+php artisan queue:retry --queue=name
+
+Pour réessayer toutes vos tâches ayant échoué, exécutez la queue:retrycommande et transmettez allcomme ID :
+
+php artisan queue:retry all
+
+Si vous souhaitez supprimer une tâche ayant échoué, vous pouvez utiliser la queue:forgetcommande :
+
+php artisan queue:forget 91401d2c-0784-4f43-824c-34f94a33c24d
+
+
+Lorsque vous utilisez Horizon , vous devez utiliser la horizon:forgetcommande pour supprimer une tâche ayant échoué au lieu de la queue:forgetcommande.
+
+
+Pour supprimer tous vos travaux ayant échoué du failed_jobstableau, vous pouvez utiliser la queue:flushcommande :
+
+php artisan queue:flush
+
+Ignorer les modèles manquants
+Lors de l'injection d'un modèle Eloquent dans une tâche, le modèle est automatiquement sérialisé avant d'être placé dans la file d'attente et récupéré de la base de données lorsque la tâche est traitée. Cependant, si le modèle a été supprimé alors que la tâche attendait d'être traitée par un agent, votre tâche peut échouer avec un ModelNotFoundException.
+
+Pour plus de commodité, vous pouvez choisir de supprimer automatiquement les travaux avec des modèles manquants en définissant la deleteWhenMissingModelspropriété de votre travail sur true. Lorsque cette propriété est définie sur true, Laravel supprimera discrètement le travail sans lever d'exception :
+
+/**
+ * Delete the job if its models no longer exist.
+ *
+ * @var bool
+ */
+public $deleteWhenMissingModels = true;
+
+Élagage des tâches ayant échoué
+Vous pouvez supprimer tous les enregistrements de la failed_jobstable de votre application en appelant la queue:prune-failedcommande Artisan :
+
+php artisan queue:prune-failed
+
+Si vous fournissez l' --hoursoption à la commande, seuls les enregistrements de travaux ayant échoué qui ont été insérés au cours des N dernières heures seront conservés. Par exemple, la commande suivante supprimera tous les enregistrements de travaux ayant échoué qui ont été insérés il y a plus de 48 heures :
+
+php artisan queue:prune-failed --hours=48
+
+Stockage des tâches ayant échoué dans DynamoDB
+Laravel prend également en charge le stockage de vos enregistrements de travaux ayant échoué dans DynamoDB au lieu d'une table de base de données relationnelle. Cependant, vous devez créer une table DynamoDB pour stocker tous les enregistrements de tâche ayant échoué. En règle générale, cette table doit être nommée failed_jobs, mais vous devez nommer la table en fonction de la valeur de la valeur de queue.failed.tableconfiguration dans le fichier de configuration de votre application queue.
+
+La failed_jobstable doit avoir une clé de partition primaire de chaîne nommée applicationet une clé de tri primaire de chaîne nommée uuid. La applicationpartie de la clé contiendra le nom de votre application tel que défini par la namevaleur de configuration dans le fichier de configuration de votre application app. Étant donné que le nom de l'application fait partie de la clé de la table DynamoDB, vous pouvez utiliser la même table pour stocker les travaux ayant échoué pour plusieurs applications Laravel.
+
+De plus, assurez-vous d'installer le kit SDK AWS afin que votre application Laravel puisse communiquer avec Amazon DynamoDB :
+
+composer require aws/aws-sdk-php
+
+Ensuite, définissez la queue.failed.drivervaleur de l'option de configuration sur dynamodb. En outre, vous devez définir les options de configuration key, secretet regiondans le tableau de configuration des tâches ayant échoué. Ces options seront utilisées pour s'authentifier auprès d'AWS. Lors de l'utilisation du dynamodbpilote, l' queue.failed.databaseoption de configuration n'est pas nécessaire :
+
+'failed' => [
+    'driver' => env('QUEUE_FAILED_DRIVER', 'dynamodb'),
+    'key' => env('AWS_ACCESS_KEY_ID'),
+    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+    'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    'table' => 'failed_jobs',
+],
+
+Désactivation du stockage des tâches ayant échoué
+Vous pouvez demander à Laravel de supprimer les travaux ayant échoué sans les stocker en définissant la queue.failed.drivervaleur de l'option de configuration sur null. Généralement, cela peut être accompli via la QUEUE_FAILED_DRIVERvariable d'environnement :
+
+QUEUE_FAILED_DRIVER=null
+
+Échec des événements de travail
+Si vous souhaitez enregistrer un écouteur d'événement qui sera invoqué lorsqu'une tâche échoue, vous pouvez utiliser la méthode Queuede la façade failing. Par exemple, nous pouvons attacher une fermeture à cet événement à partir de la bootméthode de AppServiceProviderqui est incluse avec Laravel :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Queue\Events\JobFailed;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Queue::failing(function (JobFailed $event) {
+            // $event->connectionName
+            // $event->job
+            // $event->exception
+        });
+    }
+}
+
+Effacement des travaux des files d'attente
+
+Lorsque vous utilisez Horizon , vous devez utiliser la horizon:clearcommande pour effacer les travaux de la file d'attente au lieu de la queue:clearcommande.
+
+
+Si vous souhaitez supprimer tous les travaux de la file d'attente par défaut de la connexion par défaut, vous pouvez le faire à l'aide de la queue:clearcommande Artisan :
+
+php artisan queue:clear
+
+Vous pouvez également fournir l' connectionargument et l' queueoption permettant de supprimer des travaux d'une connexion et d'une file d'attente spécifiques :
+
+php artisan queue:clear redis --queue=emails
+
+
+L'effacement des travaux des files d'attente n'est disponible que pour les pilotes de file d'attente SQS, Redis et de base de données. De plus, le processus de suppression des messages SQS prend jusqu'à 60 secondes, de sorte que les travaux envoyés à la file d'attente SQS jusqu'à 60 secondes après l'effacement de la file d'attente peuvent également être supprimés.
+
+
+Surveillance de vos files d'attente
+Si votre file d'attente reçoit un afflux soudain de travaux, elle peut être submergée, ce qui entraînera un long temps d'attente pour l'achèvement des travaux. Si vous le souhaitez, Laravel peut vous alerter lorsque le nombre de tâches de votre file d'attente dépasse un seuil spécifié.
+
+Pour commencer, vous devez programmer la queue:monitorcommande pour qu'elle s'exécute toutes les minutes . La commande accepte les noms des files d'attente que vous souhaitez surveiller ainsi que le seuil de nombre de travaux souhaité :
+
+php artisan queue:monitor redis:default,redis:deployments --max=100
+
+La planification de cette commande seule ne suffit pas pour déclencher une notification vous alertant de l'état débordé de la file d'attente. Lorsque la commande rencontre une file d'attente dont le nombre de travaux dépasse votre seuil, un Illuminate\Queue\Events\QueueBusyévénement est envoyé. Vous pouvez écouter cet événement dans votre application EventServiceProviderafin d'envoyer une notification à vous ou à votre équipe de développement :
+
+use App\Notifications\QueueHasLongWaitTime;
+use Illuminate\Queue\Events\QueueBusy;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
+ 
+/**
+ * Register any other events for your application.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Event::listen(function (QueueBusy $event) {
+        Notification::route('mail', 'dev@example.com')
+                ->notify(new QueueHasLongWaitTime(
+                    $event->connection,
+                    $event->queue,
+                    $event->size
+                ));
+    });
+}
+
+Événements d'emploi
+À l'aide des méthodes beforeet de la façade , vous pouvez spécifier des rappels à exécuter avant ou après le traitement d'un travail en file d'attente. Ces rappels sont une excellente occasion d'effectuer des statistiques supplémentaires de journalisation ou d'incrémentation pour un tableau de bord. En règle générale, vous devez appeler ces méthodes à partir de la méthode d'un fournisseur de services . Par exemple, nous pouvons utiliser le qui est inclus avec Laravel :afterQueue bootAppServiceProvider
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Queue::before(function (JobProcessing $event) {
+            // $event->connectionName
+            // $event->job
+            // $event->job->payload()
+        });
+ 
+        Queue::after(function (JobProcessed $event) {
+            // $event->connectionName
+            // $event->job
+            // $event->job->payload()
+        });
+    }
+}
+
+En utilisant la loopingméthode sur la Queue façade , vous pouvez spécifier des rappels qui s'exécutent avant que le travailleur ne tente de récupérer un travail dans une file d'attente. Par exemple, vous pouvez enregistrer une fermeture pour annuler toutes les transactions laissées ouvertes par une tâche ayant précédemment échoué :
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+ 
+Queue::looping(function () {
+    while (DB::transactionLevel() > 0) {
+        DB::rollBack();
+    }
+});

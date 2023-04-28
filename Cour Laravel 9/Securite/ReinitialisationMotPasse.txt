@@ -1,0 +1,173 @@
+Réinitialisation des mots de passe
+Introduction
+Préparation du modèle
+Préparation de la base de données
+Configuration des hôtes approuvés
+Routage
+Demander le lien de réinitialisation du mot de passe
+Réinitialiser le mot de passe
+Suppression des jetons expirés
+Personnalisation
+Introduction
+La plupart des applications Web permettent aux utilisateurs de réinitialiser leurs mots de passe oubliés. Plutôt que de vous forcer à le réimplémenter manuellement pour chaque application que vous créez, Laravel fournit des services pratiques pour envoyer des liens de réinitialisation de mot de passe et des mots de passe de réinitialisation sécurisés.
+
+
+Vous voulez démarrer rapidement ? Installez un kit de démarrage d'application Laravel dans une nouvelle application Laravel. Les kits de démarrage de Laravel se chargeront d'échafauder l'ensemble de votre système d'authentification, y compris la réinitialisation des mots de passe oubliés.
+
+
+Préparation du modèle
+Avant d'utiliser les fonctionnalités de réinitialisation de mot de passe de Laravel, le App\Models\Usermodèle de votre application doit utiliser le Illuminate\Notifications\Notifiabletrait. En règle générale, ce trait est déjà inclus dans le App\Models\Usermodèle par défaut créé avec les nouvelles applications Laravel.
+
+Ensuite, vérifiez que votre App\Models\Usermodèle implémente le Illuminate\Contracts\Auth\CanResetPasswordcontrat. Le App\Models\Usermodèle inclus avec le framework implémente déjà cette interface et utilise le Illuminate\Auth\Passwords\CanResetPasswordtrait pour inclure les méthodes nécessaires à l'implémentation de l'interface.
+
+Préparation de la base de données
+Une table doit être créée pour stocker les jetons de réinitialisation de mot de passe de votre application. La migration de cette table est incluse dans l'application Laravel par défaut, il vous suffit donc de migrer votre base de données pour créer cette table :
+
+php artisan migrate
+
+Configuration des hôtes approuvés
+Par défaut, Laravel répondra à toutes les requêtes qu'il reçoit, quel que soit le contenu de l'en-tête de la requête HTTP Host. De plus, la Hostvaleur de l'en-tête sera utilisée lors de la génération d'URL absolues vers votre application lors d'une requête Web.
+
+En règle générale, vous devez configurer votre serveur Web, tel que Nginx ou Apache, pour n'envoyer à votre application que les requêtes qui correspondent à un nom d'hôte donné. Cependant, si vous n'avez pas la possibilité de personnaliser directement votre serveur Web et que vous devez demander à Laravel de ne répondre qu'à certains noms d'hôte, vous pouvez le faire en activant le App\Http\Middleware\TrustHostsmiddleware pour votre application. Ceci est particulièrement important lorsque votre application offre une fonctionnalité de réinitialisation de mot de passe.
+
+Pour en savoir plus sur ce middleware, veuillez consulter la TrustHostsdocumentation du middleware .
+
+Routage
+Pour implémenter correctement la prise en charge permettant aux utilisateurs de réinitialiser leurs mots de passe, nous devrons définir plusieurs itinéraires. Tout d'abord, nous aurons besoin d'une paire de routes à gérer permettant à l'utilisateur de demander un lien de réinitialisation de mot de passe via son adresse e-mail. Deuxièmement, nous aurons besoin d'une paire de routes pour gérer la réinitialisation du mot de passe une fois que l'utilisateur visite le lien de réinitialisation du mot de passe qui lui est envoyé par e-mail et remplit le formulaire de réinitialisation du mot de passe.
+
+Demander le lien de réinitialisation du mot de passe
+Le formulaire de demande de lien de réinitialisation de mot de passe
+Tout d'abord, nous définirons les routes nécessaires pour demander des liens de réinitialisation de mot de passe. Pour commencer, nous allons définir une route qui renvoie une vue avec le formulaire de demande de lien de réinitialisation du mot de passe :
+
+Route::get('/forgot-password', function () {
+    return view('auth.forgot-password');
+})->middleware('guest')->name('password.request');
+
+La vue renvoyée par cette route doit avoir un formulaire contenant un emailchamp, qui permettra à l'utilisateur de demander un lien de réinitialisation du mot de passe pour une adresse e-mail donnée.
+
+Gérer la soumission du formulaire
+Ensuite, nous allons définir une route qui gère la demande de soumission de formulaire depuis la vue "mot de passe oublié". Cette route se chargera de valider l'adresse e-mail et d'envoyer la demande de réinitialisation du mot de passe à l'utilisateur correspondant :
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
+ 
+Route::post('/forgot-password', function (Request $request) {
+    $request->validate(['email' => 'required|email']);
+ 
+    $status = Password::sendResetLink(
+        $request->only('email')
+    );
+ 
+    return $status === Password::RESET_LINK_SENT
+                ? back()->with(['status' => __($status)])
+                : back()->withErrors(['email' => __($status)]);
+})->middleware('guest')->name('password.email');
+
+Avant de poursuivre, examinons cet itinéraire plus en détail. Tout d'abord, l'attribut de la requête emailest validé. Ensuite, nous utiliserons le "courtier de mot de passe" intégré de Laravel (via la Passwordfaçade) pour envoyer un lien de réinitialisation de mot de passe à l'utilisateur. Le courtier de mots de passe se chargera de récupérer l'utilisateur par le champ donné (dans ce cas, l'adresse e-mail) et d'envoyer à l'utilisateur un lien de réinitialisation de mot de passe via le système de notification intégré de Laravel .
+
+La sendResetLinkméthode renvoie un slug "statut". Ce statut peut être traduit à l'aide des assistants de localisation de Laravel afin d'afficher un message convivial à l'utilisateur concernant le statut de sa demande. La traduction de l'état de réinitialisation du mot de passe est déterminée par le lang/{lang}/passwords.phpfichier de langue de votre application. Une entrée pour chaque valeur possible du slug d'état se trouve dans le passwordsfichier de langue.
+
+Vous vous demandez peut-être comment Laravel sait comment récupérer l'enregistrement de l'utilisateur à partir de la base de données de votre application lors de l'appel de la méthode Passwordde la façade sendResetLink. Le courtier de mots de passe Laravel utilise les "fournisseurs d'utilisateurs" de votre système d'authentification pour récupérer les enregistrements de la base de données. Le fournisseur d'utilisateurs utilisé par le courtier de mots de passe est configuré dans le passwordstableau de config/auth.phpconfiguration de votre fichier de configuration. Pour en savoir plus sur l'écriture de fournisseurs d'utilisateurs personnalisés, consultez la documentation sur l'authentification .
+
+
+Lorsque vous implémentez manuellement des réinitialisations de mot de passe, vous devez définir vous-même le contenu des vues et des itinéraires. Si vous souhaitez un échafaudage qui inclut toute la logique d'authentification et de vérification nécessaire, consultez les kits de démarrage d'application Laravel .
+
+
+Réinitialiser le mot de passe
+Le formulaire de réinitialisation du mot de passe
+Ensuite, nous définirons les itinéraires nécessaires pour réellement réinitialiser le mot de passe une fois que l'utilisateur clique sur le lien de réinitialisation du mot de passe qui lui a été envoyé par e-mail et fournit un nouveau mot de passe. Tout d'abord, définissons la route qui affichera le formulaire de réinitialisation du mot de passe qui s'affiche lorsque l'utilisateur clique sur le lien de réinitialisation du mot de passe. Cette route recevra un tokenparamètre que nous utiliserons plus tard pour vérifier la demande de réinitialisation du mot de passe :
+
+Route::get('/reset-password/{token}', function ($token) {
+    return view('auth.reset-password', ['token' => $token]);
+})->middleware('guest')->name('password.reset');
+
+La vue renvoyée par cette route doit afficher un formulaire contenant un emailchamp, un passwordchamp, un password_confirmationchamp et un champ caché token, qui doit contenir la valeur du secret $tokenreçu par notre route.
+
+Gérer la soumission du formulaire
+Bien sûr, nous devons définir une route pour gérer réellement la soumission du formulaire de réinitialisation du mot de passe. Cette route se chargera de valider la requête entrante et de mettre à jour le mot de passe de l'utilisateur dans la base de données :
+
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+ 
+Route::post('/reset-password', function (Request $request) {
+    $request->validate([
+        'token' => 'required',
+        'email' => 'required|email',
+        'password' => 'required|min:8|confirmed',
+    ]);
+ 
+    $status = Password::reset(
+        $request->only('email', 'password', 'password_confirmation', 'token'),
+        function ($user, $password) {
+            $user->forceFill([
+                'password' => Hash::make($password)
+            ])->setRememberToken(Str::random(60));
+ 
+            $user->save();
+ 
+            event(new PasswordReset($user));
+        }
+    );
+ 
+    return $status === Password::PASSWORD_RESET
+                ? redirect()->route('login')->with('status', __($status))
+                : back()->withErrors(['email' => [__($status)]]);
+})->middleware('guest')->name('password.update');
+
+Avant de poursuivre, examinons cet itinéraire plus en détail. tokenTout d'abord, les attributs , emailet de la requête passwordsont validés. Ensuite, nous utiliserons le "courtier de mots de passe" intégré de Laravel (via la Passwordfaçade) pour valider les informations d'identification de la demande de réinitialisation du mot de passe.
+
+Si le jeton, l'adresse e-mail et le mot de passe donnés au courtier de mots de passe sont valides, la fermeture transmise à la resetméthode sera invoquée. Dans cette fermeture, qui reçoit l'instance de l'utilisateur et le mot de passe en clair fourni au formulaire de réinitialisation du mot de passe, nous pouvons mettre à jour le mot de passe de l'utilisateur dans la base de données.
+
+La resetméthode renvoie un slug "statut". Ce statut peut être traduit à l'aide des assistants de localisation de Laravel afin d'afficher un message convivial à l'utilisateur concernant le statut de sa demande. La traduction de l'état de réinitialisation du mot de passe est déterminée par le lang/{lang}/passwords.phpfichier de langue de votre application. Une entrée pour chaque valeur possible du slug d'état se trouve dans le passwordsfichier de langue.
+
+Avant de continuer, vous vous demandez peut-être comment Laravel sait comment récupérer l'enregistrement de l'utilisateur dans la base de données de votre application lors de l'appel de la méthode Passwordde la façade reset. Le courtier de mots de passe Laravel utilise les "fournisseurs d'utilisateurs" de votre système d'authentification pour récupérer les enregistrements de la base de données. Le fournisseur d'utilisateurs utilisé par le courtier de mots de passe est configuré dans le passwordstableau de config/auth.phpconfiguration de votre fichier de configuration. Pour en savoir plus sur l'écriture de fournisseurs d'utilisateurs personnalisés, consultez la documentation sur l'authentification .
+
+Suppression des jetons expirés
+Les jetons de réinitialisation de mot de passe qui ont expiré seront toujours présents dans votre base de données. Cependant, vous pouvez facilement supprimer ces enregistrements à l'aide de la auth:clear-resetscommande Artisan :
+
+php artisan auth:clear-resets
+
+Si vous souhaitez automatiser ce processus, pensez à ajouter la commande au planificateur de votre application :
+
+$schedule->command('auth:clear-resets')->everyFifteenMinutes();
+
+Personnalisation
+Réinitialiser la personnalisation du lien
+Vous pouvez personnaliser l'URL du lien de réinitialisation du mot de passe à l'aide de la createUrlUsingméthode fournie par la ResetPasswordclasse de notification. Cette méthode accepte une fermeture qui reçoit l'instance d'utilisateur qui reçoit la notification ainsi que le jeton de lien de réinitialisation du mot de passe. En règle générale, vous devez appeler cette méthode à partir de la méthode de votre App\Providers\AuthServiceProviderfournisseur de servicesboot :
+
+use Illuminate\Auth\Notifications\ResetPassword;
+ 
+/**
+ * Register any authentication / authorization services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    $this->registerPolicies();
+ 
+    ResetPassword::createUrlUsing(function ($user, string $token) {
+        return 'https://example.com/reset-password?token='.$token;
+    });
+}
+
+Réinitialiser la personnalisation des e-mails
+Vous pouvez facilement modifier la classe de notification utilisée pour envoyer le lien de réinitialisation du mot de passe à l'utilisateur. Pour commencer, remplacez la sendPasswordResetNotificationméthode sur votre App\Models\Usermodèle. Dans cette méthode, vous pouvez envoyer la notification en utilisant n'importe quelle classe de notification de votre propre création. La réinitialisation du mot de passe $tokenest le premier argument reçu par la méthode. Vous pouvez l'utiliser $tokenpour créer l'URL de réinitialisation du mot de passe de votre choix et envoyer votre notification à l'utilisateur :
+
+use App\Notifications\ResetPasswordNotification;
+ 
+/**
+ * Send a password reset notification to the user.
+ *
+ * @param  string  $token
+ * @return void
+ */
+public function sendPasswordResetNotification($token)
+{
+    $url = 'https://example.com/reset-password?token='.$token;
+ 
+    $this->notify(new ResetPasswordNotification($url));
+}

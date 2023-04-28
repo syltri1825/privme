@@ -1,0 +1,453 @@
+Installation
+Rencontrez Laravel
+Pourquoi Laravel ?
+Votre premier projet Laravel
+Laravel et Docker
+Premiers pas sur macOS
+Premiers pas sous Windows
+Démarrer sur Linux
+Choisir vos services de voile
+Configuration initiale
+Configuration basée sur l'environnement
+Configuration du répertoire
+Bases de données et migrations
+Prochaines étapes
+Laravel Le cadre de la pile complète
+Laravel Le backend de l'API
+Rencontrez Laravel
+Laravel est un framework d'application Web avec une syntaxe 
+
+expressive et élégante. Un framework Web fournit une structure 
+
+et un point de départ pour la création de votre application, 
+
+vous permettant de vous concentrer sur la création de quelque 
+
+chose d'incroyable pendant que nous transpirons les détails.
+
+Laravel s'efforce de fournir une expérience de développement 
+
+incroyable tout en fournissant des fonctionnalités puissantes 
+
+telles qu'une injection de dépendance approfondie, une couche 
+
+d'abstraction de base de données expressive, des files d'attente 
+
+et des tâches planifiées, des tests unitaires et d'intégration, etc.
+
+Que vous soyez nouveau dans les frameworks Web PHP ou que vous ayez 
+
+des années d'expérience, Laravel est un framework qui peut évoluer 
+
+avec vous. Nous vous aiderons à faire vos premiers pas en tant que 
+
+développeur Web ou vous donnerons un coup de pouce pour faire passer 
+
+votre expertise au niveau supérieur. Nous avons hâte de voir ce que 
+
+vous construisez.
+
+Pourquoi Laravel ?
+Il existe une variété d'outils et de frameworks à votre disposition 
+
+lors de la création d'une application Web. Cependant, nous pensons 
+
+que Laravel est le meilleur choix pour créer des applications Web 
+
+modernes et complètes.
+
+Un cadre progressif
+Nous aimons appeler Laravel un framework "progressif". Nous 
+
+entendons par là que Laravel grandit avec vous. Si vous 
+
+faites vos premiers pas dans le développement Web, la vaste 
+
+bibliothèque de documentation, de guides et de didacticiels vidéo 
+
+de Laravel vous aidera à apprendre les ficelles du métier sans 
+
+être submergé.
+
+Si vous êtes un développeur expérimenté, Laravel vous offre des 
+
+outils robustes pour l'injection de dépendances , les tests unitaires 
+
+, les files d'attente , les événements en temps réel , etc. Laravel 
+
+est conçu pour créer des applications Web professionnelles et prêt 
+
+à gérer les charges de travail de l'entreprise.
+
+Un cadre évolutif
+Laravel est incroyablement évolutif. Grâce à la nature conviviale 
+
+de la mise à l'échelle de PHP et à la prise en charge intégrée de 
+
+Laravel pour les systèmes de cache distribués rapides comme Redis, 
+
+la mise à l'échelle horizontale avec Laravel est un jeu d'enfant. 
+
+En fait, les applications Laravel ont été facilement mises à l'échelle 
+
+pour gérer des centaines de millions de demandes par mois.
+
+Besoin d'une mise à l'échelle extrême ? Des plates-formes comme 
+
+Laravel Vapor vous permettent d'exécuter votre application Laravel à 
+
+une échelle presque illimitée sur la dernière technologie sans serveur 
+
+d'AWS.
+
+Un cadre communautaire
+Laravel combine les meilleurs packages de l'écosystème PHP pour offrir 
+
+le cadre le plus robuste et le plus convivial disponible pour les 
+
+développeurs. De plus, des milliers de développeurs talentueux du monde 
+
+entier ont contribué au framework . Qui sait, peut-être deviendrez-vous 
+
+même un contributeur Laravel.
+
+Votre premier projet Laravel
+Avant de créer votre premier projet Laravel, vous devez vous assurer 
+
+que PHP et Composer sont installés sur votre ordinateur local. Si vous 
+
+développez sur macOS, PHP et Composer peuvent être installés via 
+
+Homebrew . De plus, nous vous recommandons d'installer Node et NPM .
+
+Après avoir installé PHP et Composer, vous pouvez créer un nouveau 
+
+projet Laravel via la create-projectcommande Composer :
+
+composer create-project laravel/laravel example-app
+
+Une fois le projet créé, démarrez le serveur de développement local 
+
+de Laravel à l'aide de la servecommande CLI Artisan de Laravel :
+
+cd example-app
+ 
+php artisan serve
+
+Une fois que vous avez démarré le serveur de développement Artisan, 
+
+votre application sera accessible dans votre navigateur Web à 
+
+l'adresse http://localhost:8000. Ensuite, vous êtes prêt à 
+
+commencer vos prochaines étapes dans l'écosystème Laravel . 
+
+Bien entendu, vous pouvez également configurer une base de données .
+
+Si vous souhaitez avoir une longueur d'avance lors du développement 
+
+de votre application Laravel, pensez à utiliser l'un de nos kits 
+
+de démarrage . Les kits de démarrage de Laravel fournissent un 
+
+échafaudage d'authentification backend et frontend pour votre 
+
+nouvelle application Laravel.
+
+
+Laravel et Docker
+Nous voulons qu'il soit aussi simple que possible de démarrer 
+
+avec Laravel, quel que soit votre système d'exploitation préféré. 
+
+Ainsi, il existe une variété d'options pour développer et exécuter 
+
+un projet Laravel sur votre machine locale. Bien que vous souhaitiez 
+
+peut-être explorer ces options ultérieurement, Laravel fournit Sail , 
+
+une solution intégrée pour exécuter votre projet Laravel à l'aide 
+
+de Docker .
+
+Docker est un outil permettant d'exécuter des applications et des 
+
+services dans de petits "conteneurs" légers qui n'interfèrent pas avec 
+
+le logiciel installé ou la configuration de votre machine locale. 
+
+Cela signifie que vous n'avez pas à vous soucier de la configuration 
+
+ou de la mise en place d'outils de développement compliqués tels que 
+
+des serveurs Web et des bases de données sur votre ordinateur local. 
+
+Pour commencer, il vous suffit d'installer Docker Desktop .
+
+Laravel Sail est une interface de ligne de commande légère pour 
+
+interagir avec la configuration Docker par défaut de Laravel. Sail 
+
+fournit un excellent point de départ pour créer une application 
+
+Laravel à l'aide de PHP, MySQL et Redis sans nécessiter d'expérience 
+
+Docker préalable.
+
+Déjà expert Docker ? Ne vous inquiétez pas! Tout ce qui concerne 
+
+Sail peut être personnalisé à l'aide du docker-compose.ymlfichier 
+
+fourni avec Laravel.
+
+
+Premiers pas sur macOS
+Si vous développez sur un Mac et que Docker Desktop est déjà installé, vous pouvez utiliser une simple commande de terminal pour créer un nouveau projet Laravel. Par exemple, pour créer une nouvelle application Laravel dans un répertoire nommé "example-app", vous pouvez exécuter la commande suivante dans votre terminal :
+
+curl -s "https://laravel.build/example-app" | bash
+
+Bien sûr, vous pouvez remplacer "example-app" dans cette URL par ce que vous voulez - assurez-vous simplement que le nom de l'application ne contient que des caractères alphanumériques, des tirets et des traits de soulignement. Le répertoire de l'application Laravel sera créé dans le répertoire à partir duquel vous exécutez la commande.
+
+Une fois le projet créé, vous pouvez accéder au répertoire de l'application et démarrer Laravel Sail. Laravel Sail fournit une interface de ligne de commande simple pour interagir avec la configuration Docker par défaut de Laravel :
+
+cd example-app
+ 
+./vendor/bin/sail up
+
+La première fois que vous exécutez la upcommande Sail, les conteneurs d'applications de Sail seront créés sur votre machine locale. Cela pourrait prendre plusieurs minutes. Ne vous inquiétez pas, les tentatives ultérieures de démarrage de Sail seront beaucoup plus rapides.
+
+Une fois les conteneurs Docker de l'application démarrés, vous pouvez accéder à l'application dans votre navigateur Web à l' adresse : http://localhost .
+
+
+Pour continuer à en savoir plus sur Laravel Sail, consultez sa documentation complète .
+
+
+Premiers pas sous Windows
+Avant de créer une nouvelle application Laravel sur votre machine Windows, 
+
+assurez-vous d'installer Docker Desktop . Ensuite, vous devez vous 
+
+assurer que le sous-système Windows pour Linux 2 (WSL2) est 
+
+installé et activé. WSL vous permet d'exécuter des exécutables 
+
+binaires Linux de manière native sur Windows 10. Des informations 
+
+sur l'installation et l'activation de WSL2 sont disponibles 
+
+dans la documentation de l'environnement de développement de Microsoft .
+
+
+Après avoir installé et activé WSL2, vous devez vous assurer que 
+
+Docker Desktop est configuré pour utiliser le backend WSL2 .
+
+
+Ensuite, vous êtes prêt à créer votre premier projet Laravel. 
+
+Lancez Windows Terminal et démarrez une nouvelle session de terminal 
+
+pour votre système d'exploitation WSL2 Linux. Ensuite, 
+
+vous pouvez utiliser une simple commande de terminal pour créer un 
+
+nouveau projet Laravel. Par exemple, pour créer une nouvelle 
+
+application Laravel dans un répertoire nommé "example-app", 
+
+vous pouvez exécuter la commande suivante dans votre terminal :
+
+curl -s https://laravel.build/example-app | bash
+
+Bien sûr, vous pouvez remplacer "example-app" dans cette URL par 
+
+ce que vous voulez - assurez-vous simplement que le nom de 
+
+l'application ne contient que des caractères alphanumériques, 
+
+des tirets et des traits de soulignement. Le répertoire de 
+
+l'application Laravel sera créé dans le répertoire à partir 
+
+duquel vous exécutez la commande.
+
+Une fois le projet créé, vous pouvez accéder au répertoire de 
+
+l'application et démarrer Laravel Sail. Laravel Sail fournit une 
+
+interface de ligne de commande simple pour interagir avec la 
+
+configuration Docker par défaut de Laravel :
+
+cd example-app
+ 
+./vendor/bin/sail up
+
+La première fois que vous exécutez la upcommande Sail, 
+
+les conteneurs d'applications de Sail seront créés 
+
+sur votre machine locale. Cela pourrait prendre plusieurs 
+
+minutes. Ne vous inquiétez pas, les tentatives ultérieures 
+
+de démarrage de Sail seront beaucoup plus rapides.
+
+Une fois les conteneurs Docker de l'application démarrés, 
+
+vous pouvez accéder à l'application dans votre navigateur Web à 
+
+l' adresse : http://localhost .
+
+
+Pour continuer à en savoir plus sur Laravel Sail, 
+
+consultez sa documentation complète .
+
+
+Développer au sein de WSL2
+Bien sûr, vous devrez être en mesure de modifier les 
+
+fichiers d'application Laravel qui ont été créés dans votre 
+
+installation WSL2. Pour ce faire, nous vous recommandons 
+
+d'utiliser l' éditeur de code Visual Studio de Microsoft 
+
+et son extension propriétaire pour le développement à distance .
+
+Une fois ces outils installés, vous pouvez ouvrir 
+
+n'importe quel projet Laravel en exécutant la code .commande 
+
+à partir du répertoire racine de votre application 
+
+à l'aide de Windows Terminal.
+
+Démarrer sur Linux
+Si vous développez sur Linux et que Docker Compose est 
+
+déjà installé, vous pouvez utiliser une simple commande de 
+
+terminal pour créer un nouveau projet Laravel. Par exemple, 
+
+pour créer une nouvelle application Laravel dans un répertoire 
+
+nommé "example-app", vous pouvez exécuter la commande suivante 
+
+dans votre terminal :
+
+curl -s https://laravel.build/example-app | bash
+
+Bien sûr, vous pouvez remplacer "example-app" dans cette URL 
+
+par ce que vous voulez - assurez-vous simplement que le nom de 
+
+l'application ne contient que des caractères alphanumériques, 
+
+des tirets et des traits de soulignement. Le répertoire de 
+
+l'application Laravel sera créé dans le répertoire à partir 
+
+duquel vous exécutez la commande.
+
+Une fois le projet créé, vous pouvez accéder au répertoire de 
+
+l'application et démarrer Laravel Sail. Laravel Sail fournit 
+
+une interface de ligne de commande simple pour interagir 
+
+avec la configuration Docker par défaut de Laravel :
+
+cd example-app
+ 
+./vendor/bin/sail up
+
+La première fois que vous exécutez la upcommande Sail, les conteneurs d'applications de Sail seront créés sur votre machine locale. Cela pourrait prendre plusieurs minutes. Ne vous inquiétez pas, les tentatives ultérieures de démarrage de Sail seront beaucoup plus rapides.
+
+Une fois les conteneurs Docker de l'application démarrés, vous pouvez accéder à l'application dans votre navigateur Web à l' adresse : http://localhost .
+
+
+Pour continuer à en savoir plus sur Laravel Sail, consultez sa documentation complète .
+
+
+Choisir vos services de voile
+Lors de la création d'une nouvelle application Laravel via Sail, vous pouvez utiliser la withvariable de chaîne de requête pour choisir les services à configurer dans le docker-compose.ymlfichier de votre nouvelle application. Les services disponibles incluent mysql, pgsql, mariadb, redis, memcached, meilisearch, minio, selenium, et mailhog:
+
+curl -s "https://laravel.build/example-app?with=mysql,redis" | bash
+
+Si vous ne spécifiez pas les services que vous souhaitez configurer, une pile par défaut de mysql, redis, meilisearch, mailhoget seleniumsera configurée.
+
+Vous pouvez demander à Sail d'installer un Devcontainer par défaut en ajoutant le devcontainerparamètre à l'URL :
+
+curl -s "https://laravel.build/example-app?with=mysql,redis&devcontainer" | bash
+
+Configuration initiale
+Tous les fichiers de configuration du framework Laravel sont stockés dans le configrépertoire. Chaque option est documentée, alors n'hésitez pas à parcourir les fichiers et à vous familiariser avec les options qui s'offrent à vous.
+
+Laravel n'a besoin de presque aucune configuration supplémentaire prête à l'emploi. Vous êtes libre de commencer à développer ! Toutefois, vous souhaiterez peut-être consulter le config/app.phpfichier et sa documentation. Il contient plusieurs options telles que timezoneet localeque vous pouvez souhaiter modifier en fonction de votre application.
+
+Configuration basée sur l'environnement
+Étant donné que de nombreuses valeurs d'options de configuration de Laravel peuvent varier selon que votre application s'exécute sur votre machine locale ou sur un serveur Web de production, de nombreuses valeurs de configuration importantes sont définies à l'aide du .envfichier qui existe à la racine de votre application.
+
+Votre .envfichier ne doit pas être engagé dans le contrôle de code source de votre application, car chaque développeur/serveur utilisant votre application peut nécessiter une configuration d'environnement différente. De plus, cela constituerait un risque pour la sécurité dans le cas où un intrus accèderait à votre référentiel de contrôle de source, car toutes les informations d'identification sensibles seraient exposées.
+
+
+Pour plus d'informations sur la .envconfiguration basée sur les fichiers et l'environnement, consultez la documentation de configuration complète .
+
+
+Configuration du répertoire
+Laravel doit toujours être servi à partir de la racine du "répertoire Web" configuré pour votre serveur Web. Vous ne devez pas tenter de servir une application Laravel à partir d'un sous-répertoire du "répertoire Web". Tenter de le faire pourrait exposer des fichiers sensibles qui existent dans votre application.
+
+Bases de données et migrations
+Maintenant que vous avez créé votre application Laravel, vous souhaitez probablement stocker certaines données dans une base de données. Par défaut, le .envfichier de configuration de votre application spécifie que Laravel interagira avec une base de données MySQL et accédera à la base de données à 127.0.0.1. Si vous développez sur macOS et que vous devez installer MySQL, Postgres ou Redis localement, vous trouverez peut-être pratique d'utiliser DBngin .
+
+Si vous ne souhaitez pas installer MySQL ou Postgres sur votre machine locale, vous pouvez toujours utiliser une base de données SQLite . SQLite est un petit moteur de base de données rapide et autonome. Pour commencer, créez une base de données SQLite en créant un fichier SQLite vide. Typiquement, ce fichier existera dans le databaserépertoire de votre application Laravel :
+
+touch database/database.sqlite
+
+Ensuite, mettez à jour votre .envfichier de configuration pour utiliser le sqlitepilote de base de données de Laravel. Vous pouvez supprimer les autres options de configuration de la base de données :
+
+DB_CONNECTION=sqlite 
+DB_CONNECTION=mysql 
+DB_HOST=127.0.0.1 
+DB_PORT=3306 
+DB_DATABASE=laravel 
+DB_USERNAME=root 
+DB_PASSWORD= 
+
+Une fois que vous avez configuré votre base de données SQLite, vous pouvez exécuter les migrations de la base de données de votre application , ce qui créera les tables de la base de données de votre application :
+
+php artisan migrate
+
+Prochaines étapes
+Maintenant que vous avez créé votre projet Laravel, vous vous demandez peut-être quoi apprendre ensuite. Tout d'abord, nous vous recommandons vivement de vous familiariser avec le fonctionnement de Laravel en lisant la documentation suivante :
+
+Cycle de vie de la demande
+Configuration
+Structure du répertoire
+L'extrémité avant
+Conteneur de services
+Façades
+La façon dont vous souhaitez utiliser Laravel dictera également les prochaines étapes de votre voyage. Il existe une variété de façons d'utiliser Laravel, et nous allons explorer deux cas d'utilisation principaux pour le framework ci-dessous.
+
+Laravel Le cadre de la pile complète
+Laravel peut servir de framework de pile complète. Par framework "full stack", nous entendons que vous allez utiliser Laravel pour acheminer les requêtes vers votre application et restituer votre frontend via des templates Blade ou une technologie hybride d'application monopage comme Inertia . C'est la manière la plus courante d'utiliser le framework Laravel et, à notre avis, la manière la plus productive d'utiliser Laravel.
+
+Si c'est ainsi que vous envisagez d'utiliser Laravel, vous pouvez consulter notre documentation sur le développement frontal , le routage , les vues ou l' ORM Eloquent . De plus, vous pourriez être intéressé à en savoir plus sur les packages communautaires tels que Livewire et Inertia . Ces packages vous permettent d'utiliser Laravel en tant que framework complet tout en profitant des nombreux avantages de l'interface utilisateur fournis par les applications JavaScript monopage.
+
+Si vous utilisez Laravel en tant que framework full stack, nous vous encourageons également fortement à apprendre à compiler le CSS et le JavaScript de votre application à l'aide de Vite .
+
+
+Si vous souhaitez prendre une longueur d'avance sur la création de votre application, consultez l'un de nos kits de démarrage d'application officiels .
+
+
+Laravel Le backend de l'API
+Laravel peut également servir de backend API pour une application JavaScript monopage ou une application mobile. Par exemple, vous pouvez utiliser Laravel comme backend d'API pour votre application Next.js. Dans ce contexte, vous pouvez utiliser Laravel pour fournir l' authentification et le stockage/récupération de données pour votre application, tout en profitant des puissants services de Laravel tels que les files d'attente, les e-mails, les notifications, etc.
+
+Si c'est ainsi que vous envisagez d'utiliser Laravel, vous pouvez consulter notre documentation sur le routage , Laravel Sanctum et l' ORM éloquent .
+
+
+Besoin d'une longueur d'avance pour échafauder votre backend Laravel et votre frontend Next.js ? Laravel Breeze propose une pile d'API ainsi qu'une implémentation frontale Next.js pour que vous puissiez démarrer en quelques minutes.
+
+

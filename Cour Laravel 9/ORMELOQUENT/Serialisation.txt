@@ -1,0 +1,185 @@
+Éloquent : sérialisation
+Introduction
+Sérialisation des modèles et des collections
+Sérialisation vers des tableaux
+Sérialisation vers JSON
+Masquer les attributs de JSON
+Ajout de valeurs à JSON
+Sérialisation de la date
+Introduction
+Lors de la création d'API à l'aide de Laravel, vous devrez souvent convertir vos modèles et relations en tableaux ou JSON. Eloquent inclut des méthodes pratiques pour effectuer ces conversions, ainsi que pour contrôler les attributs inclus dans la représentation sérialisée de vos modèles.
+
+
+Pour une manière encore plus robuste de gérer la sérialisation JSON du modèle et de la collection Eloquent, consultez la documentation sur les ressources de l'API Eloquent .
+
+
+Sérialisation des modèles et des collections
+Sérialisation vers des tableaux
+Pour convertir un modèle et ses relations chargées en un tableau, vous devez utiliser la toArrayméthode. Cette méthode est récursive, donc tous les attributs et toutes les relations (y compris les relations de relations) seront convertis en tableaux :
+
+use App\Models\User;
+ 
+$user = User::with('roles')->first();
+ 
+return $user->toArray();
+
+La attributesToArrayméthode peut être utilisée pour convertir les attributs d'un modèle en un tableau, mais pas ses relations :
+
+$user = User::first();
+ 
+return $user->attributesToArray();
+
+Vous pouvez également convertir des collections entières de modèles en tableaux en appelant la toArrayméthode sur l'instance de collection :
+
+$users = User::all();
+ 
+return $users->toArray();
+
+Sérialisation vers JSON
+Pour convertir un modèle en JSON, vous devez utiliser la toJsonméthode. Comme toArray, la toJsonméthode est récursive, donc tous les attributs et relations seront convertis en JSON. Vous pouvez également spécifier toutes les options d'encodage JSON prises en charge par PHP :
+
+use App\Models\User;
+ 
+$user = User::find(1);
+ 
+return $user->toJson();
+ 
+return $user->toJson(JSON_PRETTY_PRINT);
+
+Alternativement, vous pouvez convertir un modèle ou une collection en une chaîne, qui appellera automatiquement la toJsonméthode sur le modèle ou la collection :
+
+return (string) User::find(1);
+
+Étant donné que les modèles et les collections sont convertis en JSON lorsqu'ils sont convertis en chaîne, vous pouvez renvoyer des objets Eloquent directement à partir des routes ou des contrôleurs de votre application. Laravel sérialisera automatiquement vos modèles et collections Eloquent en JSON lorsqu'ils seront renvoyés par des routes ou des contrôleurs :
+
+Route::get('users', function () {
+    return User::all();
+});
+
+Des relations
+Lorsqu'un modèle Eloquent est converti en JSON, ses relations chargées seront automatiquement incluses en tant qu'attributs sur l'objet JSON. De plus, bien que les méthodes de relation Eloquent soient définies à l'aide de noms de méthode "camel case", l'attribut JSON d'une relation sera "snake case".
+
+Masquer les attributs de JSON
+Parfois, vous souhaiterez peut-être limiter les attributs, tels que les mots de passe, qui sont inclus dans le tableau ou la représentation JSON de votre modèle. Pour ce faire, ajoutez une $hiddenpropriété à votre modèle. Les attributs répertoriés dans le $hiddentableau de la propriété ne seront pas inclus dans la représentation sérialisée de votre modèle :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be hidden for arrays.
+     *
+     * @var array
+     */
+    protected $hidden = ['password'];
+}
+
+
+Pour masquer les relations, ajoutez le nom de la méthode de la relation à la $hiddenpropriété de votre modèle Eloquent.
+
+
+Vous pouvez également utiliser la visiblepropriété pour définir une "liste autorisée" d'attributs qui doivent être inclus dans le tableau et la représentation JSON de votre modèle. Tous les attributs qui ne sont pas présents dans le $visibletableau seront masqués lorsque le modèle sera converti en tableau ou JSON :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The attributes that should be visible in arrays.
+     *
+     * @var array
+     */
+    protected $visible = ['first_name', 'last_name'];
+}
+
+Modification temporaire de la visibilité des attributs
+Si vous souhaitez rendre visibles certains attributs généralement masqués sur une instance de modèle donnée, vous pouvez utiliser la makeVisibleméthode . La makeVisibleméthode renvoie l'instance de modèle :
+
+return $user->makeVisible('attribute')->toArray();
+
+De même, si vous souhaitez masquer certains attributs généralement visibles, vous pouvez utiliser la makeHiddenméthode .
+
+return $user->makeHidden('attribute')->toArray();
+
+Ajout de valeurs à JSON
+Parfois, lors de la conversion de modèles en tableaux ou JSON, vous souhaiterez peut-être ajouter des attributs qui n'ont pas de colonne correspondante dans votre base de données. Pour ce faire, définissez d'abord un accesseur pour la valeur :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * Determine if the user is an administrator.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function isAdmin(): Attribute
+    {
+        return new Attribute(
+            get: fn () => 'yes',
+        );
+    }
+}
+
+Après avoir créé l'accesseur, ajoutez le nom de l'attribut à la appendspropriété de votre modèle. Notez que les noms d'attributs sont généralement référencés à l'aide de leur représentation sérialisée "snake case", même si la méthode PHP de l'accesseur est définie à l'aide de "camel case":
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['is_admin'];
+}
+
+Une fois l'attribut ajouté à la appendsliste, il sera inclus à la fois dans le tableau du modèle et dans les représentations JSON. Les attributs du appendstableau respecteront également les paramètres visibleet hiddenconfigurés sur le modèle.
+
+Ajout au moment de l'exécution
+Lors de l'exécution, vous pouvez demander à une instance de modèle d'ajouter des attributs supplémentaires à l'aide de la appendméthode. Ou, vous pouvez utiliser la setAppendsméthode pour remplacer l'ensemble du tableau de propriétés ajoutées pour une instance de modèle donnée :
+
+return $user->append('is_admin')->toArray();
+ 
+return $user->setAppends(['is_admin'])->toArray();
+
+Sérialisation de la date
+Personnalisation du format de date par défaut
+Vous pouvez personnaliser le format de sérialisation par défaut en remplaçant la serializeDateméthode. Cette méthode n'affecte pas la façon dont vos dates sont formatées pour le stockage dans la base de données :
+
+/**
+ * Prepare a date for array / JSON serialization.
+ *
+ * @param  \DateTimeInterface  $date
+ * @return string
+ */
+protected function serializeDate(DateTimeInterface $date)
+{
+    return $date->format('Y-m-d');
+}
+
+Personnalisation du format de date par attribut
+Vous pouvez personnaliser le format de sérialisation des attributs de date Eloquent individuels en spécifiant le format de date dans les déclarations de distribution du modèle :
+
+protected $casts = [
+    'birthday' => 'date:Y-m-d',
+    'joined_at' => 'datetime:Y-m-d H:00',
+];

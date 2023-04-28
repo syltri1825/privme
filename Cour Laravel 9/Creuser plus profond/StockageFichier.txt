@@ -1,0 +1,879 @@
+Stockage de fichiers
+Introduction
+Configuration
+Le chauffeur local
+Le disque public
+Prérequis du pilote
+Systèmes de fichiers compatibles Amazon S3
+Obtention d'instances de disque
+Disques à la demande
+Récupération de fichiers
+Téléchargement de fichiers
+URL de fichier
+Métadonnées de fichier
+Stockage de fichiers
+Préfixe et ajout aux fichiers
+Copier et déplacer des fichiers
+Diffusion automatique
+Téléchargements de fichiers
+Visibilité des fichiers
+Suppression de fichiers
+Annuaires
+Systèmes de fichiers personnalisés
+Introduction
+Laravel fournit une puissante abstraction du système de fichiers grâce au merveilleux package PHP Flysystem de Frank de Jonge. L'intégration de Laravel Flysystem fournit des pilotes simples pour travailler avec des systèmes de fichiers locaux, SFTP et Amazon S3. Mieux encore, il est incroyablement simple de basculer entre ces options de stockage entre votre machine de développement locale et votre serveur de production, car l'API reste la même pour chaque système.
+
+Configuration
+Le fichier de configuration du système de fichiers de Laravel se trouve dans config/filesystems.php. Dans ce fichier, vous pouvez configurer tous les "disques" de votre système de fichiers. Chaque disque représente un pilote de stockage et un emplacement de stockage particuliers. Des exemples de configurations pour chaque pilote pris en charge sont inclus dans le fichier de configuration afin que vous puissiez modifier la configuration pour refléter vos préférences de stockage et vos informations d'identification.
+
+Le localpilote interagit avec les fichiers stockés localement sur le serveur exécutant l'application Laravel tandis que le s3pilote est utilisé pour écrire sur le service de stockage en nuage S3 d'Amazon.
+
+
+Vous pouvez configurer autant de disques que vous le souhaitez et même avoir plusieurs disques qui utilisent le même pilote.
+
+
+Le chauffeur local
+Lorsque vous utilisez le localpilote, toutes les opérations sur les fichiers sont relatives au rootrépertoire défini dans votre filesystemsfichier de configuration. Par défaut, cette valeur est définie sur le storage/apprépertoire. Par conséquent, la méthode suivante écrirait à storage/app/example.txt:
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::disk('local')->put('example.txt', 'Contents');
+
+Le disque public
+Le publicdisque inclus dans le filesystemsfichier de configuration 
+
+de votre application est destiné aux fichiers qui seront accessibles 
+
+au public. Par défaut, le publicdisque utilise le localpilote et 
+
+stocke ses fichiers au format storage/app/public.
+
+Pour rendre ces fichiers accessibles depuis le Web, vous devez 
+
+créer un lien symbolique de public/storagevers storage/app/public. 
+
+L'utilisation de cette convention de dossier conservera vos fichiers 
+
+accessibles au public dans un répertoire qui peut être facilement 
+
+partagé entre les déploiements lors de l'utilisation de systèmes 
+
+de déploiement sans temps d'arrêt comme Envoyer .
+
+Pour créer le lien symbolique, vous pouvez utiliser la 
+
+storage:linkcommande Artisan :
+
+php artisan storage:link
+
+Une fois qu'un fichier a été stocké et que le lien symbolique 
+
+a été créé, vous pouvez créer une URL vers les fichiers à l'aide 
+
+de l' assetassistant :
+
+echo asset('storage/file.txt');
+
+Vous pouvez configurer des liens symboliques supplémentaires 
+
+dans votre filesystemsfichier de configuration. Chacun des 
+
+liens configurés sera créé lorsque vous exécuterez la 
+
+storage:linkcommande :
+
+'links' => [
+    public_path('storage') => storage_path('app/public'),
+    public_path('images') => storage_path('app/images'),
+],
+
+Prérequis du pilote
+Configuration du pilote S3
+Avant d'utiliser le pilote S3, vous devrez installer le package 
+
+Flysystem S3 via le gestionnaire de packages Composer :
+
+composer require league/flysystem-aws-s3-v3 "^3.0"
+
+Les informations de configuration du pilote S3 se trouvent dans 
+
+votre config/filesystems.phpfichier de configuration. Ce fichier 
+
+contient un exemple de tableau de configuration pour un pilote S3. 
+
+Vous êtes libre de modifier ce tableau avec votre propre configuration 
+
+S3 et vos informations d'identification. Pour plus de commodité, 
+
+ces variables d'environnement correspondent à la convention de 
+
+dénomination utilisée par l'AWS CLI.
+
+Configuration du pilote FTP
+Avant d'utiliser le pilote FTP, vous devrez installer le 
+
+package FTP Flysystem via le gestionnaire de packages Composer :
+
+composer require league/flysystem-ftp "^3.0"
+
+Les intégrations Flysystem de Laravel fonctionnent très bien 
+
+avec FTP ; filesystems.phpcependant, un exemple de configuration 
+
+n'est pas inclus dans le fichier de configuration par défaut du 
+
+framework . Si vous avez besoin de configurer un système de 
+
+fichiers FTP, vous pouvez utiliser l'exemple de configuration 
+
+ci-dessous :
+
+'ftp' => [
+    'driver' => 'ftp',
+    'host' => env('FTP_HOST'),
+    'username' => env('FTP_USERNAME'),
+    'password' => env('FTP_PASSWORD'),
+ 
+    // Optional FTP Settings...
+    // 'port' => env('FTP_PORT', 21),
+    // 'root' => env('FTP_ROOT'),
+    // 'passive' => true,
+    // 'ssl' => true,
+    // 'timeout' => 30,
+],
+
+Configuration du pilote SFTP
+Avant d'utiliser le pilote SFTP, vous devrez installer le 
+
+package Flysystem SFTP via le gestionnaire de packages Composer :
+
+composer require league/flysystem-sftp-v3 "^3.0"
+
+Les intégrations Flysystem de Laravel fonctionnent très bien 
+
+avec SFTP ; filesystems.phpcependant, un exemple de configuration 
+
+n'est pas inclus dans le fichier de configuration par défaut du 
+
+framework . Si vous devez configurer un système de fichiers SFTP, 
+
+vous pouvez utiliser l'exemple de configuration ci-dessous :
+
+'sftp' => [
+    'driver' => 'sftp',
+    'host' => env('SFTP_HOST'),
+ 
+    // Settings for basic authentication...
+    'username' => env('SFTP_USERNAME'),
+    'password' => env('SFTP_PASSWORD'),
+ 
+    // Settings for SSH key based authentication with encryption password...
+    'privateKey' => env('SFTP_PRIVATE_KEY'),
+    'password' => env('SFTP_PASSWORD'),
+ 
+    // Optional SFTP Settings...
+    // 'hostFingerprint' => env('SFTP_HOST_FINGERPRINT'),
+    // 'maxTries' => 4,
+    // 'passphrase' => env('SFTP_PASSPHRASE'),
+    // 'port' => env('SFTP_PORT', 22),
+    // 'root' => env('SFTP_ROOT', ''),
+    // 'timeout' => 30,
+    // 'useAgent' => true,
+],
+
+Systèmes de fichiers compatibles Amazon S3
+Par défaut, le filesystemsfichier de configuration de votre application contient une configuration de disque pour le s3disque. En plus d'utiliser ce disque pour interagir avec Amazon S3, vous pouvez l'utiliser pour interagir avec n'importe quel service de stockage de fichiers compatible S3 tel que MinIO ou DigitalOcean Spaces .
+
+Généralement, après avoir mis à jour les informations d'identification du disque pour qu'elles correspondent aux informations d'identification du service que vous prévoyez d'utiliser, il vous suffit de mettre à jour la valeur de l' urloption de configuration. La valeur de cette option est généralement définie via la AWS_ENDPOINTvariable d'environnement :
+
+'endpoint' => env('AWS_ENDPOINT', 'https://minio:9000'),
+
+Obtention d'instances de disque
+La Storagefaçade peut être utilisée pour interagir avec n'importe lequel de vos disques configurés. Par exemple, vous pouvez utiliser la putméthode sur la façade pour stocker un avatar sur le disque par défaut. Si vous appelez des méthodes sur la Storagefaçade sans appeler la diskméthode au préalable, la méthode sera automatiquement transmise au disque par défaut :
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::put('avatars/1', $content);
+
+Si votre application interagit avec plusieurs disques, vous pouvez utiliser la diskméthode sur la Storagefaçade pour travailler avec des fichiers sur un disque particulier :
+
+Storage::disk('s3')->put('avatars/1', $content);
+
+Disques à la demande
+Parfois, vous souhaiterez peut-être créer un disque au moment de l'exécution en utilisant une configuration donnée sans que cette configuration soit réellement présente dans le filesystemsfichier de configuration de votre application. Pour ce faire, vous pouvez passer un tableau de configuration à la méthode de la Storagefaçadebuild :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$disk = Storage::build([
+    'driver' => 'local',
+    'root' => '/path/to/root',
+]);
+ 
+$disk->put('image.jpg', $content);
+
+Récupération de fichiers
+Le getprocédé peut être utilisé pour récupérer le contenu 
+
+d'un fichier. Le contenu brut de la chaîne du fichier sera 
+
+renvoyé par la méthode. N'oubliez pas que tous les chemins 
+
+de fichiers doivent être spécifiés par rapport à l'emplacement 
+
+"racine" du disque :
+
+$contents = Storage::get('file.jpg');
+
+La existsméthode peut être utilisée pour déterminer si un fichier 
+
+existe sur le disque :
+
+if (Storage::disk('s3')->exists('file.jpg')) {
+    // ...
+}
+
+La missingméthode peut être utilisée pour déterminer si un 
+
+fichier est manquant sur le disque :
+
+if (Storage::disk('s3')->missing('file.jpg')) {
+    // ...
+}
+
+Téléchargement de fichiers
+Le downloadprocédé peut être utilisé pour générer une réponse 
+
+qui force le navigateur de l'utilisateur à télécharger le 
+
+fichier sur le chemin donné. La downloadméthode accepte un 
+
+nom de fichier comme deuxième argument de la méthode, qui 
+
+déterminera le nom de fichier qui est vu par l'utilisateur 
+
+téléchargeant le fichier. Enfin, vous pouvez passer un 
+
+tableau d'en-têtes HTTP comme troisième argument à la méthode :
+
+return Storage::download('file.jpg');
+ 
+return Storage::download('file.jpg', $name, $headers);
+
+URL de fichier
+Vous pouvez utiliser la urlméthode pour obtenir l'URL d'un 
+
+fichier donné. Si vous utilisez le localpilote, cela 
+
+ajoutera généralement juste /storageau chemin donné et 
+
+renverra une URL relative au fichier. Si vous utilisez le s3pilote, 
+
+l'URL distante complète sera renvoyée :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$url = Storage::url('file.jpg');
+
+Lors de l'utilisation du localpilote, tous 
+
+les fichiers qui doivent être accessibles au 
+
+public doivent être placés dans le storage/app/publicrépertoire. 
+
+De plus, vous devez créer un lien symboliquepublic/storage 
+
+qui pointe vers le répertoire storage/app/public.
+
+
+Lors de l'utilisation du localpilote, la valeur de retour de 
+
+urln'est pas codée en URL. Pour cette raison, nous vous 
+
+recommandons de toujours stocker vos fichiers en utilisant 
+
+des noms qui créeront des URL valides.
+
+
+URL temporaires
+En utilisant la temporaryUrlméthode, vous pouvez créer 
+
+des URL temporaires vers des fichiers stockés à l'aide 
+
+du s3pilote. Cette méthode accepte un chemin et une 
+
+DateTimeinstance spécifiant quand l'URL doit expirer :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$url = Storage::temporaryUrl(
+    'file.jpg', now()->addMinutes(5)
+);
+
+Si vous devez spécifier des paramètres de requête S3 
+
+supplémentaires , vous pouvez transmettre le tableau 
+
+des paramètres de requête comme troisième argument à 
+
+la temporaryUrlméthode :
+
+$url = Storage::temporaryUrl(
+    'file.jpg',
+    now()->addMinutes(5),
+    [
+        'ResponseContentType' => 'application/octet-stream',
+        'ResponseContentDisposition' => 'attachment; filename=file2.jpg',
+    ]
+);
+
+Si vous devez personnaliser la façon dont les URL temporaires 
+
+sont créées pour un disque de stockage spécifique, vous pouvez 
+
+utiliser la buildTemporaryUrlsUsingméthode. Par exemple, 
+
+cela peut être utile si vous avez un contrôleur qui vous 
+
+permet de télécharger des fichiers stockés via un disque 
+
+qui ne prend généralement pas en charge les URL temporaires. 
+
+Habituellement, cette méthode doit être appelée à partir 
+
+de la bootméthode d'un fournisseur de services :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Storage::disk('local')->buildTemporaryUrlsUsing(function ($path, $expiration, $options) {
+            return URL::temporarySignedRoute(
+                'files.download',
+                $expiration,
+                array_merge($options, ['path' => $path])
+            );
+        });
+    }
+}
+
+Personnalisation de l'hôte d'URL
+Si vous souhaitez prédéfinir l'hôte pour les URL générées 
+
+à l'aide de la Storagefaçade, vous pouvez ajouter une urloption au tableau de configuration du disque :
+
+'public' => [
+    'driver' => 'local',
+    'root' => storage_path('app/public'),
+    'url' => env('APP_URL').'/storage',
+    'visibility' => 'public',
+],
+
+Métadonnées de fichier
+En plus de lire et d'écrire des fichiers, Laravel peut 
+
+également fournir des informations sur les fichiers eux-mêmes. 
+
+Par exemple, la sizeméthode peut être utilisée pour obtenir la 
+
+taille d'un fichier en octets :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$size = Storage::size('file.jpg');
+
+La lastModifiedméthode renvoie l'horodatage UNIX de la 
+
+dernière modification du fichier :
+
+$time = Storage::lastModified('file.jpg');
+
+Chemins de fichiers
+Vous pouvez utiliser la pathméthode pour obtenir le chemin 
+
+d'un fichier donné. Si vous utilisez le localpilote, cela 
+
+renverra le chemin absolu vers le fichier. Si vous utilisez 
+
+le s3pilote, cette méthode renverra le chemin relatif vers le
+
+fichier dans le bucket S3 :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$path = Storage::path('file.jpg');
+
+Stockage de fichiers
+Le putprocédé peut être utilisé pour stocker le contenu d'un 
+
+fichier sur un disque. Vous pouvez également passer un PHP 
+
+resourceà la putméthode, qui utilisera le support de flux 
+
+sous-jacent de Flysystem. N'oubliez pas que tous les chemins 
+
+de fichiers doivent être spécifiés par rapport à l'emplacement 
+
+"racine" configuré pour le disque :
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::put('file.jpg', $contents);
+ 
+Storage::put('file.jpg', $resource);
+
+Échec des écritures
+Si la putméthode (ou d'autres opérations "d'écriture") est 
+
+incapable d'écrire le fichier sur le disque, falsesera renvoyé :
+
+if (! Storage::put('file.jpg', $contents)) {
+    // The file could not be written to disk...
+}
+
+Si vous le souhaitez, vous pouvez définir l' throwoption 
+
+dans le tableau de configuration de votre disque de système 
+
+de fichiers. Lorsque cette option est définie comme true, 
+
+les méthodes "write" telles que putlèvent une instance 
+
+League\Flysystem\UnableToWriteFilelorsque les opérations 
+
+d'écriture échouent :
+
+'public' => [
+    'driver' => 'local',
+    // ...
+    'throw' => true,
+],
+
+Préfixe et ajout aux fichiers
+Les méthodes prependet appendpermettent d'écrire au début 
+
+ou à la fin d'un fichier :
+
+Storage::prepend('file.log', 'Prepended Text');
+ 
+Storage::append('file.log', 'Appended Text');
+
+Copier et déplacer des fichiers
+La copyméthode peut être utilisée pour copier un fichier 
+
+existant vers un nouvel emplacement sur le disque, tandis 
+
+que la moveméthode peut être utilisée pour renommer ou 
+
+déplacer un fichier existant vers un nouvel emplacement :
+
+Storage::copy('old/file.jpg', 'new/file.jpg');
+ 
+Storage::move('old/file.jpg', 'new/file.jpg');
+
+Diffusion automatique
+La diffusion de fichiers vers le stockage offre une 
+
+utilisation de la mémoire considérablement réduite. 
+
+Si vous souhaitez que Laravel gère automatiquement le 
+
+streaming d'un fichier donné vers votre emplacement de 
+
+stockage, vous pouvez utiliser la méthode putFileou 
+
+putFileAs. Cette méthode accepte une instance 
+
+Illuminate\Http\Fileou Illuminate\Http\UploadedFileet 
+
+diffusera automatiquement le fichier à l'emplacement souhaité :
+
+use Illuminate\Http\File;
+use Illuminate\Support\Facades\Storage;
+ 
+// Automatically generate a unique ID for filename...
+$path = Storage::putFile('photos', new File('/path/to/photo'));
+ 
+// Manually specify a filename...
+$path = Storage::putFileAs('photos', new File('/path/to/photo'), 'photo.jpg');
+
+Il y a quelques points importants à noter sur la putFileméthode. 
+
+Notez que nous n'avons spécifié qu'un nom de répertoire et non un
+
+ nom de fichier. Par défaut, la putFileméthode générera un ID 
+ 
+ unique pour servir de nom de fichier. L'extension du fichier 
+ 
+ sera déterminée en examinant le type MIME du fichier. Le chemin 
+ 
+ d'accès au fichier sera renvoyé par la putFileméthode afin que 
+ 
+ vous puissiez stocker le chemin, y compris le nom de fichier 
+ 
+ généré, dans votre base de données.
+
+Les méthodes putFileet putFileAsacceptent également un argument 
+
+pour spécifier la "visibilité" du fichier stocké. Ceci est 
+
+particulièrement utile si vous stockez le fichier sur un disque 
+
+cloud tel qu'Amazon S3 et souhaitez que le fichier soit accessible 
+
+publiquement via des URL générées :
+
+Storage::putFile('photos', new File('/path/to/photo'), 'public');
+
+Téléchargements de fichiers
+Dans les applications Web, l'un des cas d'utilisation 
+
+les plus courants pour le stockage de fichiers consiste 
+
+à stocker des fichiers téléchargés par l'utilisateur, 
+
+tels que des photos et des documents. Laravel facilite 
+
+le stockage des fichiers téléchargés en utilisant la 
+
+storeméthode sur une instance de fichier téléchargé. 
+
+Appelez la storeméthode avec le chemin dans lequel 
+
+vous souhaitez stocker le fichier téléchargé :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+ 
+class UserAvatarController extends Controller
+{
+    /**
+     * Update the avatar for the user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request)
+    {
+        $path = $request->file('avatar')->store('avatars');
+ 
+        return $path;
+    }
+}
+
+Il y a quelques points importants à noter à propos de cet exemple. 
+
+Notez que nous n'avons spécifié qu'un nom de répertoire, pas 
+
+un nom de fichier. Par défaut, la storeméthode générera un ID 
+
+unique pour servir de nom de fichier. L'extension du fichier 
+
+sera déterminée en examinant le type MIME du fichier. Le 
+
+chemin d'accès au fichier sera renvoyé par la storeméthode 
+
+afin que vous puissiez stocker le chemin, y compris le nom 
+
+de fichier généré, dans votre base de données.
+
+Vous pouvez également appeler la putFileméthode sur la 
+
+Storagefaçade pour effectuer la même opération de stockage 
+
+de fichiers que dans l'exemple ci-dessus :
+
+$path = Storage::putFile('avatars', $request->file('avatar'));
+
+Spécification d'un nom de fichier
+Si vous ne souhaitez pas qu'un nom de fichier soit automatiquement 
+
+attribué à votre fichier stocké, vous pouvez utiliser la 
+
+storeAsméthode, qui reçoit le chemin, le nom de fichier et le 
+
+disque (facultatif) comme arguments :
+
+$path = $request->file('avatar')->storeAs(
+    'avatars', $request->user()->id
+);
+
+Vous pouvez également utiliser la putFileAsméthode sur 
+
+la Storagefaçade, qui effectuera la même opération de 
+
+stockage de fichiers que l'exemple ci-dessus :
+
+$path = Storage::putFileAs(
+    'avatars', $request->file('avatar'), $request->user()->id
+);
+
+
+Les caractères Unicode non imprimables et non valides 
+
+seront automatiquement supprimés des chemins de fichiers. 
+
+Par conséquent, vous souhaiterez peut-être nettoyer vos 
+
+chemins de fichiers avant de les transmettre aux méthodes 
+
+de stockage de fichiers de Laravel. Les chemins de fichiers 
+
+sont normalisés à l'aide de la 
+
+League\Flysystem\WhitespacePathNormalizer::normalizePathméthode.
+
+
+Spécification d'un disque
+Par défaut, la méthode de ce fichier téléchargé storeutilisera 
+
+votre disque par défaut. Si vous souhaitez spécifier un 
+
+autre disque, passez le nom du disque comme deuxième argument 
+
+à la storeméthode :
+
+$path = $request->file('avatar')->store(
+    'avatars/'.$request->user()->id, 's3'
+);
+
+Si vous utilisez la storeAsméthode, vous pouvez passer le 
+
+nom du disque comme troisième argument à la méthode :
+
+$path = $request->file('avatar')->storeAs(
+    'avatars',
+    $request->user()->id,
+    's3'
+);
+
+Autres informations sur les fichiers téléchargés
+Si vous souhaitez obtenir le nom et l'extension d'origine 
+
+du fichier téléchargé, vous pouvez le faire en utilisant les 
+
+méthodes getClientOriginalNameet :getClientOriginalExtension
+
+$file = $request->file('avatar');
+ 
+$name = $file->getClientOriginalName();
+$extension = $file->getClientOriginalExtension();
+
+Cependant, gardez à l'esprit que les méthodes getClientOriginalNameet 
+
+getClientOriginalExtensionsont considérées comme dangereuses, 
+
+car le nom et l'extension du fichier peuvent être falsifiés 
+
+par un utilisateur malveillant. Pour cette raison, vous 
+
+devriez généralement préférer les méthodes hashNameet 
+
+extensionpour obtenir un nom et une extension pour le 
+
+téléchargement de fichier donné :
+
+$file = $request->file('avatar');
+ 
+$name = $file->hashName(); // Generate a unique, random name...
+$extension = $file->extension(); // Determine the file's 
+
+extension based on the file's MIME type...
+
+Visibilité des fichiers
+Dans l'intégration Flysystem de Laravel, la "visibilité" 
+
+est une abstraction des autorisations de fichiers sur 
+
+plusieurs plates-formes. Les fichiers peuvent être déclarés 
+
+publicou private. Lorsqu'un fichier est déclaré public, 
+
+vous indiquez que le fichier doit généralement être accessible 
+
+aux autres. Par exemple, lorsque vous utilisez le pilote S3, 
+
+vous pouvez récupérer les URL des publicfichiers.
+
+Vous pouvez paramétrer la visibilité lors de l'écriture 
+
+du fichier via la putméthode :
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::put('file.jpg', $contents, 'public');
+
+Si le fichier a déjà été stocké, sa visibilité peut être 
+
+récupérée et paramétrée via les méthodes getVisibilityet :setVisibility
+
+$visibility = Storage::getVisibility('file.jpg');
+ 
+Storage::setVisibility('file.jpg', 'public');
+
+Lorsque vous interagissez avec des fichiers téléchargés, 
+
+vous pouvez utiliser les méthodes storePubliclyet 
+
+storePubliclyAspour stocker le fichier téléchargé 
+
+avec publicvisibilité :
+
+$path = $request->file('avatar')->storePublicly('avatars', 's3');
+ 
+$path = $request->file('avatar')->storePubliclyAs(
+    'avatars',
+    $request->user()->id,
+    's3'
+);
+
+Fichiers locaux et visibilité
+Lors de l'utilisation du localpilote, la public visibilité se 
+
+traduit par des 0755autorisations pour les répertoires et 0644des 
+
+autorisations pour les fichiers. filesystemsVous pouvez modifier 
+
+les mappages d'autorisations dans le fichier de configuration de 
+
+votre application :
+
+'local' => [
+    'driver' => 'local',
+    'root' => storage_path('app'),
+    'permissions' => [
+        'file' => [
+            'public' => 0644,
+            'private' => 0600,
+        ],
+        'dir' => [
+            'public' => 0755,
+            'private' => 0700,
+        ],
+    ],
+],
+
+Suppression de fichiers
+La deleteméthode accepte un seul nom de fichier ou un tableau de 
+
+fichiers à supprimer :
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::delete('file.jpg');
+ 
+Storage::delete(['file.jpg', 'file2.jpg']);
+
+Si nécessaire, vous pouvez spécifier le disque sur lequel le 
+
+fichier doit être supprimé :
+
+use Illuminate\Support\Facades\Storage;
+ 
+Storage::disk('s3')->delete('path/file.jpg');
+
+Annuaires
+Obtenir tous les fichiers dans un répertoire
+La filesméthode renvoie un tableau de tous les fichiers 
+
+d'un répertoire donné. Si vous souhaitez récupérer une 
+
+liste de tous les fichiers d'un répertoire donné, y compris 
+
+tous les sous-répertoires, vous pouvez utiliser la allFilesméthode :
+
+use Illuminate\Support\Facades\Storage;
+ 
+$files = Storage::files($directory);
+ 
+$files = Storage::allFiles($directory);
+
+Obtenir tous les répertoires dans un répertoire
+La directoriesméthode renvoie un tableau de tous les répertoires d'un répertoire donné. De plus, vous pouvez utiliser la allDirectoriesméthode pour obtenir une liste de tous les répertoires d'un répertoire donné et de tous ses sous-répertoires :
+
+$directories = Storage::directories($directory);
+ 
+$directories = Storage::allDirectories($directory);
+
+Créer un répertoire
+La makeDirectoryméthode créera le répertoire donné, y compris tous les sous-répertoires nécessaires :
+
+Storage::makeDirectory($directory);
+
+Supprimer un répertoire
+Enfin, la deleteDirectoryméthode peut être utilisée pour supprimer un répertoire et tous ses fichiers :
+
+Storage::deleteDirectory($directory);
+
+Systèmes de fichiers personnalisés
+L'intégration Flysystem de Laravel prend en charge plusieurs "pilotes" prêts à l'emploi ; Cependant, Flysystem ne se limite pas à ceux-ci et propose des adaptateurs pour de nombreux autres systèmes de stockage. Vous pouvez créer un pilote personnalisé si vous souhaitez utiliser l'un de ces adaptateurs supplémentaires dans votre application Laravel.
+
+Afin de définir un système de fichiers personnalisé, vous aurez besoin d'un adaptateur Flysystem. Ajoutons un adaptateur Dropbox géré par la communauté à notre projet :
+
+composer require spatie/flysystem-dropbox
+
+Ensuite, vous pouvez enregistrer le pilote dans la bootméthode de l'un des fournisseurs de services de votre application . Pour ce faire, vous devez utiliser la extendméthode de la Storagefaçade :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\ServiceProvider;
+use League\Flysystem\Filesystem;
+use Spatie\Dropbox\Client as DropboxClient;
+use Spatie\FlysystemDropbox\DropboxAdapter;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Storage::extend('dropbox', function ($app, $config) {
+            $adapter = new DropboxAdapter(new DropboxClient(
+                $config['authorization_token']
+            ));
+ 
+            return new FilesystemAdapter(
+                new Filesystem($adapter, $config),
+                $adapter,
+                $config
+            );
+        });
+    }
+}
+
+Le premier argument de la extendméthode est le nom du pilote et le second est une fermeture qui reçoit les variables $appet . $configLa fermeture doit renvoyer une instance de Illuminate\Filesystem\FilesystemAdapter. La $configvariable contient les valeurs définies dans config/filesystems.phppour le disque spécifié.
+
+Une fois que vous avez créé et enregistré le fournisseur de services de l'extension, vous pouvez utiliser le dropboxpilote dans votre config/filesystems.phpfichier de configuration.

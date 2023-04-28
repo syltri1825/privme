@@ -1,0 +1,432 @@
+Cache
+Introduction
+Configuration
+Prérequis du pilote
+Utilisation du cache
+Obtention d'une instance de cache
+Récupérer des éléments du cache
+Stocker des éléments dans le cache
+Suppression d'éléments du cache
+L'assistant de cache
+Balises de cache
+Stockage des éléments de cache marqués
+Accéder aux éléments de cache marqués
+Suppression d'éléments de cache marqués
+Serrures atomiques
+Prérequis du pilote
+Gestion des verrous
+Gestion des verrous à travers les processus
+Ajout de pilotes de cache personnalisés
+Écrire le pilote
+Enregistrement du pilote
+Événements
+Introduction
+Certaines des tâches de récupération ou de traitement de données effectuées par votre application peuvent être gourmandes en CPU ou prendre plusieurs secondes. Lorsque c'est le cas, il est courant de mettre en cache les données récupérées pendant un certain temps afin qu'elles puissent être récupérées rapidement lors de demandes ultérieures pour les mêmes données. Les données mises en cache sont généralement stockées dans un magasin de données très rapide tel que Memcached ou Redis .
+
+Heureusement, Laravel fournit une API expressive et unifiée pour divers backends de cache, vous permettant de tirer parti de leur récupération de données ultra-rapide et d'accélérer votre application Web.
+
+Configuration
+Le fichier de configuration du cache de votre application se trouve dans config/cache.php. Dans ce fichier, vous pouvez spécifier le pilote de cache que vous souhaitez utiliser par défaut dans votre application. Laravel prend en charge les backends de mise en cache populaires tels que Memcached , Redis , DynamoDB et les bases de données relationnelles prêtes à l'emploi. De plus, un pilote de cache basé sur des fichiers est disponible, tandis que arrayles pilotes de cache "null" fournissent des backends de cache pratiques pour vos tests automatisés.
+
+Le fichier de configuration du cache contient également diverses autres options, qui sont documentées dans le fichier, alors assurez-vous de lire ces options. Par défaut, Laravel est configuré pour utiliser le filepilote de cache, qui stocke les objets sérialisés et mis en cache sur le système de fichiers du serveur. Pour les applications plus importantes, il est recommandé d'utiliser un pilote plus robuste tel que Memcached ou Redis. Vous pouvez même configurer plusieurs configurations de cache pour le même pilote.
+
+Prérequis du pilote
+Base de données
+Lors de l'utilisation du databasepilote de cache, vous devrez configurer une table pour contenir les éléments du cache. Vous trouverez un exemple Schemade déclaration pour le tableau ci-dessous :
+
+Schema::create('cache', function ($table) {
+    $table->string('key')->unique();
+    $table->text('value');
+    $table->integer('expiration');
+});
+
+
+Vous pouvez également utiliser la php artisan cache:tablecommande Artisan pour générer une migration avec le schéma approprié.
+
+
+Memcaché
+L'utilisation du pilote Memcached nécessite l' installation du package Memcached PECL . Vous pouvez répertorier tous vos serveurs Memcached dans le config/cache.phpfichier de configuration. Ce fichier contient déjà une memcached.serversentrée pour vous aider à démarrer :
+
+'memcached' => [
+    'servers' => [
+        [
+            'host' => env('MEMCACHED_HOST', '127.0.0.1'),
+            'port' => env('MEMCACHED_PORT', 11211),
+            'weight' => 100,
+        ],
+    ],
+],
+
+Si nécessaire, vous pouvez définir l' hostoption sur un chemin de socket UNIX. Si vous faites cela, l' portoption doit être définie sur0 :
+
+'memcached' => [
+    [
+        'host' => '/var/run/memcached/memcached.sock',
+        'port' => 0,
+        'weight' => 100
+    ],
+],
+
+Redis
+Avant d'utiliser un cache Redis avec Laravel, vous devrez soit installer l'extension PhpRedis PHP via PECL, soit installer le predis/predispackage (~1.0) via Composer. Laravel Sail inclut déjà cette extension. De plus, les plates-formes de déploiement officielles de Laravel telles que Laravel Forge et Laravel Vapor ont l'extension PhpRedis installée par défaut.
+
+Pour plus d'informations sur la configuration de Redis, consultez sa page de documentation Laravel .
+
+DynamoDB
+Avant d'utiliser le pilote de cache DynamoDB , vous devez créer une table DynamoDB pour stocker toutes les données mises en cache. En règle générale, cette table doit être nommée cache. Cependant, vous devez nommer la table en fonction de la valeur de la valeur de stores.dynamodb.tableconfiguration dans le fichier de configuration de votre application cache.
+
+Cette table doit également avoir une clé de partition de chaîne avec un nom qui correspond à la valeur de l' stores.dynamodb.attributes.keyélément de configuration dans le fichier de configuration de votre application cache. Par défaut, la clé de partition doit être nommée key.
+
+Utilisation du cache
+Obtention d'une instance de cache
+Pour obtenir une instance de magasin de cache, vous pouvez utiliser la Cachefaçade, que nous utiliserons tout au long de cette documentation. La Cachefaçade fournit un accès pratique et concis aux implémentations sous-jacentes des contrats de cache Laravel :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use Illuminate\Support\Facades\Cache;
+ 
+class UserController extends Controller
+{
+    /**
+     * Show a list of all users of the application.
+     *
+     * @return Response
+     */
+    public function index()
+    {
+        $value = Cache::get('key');
+ 
+        //
+    }
+}
+
+Accès à plusieurs magasins de cache
+En utilisant la Cachefaçade, vous pouvez accéder à divers magasins de cache via la storeméthode. La clé transmise à la storeméthode doit correspondre à l'un des magasins répertoriés dans le storestableau de configuration de votre cachefichier de configuration :
+
+$value = Cache::store('file')->get('foo');
+ 
+Cache::store('redis')->put('bar', 'baz', 600); // 10 Minutes
+
+Récupérer des éléments du cache
+La méthode Cachede la façade getest utilisée pour récupérer les éléments du cache. Si l'élément n'existe pas dans le cache, nullsera renvoyé. Si vous le souhaitez, vous pouvez passer un deuxième argument à la getméthode en spécifiant la valeur par défaut que vous souhaitez renvoyer si l'élément n'existe pas :
+
+$value = Cache::get('key');
+ 
+$value = Cache::get('key', 'default');
+
+Vous pouvez même passer une fermeture comme valeur par défaut. Le résultat de la fermeture sera renvoyé si l'élément spécifié n'existe pas dans le cache. Passer une fermeture vous permet de différer la récupération des valeurs par défaut d'une base de données ou d'un autre service externe :
+
+$value = Cache::get('key', function () {
+    return DB::table(/* ... */)->get();
+});
+
+Vérification de l'existence de l'élément
+Le hasprocédé peut être utilisé pour déterminer si un élément existe dans le cache. Cette méthode retournera aussi falsesi l'item existe mais sa valeur est null:
+
+if (Cache::has('key')) {
+    //
+}
+
+Incrémentation / Décrémentation des valeurs
+Les méthodes incrementet decrementpeuvent être utilisées pour ajuster la valeur des éléments entiers dans le cache. Ces deux méthodes acceptent un deuxième argument facultatif indiquant le montant par lequel incrémenter ou décrémenter la valeur de l'élément :
+
+Cache::increment('key');
+Cache::increment('key', $amount);
+Cache::decrement('key');
+Cache::decrement('key', $amount);
+
+Récupérer et stocker
+Parfois, vous souhaiterez peut-être récupérer un élément du cache, mais également stocker une valeur par défaut si l'élément demandé n'existe pas. Par exemple, vous pouvez souhaiter récupérer tous les utilisateurs du cache ou, s'ils n'existent pas, les récupérer de la base de données et les ajouter au cache. Vous pouvez le faire en utilisant la Cache::rememberméthode :
+
+$value = Cache::remember('users', $seconds, function () {
+    return DB::table('users')->get();
+});
+
+Si l'élément n'existe pas dans le cache, la fermeture passée à la rememberméthode sera exécutée et son résultat sera placé dans le cache.
+
+Vous pouvez utiliser la rememberForeverméthode pour récupérer un élément du cache ou le stocker pour toujours s'il n'existe pas :
+
+$value = Cache::rememberForever('users', function () {
+    return DB::table('users')->get();
+});
+
+Récupérer et supprimer
+Si vous devez récupérer un élément du cache, puis supprimer l'élément, vous pouvez utiliser la pullméthode. Comme la getméthode, nullsera renvoyé si l'élément n'existe pas dans le cache :
+
+$value = Cache::pull('key');
+
+Stocker des éléments dans le cache
+Vous pouvez utiliser la putméthode sur la Cachefaçade pour stocker des objets dans la cache :
+
+Cache::put('key', 'value', $seconds = 10);
+
+Si le temps de stockage n'est pas passé à la putméthode, l'élément sera stocké indéfiniment :
+
+Cache::put('key', 'value');
+
+Au lieu de transmettre le nombre de secondes sous forme d'entier, vous pouvez également transmettre une DateTimeinstance représentant le délai d'expiration souhaité de l'élément mis en cache :
+
+Cache::put('key', 'value', now()->addMinutes(10));
+
+Stocker si non présent
+La addméthode n'ajoutera l'élément au cache que s'il n'existe pas déjà dans le magasin de cache. La méthode retournera truesi l'élément est réellement ajouté au cache. Sinon, la méthode retournera false. La addméthode est une opération atomique :
+
+Cache::add('key', 'value', $seconds);
+
+Stocker des objets pour toujours
+Le foreverprocédé peut être utilisé pour stocker un élément dans le cache de façon permanente. Étant donné que ces éléments n'expireront pas, ils doivent être supprimés manuellement du cache en utilisant la forgetméthode :
+
+Cache::forever('key', 'value');
+
+
+Si vous utilisez le pilote Memcached, les éléments stockés « pour toujours » peuvent être supprimés lorsque le cache atteint sa limite de taille.
+
+
+Suppression d'éléments du cache
+Vous pouvez supprimer des éléments du cache en utilisant la forgetméthode :
+
+Cache::forget('key');
+
+Vous pouvez également supprimer des éléments en fournissant un nombre nul ou négatif de secondes d'expiration :
+
+Cache::put('key', 'value', 0);
+ 
+Cache::put('key', 'value', -5);
+
+Vous pouvez vider tout le cache en utilisant la flushméthode :
+
+Cache::flush();
+
+
+Le vidage du cache ne respecte pas le "préfixe" de votre cache configuré et supprimera toutes les entrées du cache. Tenez-en compte lorsque vous effacez un cache partagé par d'autres applications.
+
+
+L'assistant de cache
+En plus d'utiliser la Cachefaçade, vous pouvez également utiliser la cachefonction globale pour récupérer et stocker des données via le cache. Lorsque la cachefonction est appelée avec un seul argument de chaîne, elle renverra la valeur de la clé donnée :
+
+$value = cache('key');
+
+Si vous fournissez un tableau de paires clé/valeur et un délai d'expiration à la fonction, elle stockera les valeurs dans le cache pendant la durée spécifiée :
+
+cache(['key' => 'value'], $seconds);
+ 
+cache(['key' => 'value'], now()->addMinutes(10));
+
+Lorsque la cachefonction est appelée sans aucun argument, elle renvoie une instance de l' Illuminate\Contracts\Cache\Factoryimplémentation, vous permettant d'appeler d'autres méthodes de mise en cache :
+
+cache()->remember('users', $seconds, function () {
+    return DB::table('users')->get();
+});
+
+
+Lors du test de l'appel à la fonction globale cache, vous pouvez utiliser la Cache::shouldReceiveméthode comme si vous testiez la façade .
+
+
+Balises de cache
+
+Les balises de cache ne sont pas prises en charge lors de l'utilisation des pilotes de cache file, dynamodbou . databaseDe plus, lors de l'utilisation de plusieurs balises avec des caches stockés "pour toujours", les performances seront meilleures avec un pilote tel que memcached, qui purge automatiquement les enregistrements obsolètes.
+
+
+Stockage des éléments de cache marqués
+Les balises de cache vous permettent de baliser des éléments associés dans le cache, puis de vider toutes les valeurs mises en cache auxquelles une balise donnée a été attribuée. Vous pouvez accéder à un cache de balises en transmettant un tableau ordonné de noms de balises. Les éléments stockés via des balises ne sont pas accessibles sans fournir également les balises qui ont été utilisées pour stocker la valeur. Par exemple, accédons à un cache étiqueté et putà une valeur dans le cache :
+
+Cache::tags(['people', 'artists'])->put('John', $john, $seconds);
+ 
+Cache::tags(['people', 'authors'])->put('Anne', $anne, $seconds);
+
+Accéder aux éléments de cache marqués
+Pour récupérer un élément de cache balisé, passez la même liste ordonnée de balises à la tagsméthode, puis appelez la getméthode avec la clé que vous souhaitez récupérer :
+
+$john = Cache::tags(['people', 'artists'])->get('John');
+ 
+$anne = Cache::tags(['people', 'authors'])->get('Anne');
+
+Suppression d'éléments de cache marqués
+Vous pouvez vider tous les éléments auxquels une balise ou une liste de balises est affectée. Par exemple, cette instruction supprimerait tous les caches marqués avec people, authorsou les deux. Ainsi, les deux Anneet Johnseraient supprimés du cache :
+
+Cache::tags(['people', 'authors'])->flush();
+
+En revanche, cette instruction ne supprimerait que les valeurs mises en cache étiquetées authors, Anneelles seraient donc supprimées, mais pasJohn :
+
+Cache::tags('authors')->flush();
+
+Serrures atomiques
+
+Pour utiliser cette fonctionnalité, votre application doit utiliser le pilote de cache memcached, redis, dynamodb, database, fileou arraycomme pilote de cache par défaut de votre application. De plus, tous les serveurs doivent communiquer avec le même serveur de cache central.
+
+
+Prérequis du pilote
+Base de données
+Lorsque vous utilisez le databasepilote de cache, vous devrez configurer une table pour contenir les verrous de cache de votre application. Vous trouverez un exemple Schemade déclaration pour le tableau ci-dessous :
+
+Schema::create('cache_locks', function ($table) {
+    $table->string('key')->primary();
+    $table->string('owner');
+    $table->integer('expiration');
+});
+
+Gestion des verrous
+Les verrous atomiques permettent la manipulation de verrous distribués sans se soucier des conditions de concurrence. Par exemple, Laravel Forge utilise des verrous atomiques pour s'assurer qu'une seule tâche distante est exécutée sur un serveur à la fois. Vous pouvez créer et gérer des verrous en utilisant la Cache::lockméthode :
+
+use Illuminate\Support\Facades\Cache;
+ 
+$lock = Cache::lock('foo', 10);
+ 
+if ($lock->get()) {
+    // Lock acquired for 10 seconds...
+ 
+    $lock->release();
+}
+
+La getméthode accepte également une fermeture. Une fois la fermeture exécutée, Laravel libère automatiquement le verrou :
+
+Cache::lock('foo')->get(function () {
+    // Lock acquired indefinitely and automatically released...
+});
+
+Si le verrou n'est pas disponible au moment où vous le demandez, vous pouvez demander à Laravel d'attendre un nombre de secondes spécifié. Si le verrou ne peut pas être acquis dans le délai imparti, un Illuminate\Contracts\Cache\LockTimeoutExceptionsera lancé :
+
+use Illuminate\Contracts\Cache\LockTimeoutException;
+ 
+$lock = Cache::lock('foo', 10);
+ 
+try {
+    $lock->block(5);
+ 
+    // Lock acquired after waiting a maximum of 5 seconds...
+} catch (LockTimeoutException $e) {
+    // Unable to acquire lock...
+} finally {
+    optional($lock)->release();
+}
+
+L'exemple ci-dessus peut être simplifié en passant une clôture à la blockméthode. Lorsqu'une fermeture est passée à cette méthode, Laravel tentera d'acquérir le verrou pendant le nombre de secondes spécifié et relâchera automatiquement le verrou une fois la fermeture exécutée :
+
+Cache::lock('foo', 10)->block(5, function () {
+    // Lock acquired after waiting a maximum of 5 seconds...
+});
+
+Gestion des verrous à travers les processus
+Parfois, vous souhaiterez peut-être acquérir un verrou dans un processus et le libérer dans un autre processus. Par exemple, vous pouvez acquérir un verrou lors d'une requête Web et souhaiter libérer le verrou à la fin d'une tâche en file d'attente déclenchée par cette requête. Dans ce scénario, vous devez transmettre le « jeton de propriétaire » du verrou à la tâche en file d'attente afin que la tâche puisse réinstancier le verrou à l'aide du jeton donné.
+
+Dans l'exemple ci-dessous, nous allons envoyer une tâche en file d'attente si un verrou est acquis avec succès. De plus, nous transmettrons le jeton du propriétaire du verrou au travail en file d'attente via la ownerméthode du verrou :
+
+$podcast = Podcast::find($id);
+ 
+$lock = Cache::lock('processing', 120);
+ 
+if ($lock->get()) {
+    ProcessPodcast::dispatch($podcast, $lock->owner());
+}
+
+Dans le travail de notre application ProcessPodcast, nous pouvons restaurer et libérer le verrou à l'aide du jeton propriétaire :
+
+Cache::restoreLock('processing', $this->owner)->release();
+
+Si vous souhaitez libérer un verrou sans respecter son propriétaire actuel, vous pouvez utiliser la forceReleaseméthode :
+
+Cache::lock('processing')->forceRelease();
+
+Ajout de pilotes de cache personnalisés
+Écrire le pilote
+Pour créer notre pilote de cache personnalisé, nous devons d'abord implémenter le Illuminate\Contracts\Cache\Store contrat . Ainsi, une implémentation de cache MongoDB pourrait ressembler à ceci :
+
+<?php
+ 
+namespace App\Extensions;
+ 
+use Illuminate\Contracts\Cache\Store;
+ 
+class MongoStore implements Store
+{
+    public function get($key) {}
+    public function many(array $keys) {}
+    public function put($key, $value, $seconds) {}
+    public function putMany(array $values, $seconds) {}
+    public function increment($key, $value = 1) {}
+    public function decrement($key, $value = 1) {}
+    public function forever($key, $value) {}
+    public function forget($key) {}
+    public function flush() {}
+    public function getPrefix() {}
+}
+
+Nous avons juste besoin d'implémenter chacune de ces méthodes en utilisant une connexion MongoDB. Pour un exemple d'implémentation de chacune de ces méthodes, consultez le code source Illuminate\Cache\MemcachedStoredu framework Laravel . Une fois notre implémentation terminée, nous pouvons terminer notre enregistrement de pilote personnalisé en appelant la méthode Cachede la façadeextend :
+
+Cache::extend('mongo', function ($app) {
+    return Cache::repository(new MongoStore);
+});
+
+
+Si vous vous demandez où placer votre code de pilote de cache personnalisé, vous pouvez créer un Extensionsespace de noms dans votre apprépertoire. Cependant, gardez à l'esprit que Laravel n'a pas de structure d'application rigide et que vous êtes libre d'organiser votre application selon vos préférences.
+
+
+Enregistrement du pilote
+Pour enregistrer le pilote de cache personnalisé avec Laravel, nous utiliserons la extendméthode sur la Cachefaçade. Étant donné que d'autres fournisseurs de services peuvent tenter de lire les valeurs mises en cache dans leur bootméthode, nous enregistrerons notre pilote personnalisé dans un bootingrappel. En utilisant le bootingrappel, nous pouvons nous assurer que le pilote personnalisé est enregistré juste avant que la bootméthode ne soit appelée sur les fournisseurs de services de notre application, mais après que la registerméthode soit appelée sur tous les fournisseurs de services. Nous enregistrerons notre bootingrappel dans la registerméthode de la App\Providers\AppServiceProviderclasse de notre application :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Extensions\MongoStore;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\ServiceProvider;
+ 
+class CacheServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        $this->app->booting(function () {
+             Cache::extend('mongo', function ($app) {
+                 return Cache::repository(new MongoStore);
+             });
+         });
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        //
+    }
+}
+
+Le premier argument passé à la extendméthode est le nom du pilote. Cela correspondra à votre driveroption dans le config/cache.phpfichier de configuration. Le deuxième argument est une fermeture qui doit renvoyer une Illuminate\Cache\Repositoryinstance. La fermeture sera transmise à une $appinstance, qui est une instance du conteneur de service .
+
+Une fois votre extension enregistrée, mettez à jour l'option de votre config/cache.phpfichier de configuration driveravec le nom de votre extension.
+
+Événements
+Pour exécuter du code sur chaque opération de cache, vous pouvez écouter les événements déclenchés par le cache. En règle générale, vous devez placer ces écouteurs d'événement dans la App\Providers\EventServiceProviderclasse de votre application :
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Cache\Events\CacheHit' => [
+        'App\Listeners\LogCacheHit',
+    ],
+ 
+    'Illuminate\Cache\Events\CacheMissed' => [
+        'App\Listeners\LogCacheMissed',
+    ],
+ 
+    'Illuminate\Cache\Events\KeyForgotten' => [
+        'App\Listeners\LogKeyForgotten',
+    ],
+ 
+    'Illuminate\Cache\Events\KeyWritten' => [
+        'App\Listeners\LogKeyWritten',
+    ],
+];

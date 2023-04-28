@@ -1,0 +1,1422 @@
+Modèles de lame
+Introduction
+Affichage des données
+Codage d'entité HTML
+Frameworks Blade et JavaScript
+Directives sur les lames
+Si les déclarations
+Instructions de commutation
+Boucles
+La variable de boucle
+Classes conditionnelles
+Attributs supplémentaires
+Inclure les sous-vues
+La @onceDirective
+PHP brut
+commentaires
+Composants
+Composants de rendu
+Transmission de données aux composants
+Attributs des composants
+Mots clés réservés
+Machines à sous
+Vues des composants en ligne
+Composants dynamiques
+Enregistrement manuel des composants
+Composants anonymes
+Composants d'index anonymes
+Propriétés des données / Attributs
+Accéder aux données parentales
+Espaces de noms de composants anonymes
+Plans de construction
+Mises en page à l'aide de composants
+Mises en page utilisant l'héritage de modèle
+Formes
+Champ CSRF
+Champ Méthode
+Erreurs de validation
+Piles
+Injection de services
+Rendu des modèles de lame en ligne
+Lame extensible
+Gestionnaires d'écho personnalisés
+Déclarations If personnalisées
+Introduction
+Blade est le moteur de template simple mais puissant inclus avec Laravel. Contrairement à certains moteurs de création de modèles PHP, Blade ne vous empêche pas d'utiliser du code PHP simple dans vos modèles. En fait, tous les modèles Blade sont compilés en code PHP simple et mis en cache jusqu'à ce qu'ils soient modifiés, ce qui signifie que Blade n'ajoute pratiquement aucune surcharge à votre application. Les fichiers de modèle de lame utilisent l' .blade.phpextension de fichier et sont généralement stockés dans le resources/viewsrépertoire.
+
+Les vues de lame peuvent être renvoyées à partir de routes ou de contrôleurs à l'aide de l' viewassistant global. Bien sûr, comme mentionné dans la documentation sur les vues , les données peuvent être transmises à la vue Blade en utilisant le viewdeuxième argument de l'assistant :
+
+Route::get('/', function () {
+    return view('greeting', ['name' => 'Finn']);
+});
+
+
+Vous voulez faire passer vos modèles Blade au niveau supérieur et créer facilement des interfaces dynamiques ? Découvrez Laravel Livewire .
+
+
+Affichage des données
+Vous pouvez afficher les données transmises à vos vues Blade en enveloppant la variable entre accolades. Par exemple, étant donné l'itinéraire suivant :
+
+Route::get('/', function () {
+    return view('welcome', ['name' => 'Samantha']);
+});
+
+Vous pouvez afficher le contenu de la namevariable comme ceci :
+
+Hello, {{ $name }}.
+
+
+Les instructions d'écho de Blade {{ }}sont automatiquement envoyées via la htmlspecialcharsfonction PHP pour empêcher les attaques XSS.
+
+
+Vous n'êtes pas limité à l'affichage du contenu des variables passées à la vue. Vous pouvez également afficher les résultats de n'importe quelle fonction PHP. En fait, vous pouvez mettre n'importe quel code PHP que vous souhaitez dans une instruction Blade echo :
+
+The current UNIX timestamp is {{ time() }}.
+
+Codage d'entité HTML
+Par défaut, Blade (et l'assistant Laravel e) encodera deux fois les entités HTML. Si vous souhaitez désactiver le double encodage, appelez la Blade::withoutDoubleEncodingméthode à partir de la bootméthode de votre AppServiceProvider:
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Blade::withoutDoubleEncoding();
+    }
+}
+
+Affichage des données sans échappement
+Par défaut, {{ }}les instructions Blade sont automatiquement envoyées via la htmlspecialcharsfonction PHP pour empêcher les attaques XSS. Si vous ne souhaitez pas que vos données soient échappées, vous pouvez utiliser la syntaxe suivante :
+
+Hello, {!! $name !!}.
+
+
+Soyez très prudent lorsque vous répétez le contenu fourni par les utilisateurs de votre application. Vous devez généralement utiliser la syntaxe d'échappement à double accolade pour empêcher les attaques XSS lors de l'affichage des données fournies par l'utilisateur.
+
+
+Frameworks Blade et JavaScript
+Étant donné que de nombreux frameworks JavaScript utilisent également des accolades "curly" pour indiquer qu'une expression donnée doit être affichée dans le navigateur, vous pouvez utiliser le @symbole pour informer le moteur de rendu Blade qu'une expression doit rester intacte. Par exemple:
+
+<h1>Laravel</h1>
+ 
+Hello, @{{ name }}.
+
+Dans cet exemple, le @symbole sera supprimé par Blade ; cependant, {{ name }}l'expression ne sera pas affectée par le moteur Blade, ce qui lui permettra d'être rendue par votre framework JavaScript.
+
+Le @symbole peut également être utilisé pour échapper aux directives Blade :
+
+{{-- Blade template --}}
+@@if()
+ 
+<!-- HTML output -->
+@if()
+
+Rendu JSON
+Parfois, vous pouvez passer un tableau à votre vue avec l'intention de le rendre au format JSON afin d'initialiser une variable JavaScript. Par exemple:
+
+<script>
+    var app = <?php echo json_encode($array); ?>;
+</script>
+
+Cependant, au lieu d'appeler manuellement json_encode, vous pouvez utiliser la Illuminate\Support\Js::fromdirective method . La fromméthode accepte les mêmes arguments que la fonction PHP json_encode; cependant, cela garantira que le JSON résultant est correctement échappé pour être inclus dans les guillemets HTML. La fromméthode renverra une JSON.parseinstruction JavaScript de chaîne qui convertira l'objet ou le tableau donné en un objet JavaScript valide :
+
+<script>
+    var app = {{ Illuminate\Support\Js::from($array) }};
+</script>
+
+Les dernières versions du squelette de l'application Laravel incluent une Jsfaçade, qui offre un accès pratique à cette fonctionnalité dans vos modèles Blade :
+
+<script>
+    var app = {{ Js::from($array) }};
+</script>
+
+
+Vous ne devez utiliser la Js::fromméthode que pour rendre les variables existantes au format JSON. La création de modèles Blade est basée sur des expressions régulières et les tentatives de transmission d'une expression complexe à la directive peuvent entraîner des échecs inattendus.
+
+
+La @verbatimDirective
+Si vous affichez des variables JavaScript dans une grande partie de votre modèle, vous pouvez envelopper le code HTML dans la @verbatimdirective afin de ne pas avoir à préfixer chaque instruction Blade echo avec un @symbole :
+
+@verbatim
+    <div class="container">
+        Hello, {{ name }}.
+    </div>
+@endverbatim
+
+Directives sur les lames
+Outre l'héritage des modèles et l'affichage des données, Blade fournit également des raccourcis pratiques pour les structures de contrôle PHP courantes, telles que les instructions conditionnelles et les boucles. Ces raccourcis offrent une manière très propre et concise de travailler avec les structures de contrôle PHP tout en restant familiers à leurs homologues PHP.
+
+Si les déclarations
+Vous pouvez construire des ifinstructions à l'aide des directives @if, @elseif, @elseet . @endifCes directives fonctionnent de la même manière que leurs homologues PHP :
+
+@if (count($records) === 1)
+    I have one record!
+@elseif (count($records) > 1)
+    I have multiple records!
+@else
+    I don't have any records!
+@endif
+
+Pour plus de commodité, Blade fournit également une @unlessdirective :
+
+@unless (Auth::check())
+    You are not signed in.
+@endunless
+
+En plus des directives conditionnelles déjà discutées, les directives @issetet @emptypeuvent être utilisées comme raccourcis pratiques pour leurs fonctions PHP respectives :
+
+@isset($records)
+    // $records is defined and is not null...
+@endisset
+ 
+@empty($records)
+    // $records is "empty"...
+@endempty
+
+Directives d'authentification
+Les directives @authet @guestpeuvent être utilisées pour déterminer rapidement si l'utilisateur actuel est authentifié ou est un invité :
+
+@auth
+    // The user is authenticated...
+@endauth
+ 
+@guest
+    // The user is not authenticated...
+@endguest
+
+Si nécessaire, vous pouvez spécifier le garde d'authentification qui doit être vérifié lors de l'utilisation des directives @authet :@guest
+
+@auth('admin')
+    // The user is authenticated...
+@endauth
+ 
+@guest('admin')
+    // The user is not authenticated...
+@endguest
+
+Directives environnementales
+Vous pouvez vérifier si l'application s'exécute dans l'environnement de production à l'aide de la @productiondirective :
+
+@production
+    // Production specific content...
+@endproduction
+
+Vous pouvez également déterminer si l'application s'exécute dans un environnement spécifique à l'aide de la @envdirective :
+
+@env('staging')
+    // The application is running in "staging"...
+@endenv
+ 
+@env(['staging', 'production'])
+    // The application is running in "staging" or "production"...
+@endenv
+
+Directives de section
+Vous pouvez déterminer si une section d'héritage de modèle a du contenu à l'aide de la @hasSectiondirective :
+
+@hasSection('navigation')
+    <div class="pull-right">
+        @yield('navigation')
+    </div>
+ 
+    <div class="clearfix"></div>
+@endif
+
+Vous pouvez utiliser la sectionMissingdirective pour déterminer si une section n'a pas de contenu :
+
+@sectionMissing('navigation')
+    <div class="pull-right">
+        @include('default-navigation')
+    </div>
+@endif
+
+Instructions de commutation
+Les instructions switch peuvent être construites à l'aide des directives , @switch, @caseet @break:@default@endswitch
+
+@switch($i)
+    @case(1)
+        First case...
+        @break
+ 
+    @case(2)
+        Second case...
+        @break
+ 
+    @default
+        Default case...
+@endswitch
+
+Boucles
+En plus des instructions conditionnelles, Blade fournit des directives simples pour travailler avec les structures de boucle de PHP. Encore une fois, chacune de ces directives fonctionne de manière identique à leurs homologues PHP :
+
+@for ($i = 0; $i < 10; $i++)
+    The current value is {{ $i }}
+@endfor
+ 
+@foreach ($users as $user)
+    <p>This is user {{ $user->id }}</p>
+@endforeach
+ 
+@forelse ($users as $user)
+    <li>{{ $user->name }}</li>
+@empty
+    <p>No users</p>
+@endforelse
+ 
+@while (true)
+    <p>I'm looping forever.</p>
+@endwhile
+
+
+Lors de l'itération dans une foreachboucle, vous pouvez utiliser la variable de boucle pour obtenir des informations précieuses sur la boucle, par exemple si vous êtes dans la première ou la dernière itération de la boucle.
+
+
+Lorsque vous utilisez des boucles, vous pouvez également ignorer l'itération en cours ou terminer la boucle à l'aide des directives @continueet :@break
+
+@foreach ($users as $user)
+    @if ($user->type == 1)
+        @continue
+    @endif
+ 
+    <li>{{ $user->name }}</li>
+ 
+    @if ($user->number == 5)
+        @break
+    @endif
+@endforeach
+
+Vous pouvez également inclure la condition de continuation ou de rupture dans la déclaration de la directive :
+
+@foreach ($users as $user)
+    @continue($user->type == 1)
+ 
+    <li>{{ $user->name }}</li>
+ 
+    @break($user->number == 5)
+@endforeach
+
+La variable de boucle
+Lors de l'itération dans une foreachboucle, une $loopvariable sera disponible à l'intérieur de votre boucle. Cette variable permet d'accéder à certaines informations utiles telles que l'index de la boucle actuelle et s'il s'agit de la première ou de la dernière itération dans la boucle :
+
+@foreach ($users as $user)
+    @if ($loop->first)
+        This is the first iteration.
+    @endif
+ 
+    @if ($loop->last)
+        This is the last iteration.
+    @endif
+ 
+    <p>This is user {{ $user->id }}</p>
+@endforeach
+
+Si vous êtes dans une boucle imbriquée, vous pouvez accéder à la $loopvariable de la boucle parent via la parentpropriété :
+
+@foreach ($users as $user)
+    @foreach ($user->posts as $post)
+        @if ($loop->parent->first)
+            This is the first iteration of the parent loop.
+        @endif
+    @endforeach
+@endforeach
+
+La $loopvariable contient également une variété d'autres propriétés utiles :
+
+Propriété	La description
+$loop->index	L'index de l'itération de la boucle en cours (commence à 0).
+$loop->iteration	L'itération de la boucle en cours (commence à 1).
+$loop->remaining	Les itérations restant dans la boucle.
+$loop->count	Le nombre total d'éléments dans le tableau en cours d'itération.
+$loop->first	S'il s'agit de la première itération de la boucle.
+$loop->last	S'il s'agit de la dernière itération de la boucle.
+$loop->even	S'il s'agit d'une itération paire dans la boucle.
+$loop->odd	S'il s'agit d'une itération impaire dans la boucle.
+$loop->depth	Le niveau d'imbrication de la boucle en cours.
+$loop->parent	Dans une boucle imbriquée, la variable de boucle du parent.
+Classes conditionnelles
+La @classdirective compile conditionnellement une chaîne de classe CSS. La directive accepte un tableau de classes où la clé du tableau contient la ou les classes que vous souhaitez ajouter, tandis que la valeur est une expression booléenne. Si l'élément de tableau a une clé numérique, il sera toujours inclus dans la liste de classe rendue :
+
+@php
+    $isActive = false;
+    $hasError = true;
+@endphp
+ 
+<span @class([
+    'p-4',
+    'font-bold' => $isActive,
+    'text-gray-500' => ! $isActive,
+    'bg-red' => $hasError,
+])></span>
+ 
+<span class="p-4 text-gray-500 bg-red"></span>
+
+Attributs supplémentaires
+Pour plus de commodité, vous pouvez utiliser la @checkeddirective pour indiquer facilement si une entrée de case à cocher HTML donnée est "cochée". Cette directive fera écho checkedsi la condition fournie est évaluée àtrue :
+
+<input type="checkbox"
+        name="active"
+        value="active"
+        @checked(old('active', $user->active)) />
+
+De même, la @selecteddirective peut être utilisée pour indiquer si une option de sélection donnée doit être "sélectionnée":
+
+<select name="version">
+    @foreach ($product->versions as $version)
+        <option value="{{ $version }}" @selected(old('version') == $version)>
+            {{ $version }}
+        </option>
+    @endforeach
+</select>
+
+De plus, la @disableddirective peut être utilisée pour indiquer si un élément donné doit être "désactivé":
+
+<button type="submit" @disabled($errors->isNotEmpty())>Submit</button>
+
+De plus, la @readonlydirective peut être utilisée pour indiquer si un élément donné doit être "en lecture seule":
+
+<input type="email"
+        name="email"
+        value="email@laravel.com"
+        @readonly($user->isNotAdmin()) />
+
+De plus, la @requireddirective peut être utilisée pour indiquer si un élément donné doit être "requis":
+
+<input type="text"
+        name="title"
+        value="title"
+        @required($user->isAdmin()) />
+
+Inclure les sous-vues
+
+Bien que vous soyez libre d'utiliser la directive, les composants@include Blade fournissent des fonctionnalités similaires et offrent plusieurs avantages par rapport à la directive, tels que la liaison de données et d'attributs.@include
+
+
+La directive de Blade @includevous permet d'inclure une vue Blade à partir d'une autre vue. Toutes les variables disponibles pour la vue parente seront mises à disposition de la vue incluse :
+
+<div>
+    @include('shared.errors')
+ 
+    <form>
+        <!-- Form Contents -->
+    </form>
+</div>
+
+Même si la vue incluse héritera de toutes les données disponibles dans la vue parente, vous pouvez également transmettre un tableau de données supplémentaires qui doivent être mises à la disposition de la vue incluse :
+
+@include('view.name', ['status' => 'complete'])
+
+Si vous essayez @includeune vue qui n'existe pas, Laravel lancera une erreur. Si vous souhaitez inclure une vue qui peut être présente ou non, vous devez utiliser la @includeIfdirective :
+
+@includeIf('view.name', ['status' => 'complete'])
+
+Si vous souhaitez @includevoir si une expression booléenne donnée est évaluée à trueou false, vous pouvez utiliser les directives @includeWhenet :@includeUnless
+
+@includeWhen($boolean, 'view.name', ['status' => 'complete'])
+ 
+@includeUnless($boolean, 'view.name', ['status' => 'complete'])
+
+Pour inclure la première vue qui existe à partir d'un tableau de vues donné, vous pouvez utiliser la includeFirstdirective :
+
+@includeFirst(['custom.admin', 'admin'], ['status' => 'complete'])
+
+
+Vous devez éviter d'utiliser les constantes __DIR__et dans vos vues Blade, car elles feront référence à l'emplacement de la vue compilée en cache.__FILE__
+
+
+Rendu des vues pour les collections
+@eachVous pouvez combiner des boucles et des inclusions en une seule ligne avec la directive de Blade :
+
+@each('view.name', $jobs, 'job')
+
+Le @eachpremier argument de la directive est la vue à afficher pour chaque élément du tableau ou de la collection. Le deuxième argument est le tableau ou la collection sur laquelle vous souhaitez itérer, tandis que le troisième argument est le nom de la variable qui sera attribué à l'itération actuelle dans la vue. Ainsi, par exemple, si vous itérez sur un tableau de jobs, vous souhaiterez généralement accéder à chaque travail en tant que jobvariable dans la vue. La clé de tableau pour l'itération actuelle sera disponible en tant que keyvariable dans la vue.
+
+Vous pouvez également passer un quatrième argument à la @eachdirective. Cet argument détermine la vue qui sera rendue si le tableau donné est vide.
+
+@each('view.name', $jobs, 'job', 'view.empty')
+
+
+Les vues rendues via @eachn'héritent pas des variables de la vue parent. Si la vue enfant nécessite ces variables, vous devez utiliser les directives @foreachet à la place.@include
+
+
+La @onceDirective
+La @oncedirective vous permet de définir une partie du modèle qui ne sera évaluée qu'une seule fois par cycle de rendu. Cela peut être utile pour pousser un morceau de JavaScript donné dans l'en-tête de la page à l'aide de stacks . Par exemple, si vous rendez un composant donné dans une boucle, vous souhaiterez peut-être pousser le JavaScript vers l'en-tête uniquement la première fois que le composant est rendu :
+
+@once
+    @push('scripts')
+        <script>
+            // Your custom JavaScript...
+        </script>
+    @endpush
+@endonce
+
+Étant donné que la @oncedirective est souvent utilisée conjointement avec les directives @pushou @prepend, les directives @pushOnceet @prependOncesont disponibles pour votre commodité :
+
+@pushOnce('scripts')
+    <script>
+        // Your custom JavaScript...
+    </script>
+@endPushOnce
+
+PHP brut
+Dans certaines situations, il est utile d'intégrer du code PHP dans vos vues. Vous pouvez utiliser la directive Blade @phppour exécuter un bloc de PHP simple dans votre modèle :
+
+@php
+    $counter = 1;
+@endphp
+
+commentaires
+Blade vous permet également de définir des commentaires dans vos vues. Cependant, contrairement aux commentaires HTML, les commentaires Blade ne sont pas inclus dans le code HTML renvoyé par votre application :
+
+{{-- This comment will not be present in the rendered HTML --}}
+
+Composants
+Les composants et les emplacements offrent des avantages similaires aux sections, aux mises en page et aux inclusions ; cependant, certains peuvent trouver le modèle mental des composants et des emplacements plus facile à comprendre. Il existe deux approches pour écrire des composants : les composants basés sur des classes et les composants anonymes.
+
+Pour créer un composant basé sur une classe, vous pouvez utiliser la make:componentcommande Artisan. Pour illustrer comment utiliser les composants, nous allons créer un Alertcomposant simple. La make:componentcommande placera le composant dans le app/View/Componentsrépertoire :
+
+php artisan make:component Alert
+
+La make:componentcommande créera également un modèle de vue pour le composant. La vue sera placée dans le resources/views/componentsrépertoire. Lors de l'écriture de composants pour votre propre application, les composants sont automatiquement découverts dans le app/View/Componentsrépertoire et le resources/views/componentsrépertoire, de sorte qu'aucun autre enregistrement de composant n'est généralement requis.
+
+Vous pouvez également créer des composants dans des sous-répertoires :
+
+php artisan make:component Forms/Input
+
+La commande ci-dessus créera un Inputcomposant dans le app/View/Components/Formsrépertoire et la vue sera placée dans le resources/views/components/formsrépertoire.
+
+Si vous souhaitez créer un composant anonyme (un composant avec uniquement un modèle Blade et aucune classe), vous pouvez utiliser le --viewdrapeau lors de l'appel de la make:componentcommande :
+
+php artisan make:component forms.input --view
+
+La commande ci-dessus créera un fichier Blade resources/views/components/forms/input.blade.phpqui peut être rendu en tant que composant via <x-forms.input />.
+
+Enregistrement manuel des composants du package
+Lors de l'écriture de composants pour votre propre application, les composants sont automatiquement découverts dans le app/View/Componentsrépertoire et le resources/views/componentsrépertoire.
+
+Cependant, si vous construisez un package qui utilise des composants Blade, vous devrez enregistrer manuellement votre classe de composant et son alias de balise HTML. Vous devez généralement enregistrer vos composants dans la bootméthode du fournisseur de services de votre package :
+
+use Illuminate\Support\Facades\Blade;
+ 
+/**
+ * Bootstrap your package's services.
+ */
+public function boot()
+{
+    Blade::component('package-alert', Alert::class);
+}
+
+Une fois votre composant enregistré, il peut être rendu à l'aide de son alias de balise :
+
+<x-package-alert/>
+
+Vous pouvez également utiliser la componentNamespaceméthode pour charger automatiquement les classes de composants par convention. Par exemple, un Nightshadepackage peut avoir Calendaret des ColorPickercomposants résidant dans l' espace de Package\Views\Componentsnoms :
+
+use Illuminate\Support\Facades\Blade;
+ 
+/**
+ * Bootstrap your package's services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::componentNamespace('Nightshade\\Views\\Components', 'nightshade');
+}
+
+Cela permettra l'utilisation des composants du package par leur espace de noms de fournisseur en utilisant la package-name::syntaxe :
+
+<x-nightshade::calendar />
+<x-nightshade::color-picker />
+
+Blade détectera automatiquement la classe liée à ce composant en mettant en pascal le nom du composant. Les sous-répertoires sont également pris en charge en utilisant la notation "point".
+
+Composants de rendu
+Pour afficher un composant, vous pouvez utiliser une balise de composant Blade dans l'un de vos modèles Blade. Les balises des composants de lame commencent par la chaîne x-suivie du nom du boîtier kebab de la classe de composant :
+
+<x-alert/>
+ 
+<x-user-profile/>
+
+Si la classe de composant est imbriquée plus profondément dans le app/View/Componentsrépertoire, vous pouvez utiliser le .caractère pour indiquer l'imbrication du répertoire. Par exemple, si nous supposons qu'un composant est situé à app/View/Components/Inputs/Button.php, nous pouvons le rendre ainsi :
+
+<x-inputs.button/>
+
+Transmission de données aux composants
+Vous pouvez transmettre des données aux composants Blade à l'aide d'attributs HTML. Des valeurs primitives codées en dur peuvent être transmises au composant à l'aide de simples chaînes d'attributs HTML. Les expressions et variables PHP doivent être transmises au composant via des attributs qui utilisent le :caractère comme préfixe :
+
+<x-alert type="error" :message="$message"/>
+
+Vous devez définir tous les attributs de données du composant dans son constructeur de classe. Toutes les propriétés publiques d'un composant seront automatiquement mises à la disposition de la vue du composant. Il n'est pas nécessaire de transmettre les données à la vue à partir de la renderméthode du composant :
+
+<?php
+ 
+namespace App\View\Components;
+ 
+use Illuminate\View\Component;
+ 
+class Alert extends Component
+{
+    /**
+     * The alert type.
+     *
+     * @var string
+     */
+    public $type;
+ 
+    /**
+     * The alert message.
+     *
+     * @var string
+     */
+    public $message;
+ 
+    /**
+     * Create the component instance.
+     *
+     * @param  string  $type
+     * @param  string  $message
+     * @return void
+     */
+    public function __construct($type, $message)
+    {
+        $this->type = $type;
+        $this->message = $message;
+    }
+ 
+    /**
+     * Get the view / contents that represent the component.
+     *
+     * @return \Illuminate\View\View|\Closure|string
+     */
+    public function render()
+    {
+        return view('components.alert');
+    }
+}
+
+Lorsque votre composant est rendu, vous pouvez afficher le contenu des variables publiques de votre composant en répercutant les variables par leur nom :
+
+<div class="alert alert-{{ $type }}">
+    {{ $message }}
+</div>
+
+Enveloppe
+Les arguments du constructeur de composant doivent être spécifiés à l'aide de camelCase, tandis que kebab-casedoivent être utilisés lors du référencement des noms d'arguments dans vos attributs HTML. Par exemple, étant donné le constructeur de composants suivant :
+
+/**
+ * Create the component instance.
+ *
+ * @param  string  $alertType
+ * @return void
+ */
+public function __construct($alertType)
+{
+    $this->alertType = $alertType;
+}
+
+L' $alertTypeargument peut être fourni au composant comme ceci :
+
+<x-alert alert-type="danger" />
+
+Échapper au rendu d'attribut
+Étant donné que certains frameworks JavaScript tels que Alpine.js utilisent également des attributs préfixés par deux-points, vous pouvez utiliser un ::préfixe deux-points ( ) pour informer Blade que l'attribut n'est pas une expression PHP. Par exemple, étant donné le composant suivant :
+
+<x-button ::class="{ danger: isDeleting }">
+    Submit
+</x-button>
+
+Le code HTML suivant sera rendu par Blade :
+
+<button :class="{ danger: isDeleting }">
+    Submit
+</button>
+
+Méthodes des composants
+En plus des variables publiques disponibles pour votre modèle de composant, toutes les méthodes publiques du composant peuvent être appelées. Par exemple, imaginez un composant qui a une isSelectedméthode :
+
+/**
+ * Determine if the given option is the currently selected option.
+ *
+ * @param  string  $option
+ * @return bool
+ */
+public function isSelected($option)
+{
+    return $option === $this->selected;
+}
+
+Vous pouvez exécuter cette méthode à partir de votre modèle de composant en invoquant la variable correspondant au nom de la méthode :
+
+<option {{ $isSelected($value) ? 'selected="selected"' : '' }} value="{{ $value }}">
+    {{ $label }}
+</option>
+
+Accès aux attributs et aux emplacements dans les classes de composants
+Les composants blade vous permettent également d'accéder au nom, aux attributs et à l'emplacement du composant dans la méthode de rendu de la classe. Cependant, pour accéder à ces données, vous devez renvoyer une fermeture de la renderméthode de votre composant. La fermeture recevra un $datatableau comme seul argument. Ce tableau contiendra plusieurs éléments qui fournissent des informations sur le composant :
+
+/**
+ * Get the view / contents that represent the component.
+ *
+ * @return \Illuminate\View\View|\Closure|string
+ */
+public function render()
+{
+    return function (array $data) {
+        // $data['componentName'];
+        // $data['attributes'];
+        // $data['slot'];
+ 
+        return '<div>Components content</div>';
+    };
+}
+
+Le componentNameest égal au nom utilisé dans la balise HTML après le x-préfixe. Ainsi <x-alert />en componentNamesera-t-il alert. L' attributesélément contiendra tous les attributs qui étaient présents sur la balise HTML. L' slotélément est une Illuminate\Support\HtmlStringinstance avec le contenu de l'emplacement du composant.
+
+La fermeture doit renvoyer une chaîne. Si la chaîne renvoyée correspond à une vue existante, cette vue sera rendue ; sinon, la chaîne renvoyée sera évaluée comme une vue Blade en ligne.
+
+Dépendances supplémentaires
+Si votre composant nécessite des dépendances du conteneur de service de Laravel , vous pouvez les lister avant l'un des attributs de données du composant et elles seront automatiquement injectées par le conteneur :
+
+use App\Services\AlertCreator;
+ 
+/**
+ * Create the component instance.
+ *
+ * @param  \App\Services\AlertCreator  $creator
+ * @param  string  $type
+ * @param  string  $message
+ * @return void
+ */
+public function __construct(AlertCreator $creator, $type, $message)
+{
+    $this->creator = $creator;
+    $this->type = $type;
+    $this->message = $message;
+}
+
+Masquer les attributs/méthodes
+Si vous souhaitez empêcher certaines méthodes ou propriétés publiques d'être exposées en tant que variables à votre modèle de composant, vous pouvez les ajouter à une $exceptpropriété de tableau sur votre composant :
+
+<?php
+ 
+namespace App\View\Components;
+ 
+use Illuminate\View\Component;
+ 
+class Alert extends Component
+{
+    /**
+     * The alert type.
+     *
+     * @var string
+     */
+    public $type;
+ 
+    /**
+     * The properties / methods that should not be exposed to the component template.
+     *
+     * @var array
+     */
+    protected $except = ['type'];
+}
+
+Attributs des composants
+Nous avons déjà examiné comment transmettre des attributs de données à un composant ; cependant, vous devrez parfois spécifier des attributs HTML supplémentaires, tels que class, qui ne font pas partie des données requises pour le fonctionnement d'un composant. Généralement, vous souhaitez transmettre ces attributs supplémentaires à l'élément racine du modèle de composant. Par exemple, imaginons que nous voulions rendre un alertcomposant comme ceci :
+
+<x-alert type="error" :message="$message" class="mt-4"/>
+
+Tous les attributs qui ne font pas partie du constructeur du composant seront automatiquement ajoutés au "sac d'attributs" du composant. Cet attribut bag est automatiquement mis à la disposition du composant via la $attributesvariable. Tous les attributs peuvent être rendus dans le composant en faisant écho à cette variable :
+
+<div {{ $attributes }}>
+    <!-- Component content -->
+</div>
+
+
+L'utilisation de directives telles que @envles balises de composant n'est pas prise en charge pour le moment. Par exemple, <x-alert :live="@env('production')"/>ne sera pas compilé.
+
+
+Attributs par défaut/fusionnés
+Parfois, vous devrez peut-être spécifier des valeurs par défaut pour les attributs ou fusionner des valeurs supplémentaires dans certains des attributs du composant. Pour ce faire, vous pouvez utiliser la méthode de l'attribut bag merge. Cette méthode est particulièrement utile pour définir un ensemble de classes CSS par défaut qui doivent toujours être appliquées à un composant :
+
+<div {{ $attributes->merge(['class' => 'alert alert-'.$type]) }}>
+    {{ $message }}
+</div>
+
+Si nous supposons que ce composant est utilisé comme ceci :
+
+<x-alert type="error" :message="$message" class="mb-4"/>
+
+Le rendu HTML final du composant apparaîtra comme suit :
+
+<div class="alert alert-error mb-4">
+    <!-- Contents of the $message variable -->
+</div>
+
+Fusionner conditionnellement des classes
+Parfois, vous souhaiterez peut-être fusionner des classes si une condition donnée est true. Vous pouvez accomplir cela via la classméthode, qui accepte un tableau de classes où la clé du tableau contient la ou les classes que vous souhaitez ajouter, tandis que la valeur est une expression booléenne. Si l'élément de tableau a une clé numérique, il sera toujours inclus dans la liste de classe rendue :
+
+<div {{ $attributes->class(['p-4', 'bg-red' => $hasError]) }}>
+    {{ $message }}
+</div>
+
+Si vous avez besoin de fusionner d'autres attributs sur votre composant, vous pouvez enchaîner la mergeméthode sur la classméthode :
+
+<button {{ $attributes->class(['p-4'])->merge(['type' => 'button']) }}>
+    {{ $slot }}
+</button>
+
+
+Si vous avez besoin de compiler conditionnellement des classes sur d'autres éléments HTML qui ne doivent pas recevoir d'attributs fusionnés, vous pouvez utiliser la @classdirective .
+
+
+Fusion d'attributs hors classe
+Lors de la fusion d'attributs qui ne sont pas des classattributs, les valeurs fournies à la mergeméthode seront considérées comme les valeurs "par défaut" de l'attribut. Cependant, contrairement à l' classattribut, ces attributs ne seront pas fusionnés avec les valeurs d'attribut injectées. Au lieu de cela, ils seront écrasés. Par exemple, buttonl'implémentation d'un composant peut ressembler à ceci :
+
+<button {{ $attributes->merge(['type' => 'button']) }}>
+    {{ $slot }}
+</button>
+
+Pour rendre le composant de bouton avec un custom type, il peut être spécifié lors de la consommation du composant. Si aucun type n'est spécifié, le buttontype sera utilisé :
+
+<x-button type="submit">
+    Submit
+</x-button>
+
+Le rendu HTML du buttoncomposant dans cet exemple serait :
+
+<button type="submit">
+    Submit
+</button>
+
+Si vous souhaitez qu'un attribut autre que classsa valeur par défaut et ses valeurs injectées soient jointes, vous pouvez utiliser la prependsméthode . Dans cet exemple, l' data-controllerattribut commencera toujours par profile-controlleret toutes les valeurs injectées supplémentaires data-controllerseront placées après cette valeur par défaut :
+
+<div {{ $attributes->merge(['data-controller' => $attributes->prepends('profile-controller')]) }}>
+    {{ $slot }}
+</div>
+
+Récupération et filtrage des attributs
+Vous pouvez filtrer les attributs à l'aide de la filterméthode. Cette méthode accepte une fermeture qui devrait revenir truesi vous souhaitez conserver l'attribut dans le sac d'attribut :
+
+{{ $attributes->filter(fn ($value, $key) => $key == 'foo') }}
+
+Pour plus de commodité, vous pouvez utiliser la whereStartsWithméthode pour récupérer tous les attributs dont les clés commencent par une chaîne donnée :
+
+{{ $attributes->whereStartsWith('wire:model') }}
+
+Inversement, la whereDoesntStartWithméthode peut être utilisée pour exclure tous les attributs dont les clés commencent par une chaîne donnée :
+
+{{ $attributes->whereDoesntStartWith('wire:model') }}
+
+En utilisant la firstméthode, vous pouvez restituer le premier attribut dans un sac d'attributs donné :
+
+{{ $attributes->whereStartsWith('wire:model')->first() }}
+
+Si vous souhaitez vérifier si un attribut est présent sur le composant, vous pouvez utiliser la hasméthode. Cette méthode accepte le nom de l'attribut comme seul argument et renvoie un booléen indiquant si l'attribut est présent ou non :
+
+@if ($attributes->has('class'))
+    <div>Class attribute is present</div>
+@endif
+
+Vous pouvez récupérer la valeur d'un attribut spécifique en utilisant la getméthode :
+
+{{ $attributes->get('class') }}
+
+Mots clés réservés
+Par défaut, certains mots clés sont réservés à l'usage interne de Blade afin de rendre les composants. Les mots clés suivants ne peuvent pas être définis en tant que propriétés publiques ou noms de méthode dans vos composants :
+
+data
+render
+resolveView
+shouldRender
+view
+withAttributes
+withName
+Machines à sous
+Vous aurez souvent besoin de transmettre du contenu supplémentaire à votre composant via des "slots". Les emplacements de composants sont rendus en faisant écho à la $slotvariable. Pour explorer ce concept, imaginons qu'un alertcomposant ait le balisage suivant :
+
+<!-- /resources/views/components/alert.blade.php -->
+ 
+<div class="alert alert-danger">
+    {{ $slot }}
+</div>
+
+Nous pouvons transmettre du contenu au sloten injectant du contenu dans le composant :
+
+<x-alert>
+    <strong>Whoops!</strong> Something went wrong!
+</x-alert>
+
+Parfois, un composant peut avoir besoin de rendre plusieurs emplacements différents à différents endroits du composant. Modifions notre composant alert pour permettre l'injection d'un slot "title":
+
+<!-- /resources/views/components/alert.blade.php -->
+ 
+<span class="alert-title">{{ $title }}</span>
+ 
+<div class="alert alert-danger">
+    {{ $slot }}
+</div>
+
+Vous pouvez définir le contenu de l'emplacement nommé à l'aide de la x-slotbalise. Tout contenu ne figurant pas dans une balise explicite x-slotsera transmis au composant dans la $slotvariable :
+
+<x-alert>
+    <x-slot:title>
+        Server Error
+    </x-slot>
+ 
+    <strong>Whoops!</strong> Something went wrong!
+</x-alert>
+
+Machines à sous délimitées
+Si vous avez utilisé un framework JavaScript tel que Vue, vous connaissez peut-être les "emplacements de portée", qui vous permettent d'accéder aux données ou aux méthodes du composant dans votre emplacement. Vous pouvez obtenir un comportement similaire dans Laravel en définissant des méthodes ou des propriétés publiques sur votre composant et en accédant au composant dans votre emplacement via la $componentvariable. Dans cet exemple, nous supposerons que le x-alertcomposant a une formatAlertméthode publique définie sur sa classe de composant :
+
+<x-alert>
+    <x-slot:title>
+        {{ $component->formatAlert('Server Error') }}
+    </x-slot>
+ 
+    <strong>Whoops!</strong> Something went wrong!
+</x-alert>
+
+Attributs d'emplacement
+Comme les composants Blade, vous pouvez attribuer des attributs supplémentaires aux emplacements tels que les noms de classe CSS :
+
+<x-card class="shadow-sm">
+    <x-slot:heading class="font-bold">
+        Heading
+    </x-slot>
+ 
+    Content
+ 
+    <x-slot:footer class="text-sm">
+        Footer
+    </x-slot>
+</x-card>
+
+Pour interagir avec les attributs d'emplacement, vous pouvez accéder à la attributespropriété de la variable de l'emplacement. Pour plus d'informations sur la façon d'interagir avec les attributs, veuillez consulter la documentation sur les attributs des composants :
+
+@props([
+    'heading',
+    'footer',
+])
+ 
+<div {{ $attributes->class(['border']) }}>
+    <h1 {{ $heading->attributes->class(['text-lg']) }}>
+        {{ $heading }}
+    </h1>
+ 
+    {{ $slot }}
+ 
+    <footer {{ $footer->attributes->class(['text-gray-700']) }}>
+        {{ $footer }}
+    </footer>
+</div>
+
+Vues des composants en ligne
+Pour les très petits composants, il peut sembler fastidieux de gérer à la fois la classe de composant et le modèle de vue du composant. Pour cette raison, vous pouvez renvoyer le balisage du composant directement depuis la renderméthode :
+
+/**
+ * Get the view / contents that represent the component.
+ *
+ * @return \Illuminate\View\View|\Closure|string
+ */
+public function render()
+{
+    return <<<'blade'
+        <div class="alert alert-danger">
+            {{ $slot }}
+        </div>
+    blade;
+}
+
+Génération de composants de vue en ligne
+Pour créer un composant qui restitue une vue en ligne, vous pouvez utiliser l' inlineoption lors de l'exécution de la make:componentcommande :
+
+php artisan make:component Alert --inline
+
+Composants dynamiques
+Parfois, vous devrez peut-être rendre un composant sans savoir quel composant doit être rendu avant l'exécution. Dans cette situation, vous pouvez utiliser le composant intégré de Laravel dynamic-componentpour rendre le composant basé sur une valeur ou une variable d'exécution :
+
+<x-dynamic-component :component="$componentName" class="mt-4" />
+
+Enregistrement manuel des composants
+
+La documentation suivante sur l'enregistrement manuel des composants s'applique principalement à ceux qui écrivent des packages Laravel qui incluent des composants de vue. Si vous n'écrivez pas de package, cette partie de la documentation du composant peut ne pas vous concerner.
+
+
+Lors de l'écriture de composants pour votre propre application, les composants sont automatiquement découverts dans le app/View/Componentsrépertoire et le resources/views/componentsrépertoire.
+
+Cependant, si vous construisez un package qui utilise des composants Blade ou placez des composants dans des répertoires non conventionnels, vous devrez enregistrer manuellement votre classe de composant et son alias de balise HTML afin que Laravel sache où trouver le composant. Vous devez généralement enregistrer vos composants dans la bootméthode du fournisseur de services de votre package :
+
+use Illuminate\Support\Facades\Blade;
+use VendorPackage\View\Components\AlertComponent;
+ 
+/**
+ * Bootstrap your package's services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::component('package-alert', AlertComponent::class);
+}
+
+Une fois votre composant enregistré, il peut être rendu à l'aide de son alias de balise :
+
+<x-package-alert/>
+
+Chargement automatique des composants de package
+Vous pouvez également utiliser la componentNamespaceméthode pour charger automatiquement les classes de composants par convention. Par exemple, un Nightshadepackage peut avoir Calendaret des ColorPickercomposants résidant dans l' espace de Package\Views\Componentsnoms :
+
+use Illuminate\Support\Facades\Blade;
+ 
+/**
+ * Bootstrap your package's services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::componentNamespace('Nightshade\\Views\\Components', 'nightshade');
+}
+
+Cela permettra l'utilisation des composants du package par leur espace de noms de fournisseur en utilisant la package-name::syntaxe :
+
+<x-nightshade::calendar />
+<x-nightshade::color-picker />
+
+Blade détectera automatiquement la classe liée à ce composant en mettant en pascal le nom du composant. Les sous-répertoires sont également pris en charge en utilisant la notation "point".
+
+Composants anonymes
+Semblables aux composants en ligne, les composants anonymes fournissent un mécanisme de gestion d'un composant via un seul fichier. Cependant, les composants anonymes utilisent un seul fichier de vue et n'ont pas de classe associée. Pour définir un composant anonyme, il suffit de placer un template Blade dans votre resources/views/componentsrépertoire. Par exemple, en supposant que vous avez défini un composant à resources/views/components/alert.blade.php, vous pouvez simplement le restituer comme suit :
+
+<x-alert/>
+
+Vous pouvez utiliser le .caractère pour indiquer si un composant est imbriqué plus profondément dans le componentsrépertoire. Par exemple, en supposant que le composant est défini à resources/views/components/inputs/button.blade.php, vous pouvez le rendre ainsi :
+
+<x-inputs.button/>
+
+Composants d'index anonymes
+Parfois, lorsqu'un composant est composé de plusieurs templates de Blade, vous souhaiterez peut-être regrouper les templates du composant donné dans un même répertoire. Par exemple, imaginez un composant "accordéon" avec la structure de répertoires suivante :
+
+/resources/views/components/accordion.blade.php
+/resources/views/components/accordion/item.blade.php
+
+Cette structure de répertoire vous permet de rendre le composant accordéon et son élément comme suit :
+
+<x-accordion>
+    <x-accordion.item>
+        ...
+    </x-accordion.item>
+</x-accordion>
+
+Cependant, afin de rendre le composant accordéon via x-accordion, nous avons été obligés de placer le modèle de composant accordéon "index" dans le resources/views/componentsrépertoire au lieu de l'imbriquer dans le accordionrépertoire avec les autres modèles liés à l'accordéon.
+
+Heureusement, Blade vous permet de placer un index.blade.phpfichier dans le répertoire de modèles d'un composant. Lorsqu'un index.blade.phpmodèle existe pour le composant, il sera rendu en tant que nœud "racine" du composant. Ainsi, nous pouvons continuer à utiliser la même syntaxe Blade donnée dans l'exemple ci-dessus ; cependant, nous ajusterons notre structure de répertoires comme ceci :
+
+/resources/views/components/accordion/index.blade.php
+/resources/views/components/accordion/item.blade.php
+
+Propriétés des données / Attributs
+Étant donné que les composants anonymes n'ont pas de classe associée, vous pouvez vous demander comment différencier les données à transmettre au composant en tant que variables et les attributs à placer dans l' attribut bag du composant .
+
+Vous pouvez spécifier quels attributs doivent être considérés comme des variables de données à l'aide de la @propsdirective en haut du modèle Blade de votre composant. Tous les autres attributs du composant seront disponibles via le sac d'attributs du composant. Si vous souhaitez attribuer une valeur par défaut à une variable de données, vous pouvez spécifier le nom de la variable comme clé du tableau et la valeur par défaut comme valeur du tableau :
+
+<!-- /resources/views/components/alert.blade.php -->
+ 
+@props(['type' => 'info', 'message'])
+ 
+<div {{ $attributes->merge(['class' => 'alert alert-'.$type]) }}>
+    {{ $message }}
+</div>
+
+Compte tenu de la définition du composant ci-dessus, nous pouvons rendre le composant comme suit :
+
+<x-alert type="error" :message="$message" class="mb-4"/>
+
+Accéder aux données parentales
+Parfois, vous souhaiterez peut-être accéder aux données d'un composant parent à l'intérieur d'un composant enfant. Dans ces cas, vous pouvez utiliser la @awaredirective. Par exemple, imaginons que nous construisions un composant de menu complexe composé d'un parent <x-menu>et d'un enfant<x-menu.item> :
+
+<x-menu color="purple">
+    <x-menu.item>...</x-menu.item>
+    <x-menu.item>...</x-menu.item>
+</x-menu>
+
+Le <x-menu>composant peut avoir une implémentation comme celle-ci :
+
+<!-- /resources/views/components/menu/index.blade.php -->
+ 
+@props(['color' => 'gray'])
+ 
+<ul {{ $attributes->merge(['class' => 'bg-'.$color.'-200']) }}>
+    {{ $slot }}
+</ul>
+
+Étant donné que l' coloraccessoire n'a été transmis qu'au parent ( <x-menu>), il ne sera pas disponible à l'intérieur de <x-menu.item>. Cependant, si nous utilisons la @awaredirective, nous pouvons également la rendre disponible à l'intérieur<x-menu.item> :
+
+<!-- /resources/views/components/menu/item.blade.php -->
+ 
+@aware(['color' => 'gray'])
+ 
+<li {{ $attributes->merge(['class' => 'text-'.$color.'-800']) }}>
+    {{ $slot }}
+</li>
+
+
+La @awaredirective ne peut pas accéder aux données parent qui ne sont pas explicitement transmises au composant parent via les attributs HTML. Les valeurs par défaut @propsqui ne sont pas explicitement transmises au composant parent ne sont pas accessibles par la @awaredirective.
+
+
+Espaces de noms de composants anonymes
+Comme indiqué précédemment, les composants anonymes sont généralement définis en plaçant un modèle Blade dans votre resources/views/componentsrépertoire. Cependant, vous souhaiterez peut-être parfois enregistrer d'autres chemins de composants anonymes avec Laravel en plus du chemin par défaut.
+
+Par exemple, lors de la création d'une application de réservation de vacances, vous souhaiterez peut-être placer des composants anonymes liés à la réservation de vols dans un resources/views/flights/bookings/componentsrépertoire. Pour informer Laravel de cet emplacement de composant anonyme, vous pouvez utiliser la anonymousComponentNamespaceméthode fournie par la Bladefaçade.
+
+La anonymousComponentNamespaceméthode accepte le "chemin" vers l'emplacement du composant anonyme comme premier argument et "l'espace de noms" sous lequel les composants doivent être placés comme deuxième argument. Comme vous le verrez dans l'exemple ci-dessous, "l'espace de noms" sera préfixé au nom du composant lors du rendu du composant. Typiquement, cette méthode doit être appelée depuis la bootméthode d'un des fournisseurs de service de votre application :
+
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::anonymousComponentNamespace('flights.bookings.components', 'flights');
+}
+
+Étant donné l'exemple ci-dessus, vous pouvez restituer un panelcomposant qui existe dans le répertoire de composants nouvellement enregistré comme suit :
+
+<x-flights::panel :flight="$flight" />
+
+Plans de construction
+Mises en page à l'aide de composants
+La plupart des applications Web conservent la même disposition générale sur différentes pages. Il serait incroyablement fastidieux et difficile de maintenir notre application si nous devions répéter l'intégralité de la mise en page HTML dans chaque vue que nous créons. Heureusement, il est pratique de définir cette mise en page comme un seul composant Blade, puis de l'utiliser dans toute notre application.
+
+Définir le composant de mise en page
+Par exemple, imaginons que nous construisons une application de liste "todo". Nous pourrions définir un layoutcomposant qui ressemble à ce qui suit :
+
+<!-- resources/views/components/layout.blade.php -->
+ 
+<html>
+    <head>
+        <title>{{ $title ?? 'Todo Manager' }}</title>
+    </head>
+    <body>
+        <h1>Todos</h1>
+        <hr/>
+        {{ $slot }}
+    </body>
+</html>
+
+Application du composant de mise en page
+Une fois le layoutcomposant défini, nous pouvons créer une vue Blade qui utilise le composant. Dans cet exemple, nous allons définir une vue simple qui affiche notre liste de tâches :
+
+<!-- resources/views/tasks.blade.php -->
+ 
+<x-layout>
+    @foreach ($tasks as $task)
+        {{ $task }}
+    @endforeach
+</x-layout>
+
+N'oubliez pas que le contenu injecté dans un composant sera fourni à la $slotvariable par défaut de notre layoutcomposant. Comme vous l'avez peut-être remarqué, notre layoutrespecte également un $titlecréneau s'il en existe un ; sinon, un titre par défaut est affiché. Nous pouvons injecter un titre personnalisé à partir de notre vue de liste de tâches en utilisant la syntaxe d'emplacement standard décrite dans la documentation du composant :
+
+<!-- resources/views/tasks.blade.php -->
+ 
+<x-layout>
+    <x-slot:title>
+        Custom Title
+    </x-slot>
+ 
+    @foreach ($tasks as $task)
+        {{ $task }}
+    @endforeach
+</x-layout>
+
+Maintenant que nous avons défini nos vues de mise en page et de liste de tâches, il nous suffit de renvoyer la taskvue d'un itinéraire :
+
+use App\Models\Task;
+ 
+Route::get('/tasks', function () {
+    return view('tasks', ['tasks' => Task::all()]);
+});
+
+Mises en page utilisant l'héritage de modèle
+Définir une mise en page
+Les mises en page peuvent également être créées via "l'héritage de modèle". C'était le principal moyen de créer des applications avant l'introduction des composants .
+
+Pour commencer, regardons un exemple simple. Tout d'abord, nous examinerons une mise en page. Étant donné que la plupart des applications Web conservent la même disposition générale sur différentes pages, il est pratique de définir cette disposition comme une seule vue Blade :
+
+<!-- resources/views/layouts/app.blade.php -->
+ 
+<html>
+    <head>
+        <title>App Name - @yield('title')</title>
+    </head>
+    <body>
+        @section('sidebar')
+            This is the master sidebar.
+        @show
+ 
+        <div class="container">
+            @yield('content')
+        </div>
+    </body>
+</html>
+
+Comme vous pouvez le voir, ce fichier contient un balisage HTML typique. Cependant, respectez les directives @sectionet . @yieldLa @sectiondirective, comme son nom l'indique, définit une section de contenu, tandis que la @yielddirective est utilisée pour afficher le contenu d'une section donnée.
+
+Maintenant que nous avons défini une mise en page pour notre application, définissons une page enfant qui hérite de la mise en page.
+
+Extension d'une mise en page
+Lors de la définition d'une vue enfant, utilisez la @extendsdirective Blade pour spécifier de quelle disposition la vue enfant doit "hériter". Les vues qui étendent une mise en page Blade peuvent injecter du contenu dans les sections de la mise en page à l'aide de @sectiondirectives. Rappelez-vous, comme vu dans l'exemple ci-dessus, le contenu de ces sections sera affiché dans la mise en page en utilisant @yield:
+
+<!-- resources/views/child.blade.php -->
+ 
+@extends('layouts.app')
+ 
+@section('title', 'Page Title')
+ 
+@section('sidebar')
+    @parent
+ 
+    <p>This is appended to the master sidebar.</p>
+@endsection
+ 
+@section('content')
+    <p>This is my body content.</p>
+@endsection
+
+Dans cet exemple, la sidebarsection utilise la @parentdirective pour ajouter (plutôt que d'écraser) le contenu à la barre latérale de la mise en page. La @parentdirective sera remplacée par le contenu de la mise en page lors du rendu de la vue.
+
+
+Contrairement à l'exemple précédent, cette sidebarsection se termine par @endsectionau lieu de @show. La @endsectiondirective ne définira qu'une section tandis que @showdéfinira et produira immédiatement la section.
+
+
+La @yielddirective accepte également une valeur par défaut comme second paramètre. Cette valeur sera rendue si la section générée n'est pas définie :
+
+@yield('content', 'Default content')
+
+Formes
+Champ CSRF
+Chaque fois que vous définissez un formulaire HTML dans votre application, vous devez inclure un champ de jeton CSRF masqué dans le formulaire afin que le middleware de protection CSRF puisse valider la demande. Vous pouvez utiliser la @csrfdirective Blade pour générer le champ token :
+
+<form method="POST" action="/profile">
+    @csrf
+ 
+    ...
+</form>
+
+Champ Méthode
+Étant donné que les formulaires HTML ne peuvent pas effectuer de requêtes PUT, PATCHou DELETE, vous devrez ajouter un _methodchamp masqué pour usurper ces verbes HTTP. La @methoddirective Blade peut créer ce champ pour vous :
+
+<form action="/foo/bar" method="POST">
+    @method('PUT')
+ 
+    ...
+</form>
+
+Erreurs de validation
+La @errordirective peut être utilisée pour vérifier rapidement si des messages d'erreur de validation existent pour un attribut donné. Dans une @errordirective, vous pouvez faire écho à la $messagevariable pour afficher le message d'erreur :
+
+<!-- /resources/views/post/create.blade.php -->
+ 
+<label for="title">Post Title</label>
+ 
+<input id="title"
+    type="text"
+    class="@error('title') is-invalid @enderror">
+ 
+@error('title')
+    <div class="alert alert-danger">{{ $message }}</div>
+@enderror
+
+Étant donné que la @errordirective se compile en une instruction "if", vous pouvez utiliser la @elsedirective pour afficher le contenu lorsqu'il n'y a pas d'erreur pour un attribut :
+
+<!-- /resources/views/auth.blade.php -->
+ 
+<label for="email">Email address</label>
+ 
+<input id="email"
+    type="email"
+    class="@error('email') is-invalid @else is-valid @enderror">
+
+Vous pouvez passer le nom d'un sac d'erreurs spécifique comme deuxième paramètre à la @errordirective pour récupérer les messages d'erreur de validation sur les pages contenant plusieurs formulaires :
+
+<!-- /resources/views/auth.blade.php -->
+ 
+<label for="email">Email address</label>
+ 
+<input id="email"
+    type="email"
+    class="@error('email', 'login') is-invalid @enderror">
+ 
+@error('email', 'login')
+    <div class="alert alert-danger">{{ $message }}</div>
+@enderror
+
+Piles
+Blade vous permet de pousser vers des piles nommées qui peuvent être rendues ailleurs dans une autre vue ou mise en page. Cela peut être particulièrement utile pour spécifier les bibliothèques JavaScript requises par vos vues enfants :
+
+@push('scripts')
+    <script src="/example.js"></script>
+@endpush
+
+Si vous souhaitez vous @pushcontenter si une expression booléenne donnée est évaluée à true, vous pouvez utiliser la @pushIfdirective :
+
+@pushIf($shouldPush, 'scripts')
+    <script src="/example.js"></script>
+@endPushIf
+
+Vous pouvez pousser vers une pile autant de fois que nécessaire. Pour afficher le contenu complet de la pile, transmettez le nom de la pile à la @stackdirective :
+
+<head>
+    <!-- Head Contents -->
+ 
+    @stack('scripts')
+</head>
+
+Si vous souhaitez ajouter du contenu au début d'une pile, vous devez utiliser la @prependdirective :
+
+@push('scripts')
+    This will be second...
+@endpush
+ 
+// Later...
+ 
+@prepend('scripts')
+    This will be first...
+@endprepend
+
+Injection de services
+La @injectdirective peut être utilisée pour récupérer un service du conteneur de service Laravel . Le premier argument passé à @injectest le nom de la variable dans laquelle le service sera placé, tandis que le second argument est le nom de la classe ou de l'interface du service que vous souhaitez résoudre :
+
+@inject('metrics', 'App\Services\MetricsService')
+ 
+<div>
+    Monthly Revenue: {{ $metrics->monthlyRevenue() }}.
+</div>
+
+Rendu des modèles de lame en ligne
+Parfois, vous devrez peut-être transformer une chaîne de modèle Blade brute en code HTML valide. Vous pouvez accomplir cela en utilisant la renderméthode fournie par la Bladefaçade. La renderméthode accepte la chaîne du modèle Blade et un tableau facultatif de données à fournir au modèle :
+
+use Illuminate\Support\Facades\Blade;
+ 
+return Blade::render('Hello, {{ $name }}', ['name' => 'Julian Bashir']);
+
+Laravel rend les modèles de lame en ligne en les écrivant dans le storage/framework/viewsrépertoire. Si vous souhaitez que Laravel supprime ces fichiers temporaires après le rendu du modèle Blade, vous pouvez fournir l' deleteCachedViewargument à la méthode :
+
+return Blade::render(
+    'Hello, {{ $name }}',
+    ['name' => 'Julian Bashir'],
+    deleteCachedView: true
+);
+
+Lame extensible
+Blade vous permet de définir vos propres directives personnalisées à l'aide de la directiveméthode. Lorsque le compilateur Blade rencontre la directive personnalisée, il appelle le rappel fourni avec l'expression contenue dans la directive.
+
+L'exemple suivant crée une @datetime($var)directive qui formate un donné $var, qui devrait être une instance de DateTime:
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
+    }
+ 
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        Blade::directive('datetime', function ($expression) {
+            return "<?php echo ($expression)->format('m/d/Y H:i'); ?>";
+        });
+    }
+}
+
+Comme vous pouvez le voir, nous enchaînerons la formatméthode sur n'importe quelle expression passée dans la directive. Ainsi, dans cet exemple, le PHP final généré par cette directive sera :
+
+<?php echo ($var)->format('m/d/Y H:i'); ?>
+
+
+Après avoir mis à jour la logique d'une directive Blade, vous devrez supprimer toutes les vues Blade mises en cache. Les vues Blade mises en cache peuvent être supprimées à l'aide de la view:clearcommande Artisan.
+
+
+Gestionnaires d'écho personnalisés
+Si vous essayez de "faire écho" à un objet à l'aide de Blade, la __toStringméthode de l'objet sera invoquée. La __toStringméthode est l'une des "méthodes magiques" intégrées de PHP. Cependant, il se peut que vous n'ayez parfois pas le contrôle sur la __toStringméthode d'une classe donnée, par exemple lorsque la classe avec laquelle vous interagissez appartient à une bibliothèque tierce.
+
+Dans ces cas, Blade vous permet d'enregistrer un gestionnaire d'écho personnalisé pour ce type d'objet particulier. Pour ce faire, vous devez invoquer la stringableméthode de Blade. La stringableméthode accepte une fermeture. Cette fermeture doit indiquer le type d'objet qu'elle est responsable du rendu. En règle générale, la stringableméthode doit être invoquée dans la bootméthode de la AppServiceProviderclasse de votre application :
+
+use Illuminate\Support\Facades\Blade;
+use Money\Money;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::stringable(function (Money $money) {
+        return $money->formatTo('en_GB');
+    });
+}
+
+Une fois votre gestionnaire d'écho personnalisé défini, vous pouvez simplement faire écho à l'objet dans votre modèle Blade :
+
+Cost: {{ $money }}
+
+Déclarations If personnalisées
+La programmation d'une directive personnalisée est parfois plus complexe que nécessaire lors de la définition d'instructions conditionnelles simples et personnalisées. Pour cette raison, Blade fournit une Blade::ifméthode qui vous permet de définir rapidement des directives conditionnelles personnalisées à l'aide de fermetures. Par exemple, définissons une condition personnalisée qui vérifie le "disque" par défaut configuré pour l'application. Nous pouvons le faire dans la bootméthode de notre AppServiceProvider:
+
+use Illuminate\Support\Facades\Blade;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Blade::if('disk', function ($value) {
+        return config('filesystems.default') === $value;
+    });
+}
+
+Une fois le conditionnel personnalisé défini, vous pouvez l'utiliser dans vos modèles :
+
+@disk('local')
+    <!-- The application is using the local disk... -->
+@elsedisk('s3')
+    <!-- The application is using the s3 disk... -->
+@else
+    <!-- The application is using some other disk... -->
+@enddisk
+ 
+@unlessdisk('local')
+    <!-- The application is not using the local disk... -->
+@enddisk

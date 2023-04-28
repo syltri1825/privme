@@ -1,0 +1,183 @@
+
+Introduction
+Configuration des paramètres régionaux
+Langage de pluralisation
+Définition des chaînes de traduction
+Utilisation des raccourcis clavier
+Utilisation de chaînes de traduction comme clés
+Récupération des chaînes de traduction
+Remplacement de paramètres dans les chaînes de traduction
+Pluralisation
+Remplacer les fichiers de langue du package
+Introduction
+Les fonctionnalités de localisation de Laravel offrent un moyen pratique de récupérer des chaînes dans différentes langues, vous permettant de prendre facilement en charge plusieurs langues dans votre application.
+
+Laravel propose deux façons de gérer les chaînes de traduction. Tout d'abord, les chaînes de langue peuvent être stockées dans des fichiers du langrépertoire. Dans ce répertoire, il peut y avoir des sous-répertoires pour chaque langue prise en charge par l'application. C'est l'approche que Laravel utilise pour gérer les chaînes de traduction pour les fonctionnalités intégrées de Laravel telles que les messages d'erreur de validation :
+
+/lang
+    /en
+        messages.php
+    /es
+        messages.php
+
+Ou, les chaînes de traduction peuvent être définies dans les fichiers JSON qui sont placés dans le langrépertoire. En adoptant cette approche, chaque langue prise en charge par votre application aurait un fichier JSON correspondant dans ce répertoire. Cette approche est recommandée pour les applications qui ont un grand nombre de chaînes traduisibles :
+
+/lang
+    en.json
+    es.json
+
+Nous aborderons chaque approche de gestion des chaînes de traduction dans cette documentation.
+
+Configuration des paramètres régionaux
+La langue par défaut de votre application est stockée dans l' option de configuration config/app.phpdu fichier de configuration. localeVous êtes libre de modifier cette valeur en fonction des besoins de votre application.
+
+Vous pouvez modifier la langue par défaut pour une seule requête HTTP lors de l'exécution en utilisant la setLocaleméthode fournie par la Appfaçade :
+
+use Illuminate\Support\Facades\App;
+ 
+Route::get('/greeting/{locale}', function ($locale) {
+    if (! in_array($locale, ['en', 'es', 'fr'])) {
+        abort(400);
+    }
+ 
+    App::setLocale($locale);
+ 
+    //
+});
+
+Vous pouvez configurer une "langue de secours", qui sera utilisée lorsque la langue active ne contient pas une chaîne de traduction donnée. Comme la langue par défaut, la langue de secours est également configurée dans le config/app.phpfichier de configuration :
+
+'fallback_locale' => 'en',
+
+Détermination de l'environnement local actuel
+Vous pouvez utiliser les méthodes currentLocaleet sur la façade pour déterminer la locale actuelle ou vérifier si la locale est une valeur donnée :isLocaleApp
+
+use Illuminate\Support\Facades\App;
+ 
+$locale = App::currentLocale();
+ 
+if (App::isLocale('en')) {
+    //
+}
+
+Langage de pluralisation
+Vous pouvez demander au "pluriel" de Laravel, qui est utilisé par Eloquent et d'autres parties du framework pour convertir des chaînes singulières en chaînes plurielles, d'utiliser une langue autre que l'anglais. Cela peut être accompli en invoquant la useLanguageméthode dans la bootméthode de l'un des fournisseurs de services de votre application. Les langues actuellement prises en charge par le pluraliseur sont : french, norwegian-bokmal, portuguese, spanish, et turkish:
+
+use Illuminate\Support\Pluralizer;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Pluralizer::useLanguage('spanish');
+ 
+    // ...
+}
+
+
+Si vous personnalisez la langue du pluraliseur, vous devez définir explicitement les noms de table de votre modèle Eloquent .
+
+
+Définition des chaînes de traduction
+Utilisation des raccourcis clavier
+En règle générale, les chaînes de traduction sont stockées dans des fichiers du langrépertoire. Dans ce répertoire, il devrait y avoir un sous-répertoire pour chaque langue prise en charge par votre application. C'est l'approche que Laravel utilise pour gérer les chaînes de traduction pour les fonctionnalités intégrées de Laravel telles que les messages d'erreur de validation :
+
+/lang
+    /en
+        messages.php
+    /es
+        messages.php
+
+Tous les fichiers de langue renvoient un tableau de chaînes à clés. Par exemple:
+
+<?php
+ 
+// lang/en/messages.php
+ 
+return [
+    'welcome' => 'Welcome to our application!',
+];
+
+
+Pour les langues qui diffèrent selon le territoire, vous devez nommer les répertoires de langues conformément à la norme ISO 15897. Par exemple, "en_GB" doit être utilisé pour l'anglais britannique plutôt que "en-gb".
+
+
+Utilisation de chaînes de traduction comme clés
+Pour les applications avec un grand nombre de chaînes traduisibles, la définition de chaque chaîne avec une "clé courte" peut devenir déroutante lors du référencement des clés dans vos vues et il est fastidieux d'inventer continuellement des clés pour chaque chaîne de traduction prise en charge par votre application.
+
+Pour cette raison, Laravel prend également en charge la définition de chaînes de traduction en utilisant la traduction "par défaut" de la chaîne comme clé. Les fichiers de traduction qui utilisent des chaînes de traduction comme clés sont stockés en tant que fichiers JSON dans le langrépertoire. Par exemple, si votre application a une traduction en espagnol, vous devez créer un lang/es.jsonfichier :
+
+{
+    "I love programming.": "Me encanta programar."
+}
+
+Conflits clé/fichier
+Vous ne devez pas définir de clés de chaîne de traduction qui entrent en conflit avec d'autres noms de fichiers de traduction. Par exemple, la traduction __('Action')pour la locale "NL" alors qu'un nl/action.phpfichier existe mais qu'un nl.jsonfichier n'existe pas entraînera le renvoi du contenu de nl/action.php.
+
+Récupération des chaînes de traduction
+Vous pouvez récupérer des chaînes de traduction à partir de vos fichiers de langue à l' __aide de la fonction d'assistance. Si vous utilisez des "touches courtes" pour définir vos chaînes de traduction, vous devez transmettre le fichier contenant la clé et la clé elle-même à la __fonction en utilisant la syntaxe "point". Par exemple, récupérons la welcomechaîne de traduction du lang/en/messages.phpfichier de langue :
+
+echo __('messages.welcome');
+
+Si la chaîne de traduction spécifiée n'existe pas, la __fonction renverra la clé de la chaîne de traduction. Ainsi, en utilisant l'exemple ci-dessus, la __fonction retournerait messages.welcomesi la chaîne de traduction n'existe pas.
+
+Si vous utilisez vos chaînes de traduction par défaut comme clés de traduction , vous devez transmettre la traduction par défaut de votre chaîne à la __fonction ;
+
+echo __('I love programming.');
+
+Encore une fois, si la chaîne de traduction n'existe pas, la __fonction renverra la clé de chaîne de traduction qui lui a été donnée.
+
+Si vous utilisez le moteur de création de modèles Blade , vous pouvez utiliser la {{ }}syntaxe echo pour afficher la chaîne de traduction :
+
+{{ __('messages.welcome') }}
+
+Remplacement de paramètres dans les chaînes de traduction
+Si vous le souhaitez, vous pouvez définir des espaces réservés dans vos chaînes de traduction. Tous les espaces réservés sont préfixés par un :. Par exemple, vous pouvez définir un message de bienvenue avec un nom d'espace réservé :
+
+'welcome' => 'Welcome, :name',
+
+Pour remplacer les espaces réservés lors de la récupération d'une chaîne de traduction, vous pouvez passer un tableau de remplacements comme deuxième argument à la __fonction :
+
+echo __('messages.welcome', ['name' => 'dayle']);
+
+Si votre espace réservé contient toutes les lettres majuscules, ou n'a que sa première lettre en majuscule, la valeur traduite sera mise en majuscule en conséquence :
+
+'welcome' => 'Welcome, :NAME', // Welcome, DAYLE
+'goodbye' => 'Goodbye, :Name', // Goodbye, Dayle
+
+Pluralisation
+La pluralisation est un problème complexe, car différentes langues ont une variété de règles complexes pour la pluralisation; cependant, Laravel peut vous aider à traduire les chaînes différemment en fonction des règles de pluralisation que vous définissez. À l' aide d'un |caractère, vous pouvez distinguer les formes singulier et pluriel d'une chaîne :
+
+'apples' => 'There is one apple|There are many apples',
+
+Bien entendu, la pluralisation est également prise en charge lors de l'utilisation de chaînes de traduction comme clés :
+
+{
+    "There is one apple|There are many apples": "Hay una manzana|Hay muchas manzanas"
+}
+
+Vous pouvez même créer des règles de pluralisation plus complexes qui spécifient des chaînes de traduction pour plusieurs plages de valeurs :
+
+'apples' => '{0} There are none|[1,19] There are some|[20,*] There are many',
+
+Après avoir défini une chaîne de traduction qui a des options de pluralisation, vous pouvez utiliser la trans_choicefonction pour récupérer la ligne pour un "compte" donné. Dans cet exemple, puisque le nombre est supérieur à un, la forme plurielle de la chaîne de traduction est renvoyée :
+
+echo trans_choice('messages.apples', 10);
+
+Vous pouvez également définir des attributs d'espace réservé dans les chaînes de pluralisation. Ces espaces réservés peuvent être remplacés en passant un tableau comme troisième argument à la trans_choicefonction :
+
+'minutes_ago' => '{1} :value minute ago|[2,*] :value minutes ago',
+ 
+echo trans_choice('time.minutes_ago', 5, ['value' => 5]);
+
+Si vous souhaitez afficher la valeur entière qui a été transmise à la trans_choicefonction, vous pouvez utiliser l' :countespace réservé intégré :
+
+'apples' => '{0} There are none|{1} There is one|[2,*] There are :count',
+
+Remplacer les fichiers de langue du package
+Certains packages peuvent être livrés avec leurs propres fichiers de langue. Au lieu de modifier les fichiers principaux du package pour modifier ces lignes, vous pouvez les remplacer en plaçant des fichiers dans le lang/vendor/{package}/{locale}répertoire.
+
+Ainsi, par exemple, si vous devez remplacer les chaînes de traduction en anglais dans messages.phppour un package nommé skyrim/hearthfire, vous devez placer un fichier de langue à : lang/vendor/hearthfire/en/messages.php. Dans ce fichier, vous ne devez définir que les chaînes de traduction que vous souhaitez remplacer. Toutes les chaînes de traduction que vous ne remplacez pas seront toujours chargées à partir des fichiers de langue d'origine du package.

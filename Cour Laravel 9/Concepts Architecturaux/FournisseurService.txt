@@ -1,0 +1,185 @@
+Les fournisseurs de services
+Introduction
+Fournisseurs de services de rédaction
+La méthode du registre
+La méthode de démarrage
+Enregistrement des fournisseurs
+Fournisseurs différés
+Introduction
+Les fournisseurs de services sont le lieu central de tout le démarrage des applications Laravel. Votre propre application, ainsi que tous les services de base de Laravel, sont démarrés via des fournisseurs de services.
+
+Mais qu'entend-on par "bootstrap" ? En général, nous entendons enregistrer des choses, y compris enregistrer des liaisons de conteneurs de services, des écouteurs d'événements, des intergiciels et même des routes. Les fournisseurs de services sont l'endroit central pour configurer votre application.
+
+Si vous ouvrez le config/app.phpfichier inclus avec Laravel, vous verrez un providerstableau. Ce sont toutes les classes de fournisseur de services qui seront chargées pour votre application. Par défaut, un ensemble de fournisseurs de services principaux Laravel sont répertoriés dans ce tableau. Ces fournisseurs démarrent les composants de base de Laravel, tels que le courrier, la file d'attente, le cache et autres. Beaucoup de ces fournisseurs sont des fournisseurs "différés", ce qui signifie qu'ils ne seront pas chargés à chaque demande, mais uniquement lorsque les services qu'ils fournissent sont réellement nécessaires.
+
+Dans cet aperçu, vous apprendrez à écrire vos propres fournisseurs de services et à les enregistrer avec votre application Laravel.
+
+
+Si vous souhaitez en savoir plus sur la façon dont Laravel gère les requêtes et fonctionne en interne, consultez notre documentation sur le cycle de vie des requêtes Laravel .
+
+
+Fournisseurs de services de rédaction
+Tous les fournisseurs de services étendent la Illuminate\Support\ServiceProviderclasse. La plupart des fournisseurs de services contiennent un registeret une bootméthode. Dans la registerméthode, vous ne devez lier que des éléments dans le conteneur de service . Vous ne devez jamais tenter d'enregistrer des écouteurs d'événement, des routes ou tout autre élément de fonctionnalité dans la registerméthode.
+
+L'Artisan CLI peut générer un nouveau fournisseur via la make:providercommande :
+
+php artisan make:provider RiakServiceProvider
+
+La méthode du registre
+Comme mentionné précédemment, dans la registerméthode, vous ne devez lier que des éléments dans le service container . Vous ne devez jamais tenter d'enregistrer des écouteurs d'événement, des routes ou tout autre élément de fonctionnalité dans la registerméthode. Sinon, vous risquez d'utiliser accidentellement un service fourni par un fournisseur de services qui n'a pas encore été chargé.
+
+Jetons un coup d'œil à un fournisseur de services de base. Dans n'importe laquelle de vos méthodes de fournisseur de services, vous avez toujours accès à la $apppropriété qui donne accès au conteneur de services :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Services\Riak\Connection;
+use Illuminate\Support\ServiceProvider;
+ 
+class RiakServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        $this->app->singleton(Connection::class, function ($app) {
+            return new Connection(config('riak'));
+        });
+    }
+}
+
+Ce fournisseur de services définit uniquement une registerméthode et utilise cette méthode pour définir une implémentation de App\Services\Riak\Connectiondans le conteneur de services. Si vous n'êtes pas encore familier avec le conteneur de service de Laravel, consultez sa documentation .
+
+Les propriétés bindingsetsingletons
+Si votre fournisseur de services enregistre de nombreuses liaisons simples, vous pouvez utiliser les propriétés bindingset singletonsau lieu d'enregistrer manuellement chaque liaison de conteneur. Lorsque le fournisseur de services est chargé par le framework, il vérifie automatiquement ces propriétés et enregistre leurs liaisons :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Contracts\DowntimeNotifier;
+use App\Contracts\ServerProvider;
+use App\Services\DigitalOceanServerProvider;
+use App\Services\PingdomDowntimeNotifier;
+use App\Services\ServerToolsProvider;
+use Illuminate\Support\ServiceProvider;
+ 
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * All of the container bindings that should be registered.
+     *
+     * @var array
+     */
+    public $bindings = [
+        ServerProvider::class => DigitalOceanServerProvider::class,
+    ];
+ 
+    /**
+     * All of the container singletons that should be registered.
+     *
+     * @var array
+     */
+    public $singletons = [
+        DowntimeNotifier::class => PingdomDowntimeNotifier::class,
+        ServerProvider::class => ServerToolsProvider::class,
+    ];
+}
+
+La méthode de démarrage
+Alors, que se passe-t-il si nous devons enregistrer un compositeur de vues auprès de notre fournisseur de services ? Cela devrait être fait dans la bootméthode. Cette méthode est appelée après que tous les autres fournisseurs de services ont été enregistrés , ce qui signifie que vous avez accès à tous les autres services qui ont été enregistrés par le framework :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
+ 
+class ComposerServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot()
+    {
+        View::composer('view', function () {
+            //
+        });
+    }
+}
+
+Injection de dépendance de méthode de démarrage
+Vous pouvez définir des dépendances d'indication de type pour la méthode de votre fournisseur de services boot. Le conteneur de service injectera automatiquement toutes les dépendances dont vous avez besoin :
+
+use Illuminate\Contracts\Routing\ResponseFactory;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @param  \Illuminate\Contracts\Routing\ResponseFactory  $response
+ * @return void
+ */
+public function boot(ResponseFactory $response)
+{
+    $response->macro('serialized', function ($value) {
+        //
+    });
+}
+
+Enregistrement des fournisseurs
+Tous les fournisseurs de services sont enregistrés dans le config/app.phpfichier de configuration. Ce fichier contient un providerstableau dans lequel vous pouvez répertorier les noms de classe de vos fournisseurs de services. Par défaut, un ensemble de fournisseurs de services principaux Laravel sont répertoriés dans ce tableau. Ces fournisseurs démarrent les composants de base de Laravel, tels que le courrier, la file d'attente, le cache et autres.
+
+Pour enregistrer votre fournisseur, ajoutez-le au tableau :
+
+'providers' => [
+    // Other Service Providers
+ 
+    App\Providers\ComposerServiceProvider::class,
+],
+
+Fournisseurs différés
+Si votre fournisseur n'enregistre que des liaisons dans le conteneur de service , vous pouvez choisir de différer son enregistrement jusqu'à ce que l'une des liaisons enregistrées soit réellement nécessaire. Différer le chargement d'un tel fournisseur améliorera les performances de votre application, car il n'est pas chargé à partir du système de fichiers à chaque requête.
+
+Laravel compile et stocke une liste de tous les services fournis par les fournisseurs de services différés, ainsi que le nom de sa classe de fournisseur de services. Ensuite, ce n'est que lorsque vous tentez de résoudre l'un de ces services que Laravel charge le fournisseur de services.
+
+Pour différer le chargement d'un provider, implémentez l' \Illuminate\Contracts\Support\DeferrableProviderinterface et définissez une providesméthode. La providesméthode doit renvoyer les liaisons de conteneur de service enregistrées par le fournisseur :
+
+<?php
+ 
+namespace App\Providers;
+ 
+use App\Services\Riak\Connection;
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
+ 
+class RiakServiceProvider extends ServiceProvider implements DeferrableProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        $this->app->singleton(Connection::class, function ($app) {
+            return new Connection($app['config']['riak']);
+        });
+    }
+ 
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array
+     */
+    public function provides()
+    {
+        return [Connection::class];
+    }
+}

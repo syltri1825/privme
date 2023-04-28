@@ -1,0 +1,1885 @@
+Courrier
+Introduction
+Configuration
+Prérequis du pilote
+Configuration du basculement
+Génération de mailables
+Rédaction de mailables
+Configuration de l'expéditeur
+Configuration de la vue
+Afficher les données
+Pièces jointes
+Pièces jointes en ligne
+Objets attachables
+Balises et métadonnées
+Personnaliser le message Symfony
+Envois de démarquage
+Génération d'e-mails Markdown
+Rédaction de messages de démarquage
+Personnalisation des composants
+Envoi de mail
+Mise en file d'attente du courrier
+Rendu des e-mails
+Aperçu des e-mails dans le navigateur
+Localisation des e-mails
+Tester les e-mails
+Courrier & Développement local
+Événements
+Transports personnalisés
+Transports Symfony supplémentaires
+Introduction
+L'envoi d'e-mails n'a pas besoin d'être compliqué. 
+
+Laravel fournit une API de messagerie propre et simple 
+
+alimentée par le composant populaire Symfony Mailer . 
+
+Laravel et Symfony Mailer fournissent des pilotes pour 
+
+envoyer des e-mails via SMTP, Mailgun, Postmark, Amazon 
+
+SES et sendmail, vous permettant de commencer rapidement 
+
+à envoyer des e-mails via un service local ou cloud de 
+
+votre choix.
+
+Configuration
+Les services de messagerie de Laravel peuvent être 
+
+configurés via le config/mail.phpfichier de configuration 
+
+de votre application. Chaque mailer configuré dans ce fichier 
+
+peut avoir sa propre configuration unique et même son propre 
+
+"transport", permettant à votre application d'utiliser 
+
+différents services de messagerie pour envoyer certains 
+
+messages électroniques. Par exemple, votre application 
+
+peut utiliser Postmark pour envoyer des e-mails transactionnels 
+
+tout en utilisant Amazon SES pour envoyer des e-mails en masse.
+
+Dans votre mailfichier de configuration, vous trouverez un 
+
+mailers  tableau de configuration. Ce tableau contient un exemple 
+
+d'entrée de configuration pour chacun des principaux 
+
+pilotes/transports de messagerie pris en charge par Laravel, 
+
+tandis que la defaultvaleur de configuration détermine quel 
+
+mailer sera utilisé par défaut lorsque votre application doit 
+
+envoyer un message électronique.
+
+Chauffeur / Transport Prérequis
+Les pilotes basés sur l'API tels que Mailgun et Postmark sont 
+
+souvent plus simples et plus rapides que l'envoi de courrier 
+
+via des serveurs SMTP. Dans la mesure du possible, nous vous 
+
+recommandons d'utiliser l'un de ces pilotes.
+
+Pilote de pistolet à courrier
+Pour utiliser le pilote Mailgun, installez le transport 
+
+Mailgun Mailer de Symfony via Composer :
+
+composer require symfony/mailgun-mailer symfony/http-client
+
+Ensuite, définissez l' defaultoption dans le config/mail.php fichier 
+
+de configuration de votre application sur mailgun. Après avoir 
+
+configuré le mailer par défaut de votre application, vérifiez 
+
+que votre config/services.phpfichier de configuration contient 
+
+les options suivantes :
+
+'mailgun' => [
+    'domain' => env('MAILGUN_DOMAIN'),
+    'secret' => env('MAILGUN_SECRET'),
+],
+
+Si vous n'utilisez pas la région États-Unis Mailgun , vous 
+
+pouvez définir le point de terminaison de votre région dans 
+
+le servicesfichier de configuration :
+
+'mailgun' => [
+    'domain' => env('MAILGUN_DOMAIN'),
+    'secret' => env('MAILGUN_SECRET'),
+    'endpoint' => env('MAILGUN_ENDPOINT', 'api.eu.mailgun.net'),
+],
+
+Pilote de cachet postal
+Pour utiliser le pilote Postmark, installez le transport 
+
+Postmark Mailer de Symfony via Composer :
+
+composer require symfony/postmark-mailer symfony/http-client
+
+Ensuite, définissez l' defaultoption dans le config/mail.php 
+
+fichier de configuration de votre application sur postmark. 
+
+Après avoir configuré le mailer par défaut de votre 
+
+application, vérifiez que votre config/services.php fichier 
+
+de configuration contient les options suivantes :
+
+'postmark' => [
+    'token' => env('POSTMARK_TOKEN'),
+],
+
+Si vous souhaitez spécifier le flux de messages Postmark 
+
+qui doit être utilisé par un expéditeur donné, vous pouvez 
+
+ajouter l' message_stream_idoption de configuration au 
+
+tableau de configuration de l'expéditeur. Ce tableau de 
+
+configuration se trouve dans le config/mail.phpfichier de 
+
+configuration de votre application :
+
+'postmark' => [
+    'transport' => 'postmark',
+    'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),
+], 
+
+De cette façon, vous pouvez également configurer plusieurs 
+
+expéditeurs Postmark avec différents flux de messages.
+
+Pilote SES
+Pour utiliser le pilote Amazon SES, vous devez d'abord 
+
+installer le kit SDK Amazon AWS pour PHP. Vous pouvez 
+
+installer cette bibliothèque via le gestionnaire de 
+
+packages Composer :
+
+composer require aws/aws-sdk-php
+
+Ensuite, définissez l' defaultoption dans votre 
+
+config/mail.phpfichier de configuration sur ses et 
+
+vérifiez que votre config/services.phpfichier de 
+
+configuration contient les options suivantes :
+
+'ses' => [
+    'key' => env('AWS_ACCESS_KEY_ID'),
+    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+    'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+],
+
+Pour utiliser les informations d'identification 
+
+temporaires AWS via un jeton de session, vous pouvez 
+
+ajouter une tokenclé à la configuration SES de 
+
+votre application :
+
+'ses' => [
+    'key' => env('AWS_ACCESS_KEY_ID'),
+    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+    'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    'token' => env('AWS_SESSION_TOKEN'),
+],
+
+Si vous souhaitez définir des options supplémentaires 
+
+que Laravel doit transmettre à la méthode du SDK AWS 
+
+SendEmaillors de l'envoi d'un e-mail, vous pouvez définir 
+
+un optionstableau dans votre sesconfiguration :
+
+'ses' => [
+    'key' => env('AWS_ACCESS_KEY_ID'),
+    'secret' => env('AWS_SECRET_ACCESS_KEY'),
+    'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    'options' => [
+        'ConfigurationSetName' => 'MyConfigurationSet',
+        'EmailTags' => [
+            ['Name' => 'foo', 'Value' => 'bar'],
+        ],
+    ],
+],
+
+Configuration du basculement
+Parfois, un service externe que vous avez configuré pour 
+
+envoyer le courrier de votre application peut être en panne. 
+
+Dans ces cas, il peut être utile de définir une ou 
+
+plusieurs configurations de distribution de courrier de 
+
+secours qui seront utilisées en cas de panne de votre 
+
+pilote de distribution principal.
+
+Pour ce faire, vous devez définir un mailer dans le mail 
+
+fichier de configuration de votre application qui utilise 
+
+le failovertransport. Le tableau de configuration du 
+
+logiciel de failovermessagerie de votre application doit 
+
+contenir un tableau de mailersréférence indiquant 
+
+l'ordre dans lequel les pilotes de messagerie doivent 
+
+être choisis pour la livraison :
+
+'mailers' => [
+    'failover' => [
+        'transport' => 'failover',
+        'mailers' => [
+            'postmark',
+            'mailgun',
+            'sendmail',
+        ],
+    ],
+ 
+    // ...
+],
+
+Une fois votre mailer de basculement défini, vous 
+
+devez définir ce mailer comme mailer par défaut utilisé 
+
+par votre application en spécifiant son nom comme valeur 
+
+de la defaultclé de configuration dans le fichier de 
+
+configuration de votre application mail :
+
+'default' => env('MAIL_MAILER', 'failover'),
+
+Génération de mailables
+Lors de la création d'applications Laravel, chaque type 
+
+d'e-mail envoyé par votre application est représenté 
+
+comme une classe "mailable". Ces classes sont stockées 
+
+dans le app/Mailrépertoire. Ne vous inquiétez pas si 
+
+vous ne voyez pas ce répertoire dans votre application, 
+
+car il sera généré pour vous lorsque vous créerez votre 
+
+première classe mailable à l'aide de la make:mail 
+
+commande Artisan :
+
+php artisan make:mail OrderShipped
+
+Rédaction de mailables
+Une fois que vous avez généré une classe publiable, 
+
+ouvrez-la afin que nous puissions explorer son contenu. 
+
+Tout d'abord, notez que toute la configuration d'une 
+
+classe mailable est effectuée dans la buildméthode. 
+
+Dans cette méthode, vous pouvez appeler différentes 
+
+méthodes telles que from, subject, viewet attachpour 
+
+configurer la présentation et la livraison de l'e-mail.
+
+
+Vous pouvez définir des dépendances d'indication de type 
+
+sur la méthode du mailable build. Le conteneur de service 
+
+Laravel injecte automatiquement ces dépendances.
+
+
+Configuration de l'expéditeur
+Utiliser la fromméthode
+Tout d'abord, explorons la configuration de l'expéditeur 
+
+de l'e-mail. Ou, en d'autres termes, de qui l'e-mail va 
+
+provenir. Il existe deux façons de configurer l'expéditeur. 
+
+Tout d'abord, vous pouvez utiliser la fromméthode dans la 
+
+méthode de votre classe mailable build :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->from('example@example.com', 'Example')
+                ->view('emails.orders.shipped');
+}
+
+Utilisation d'une fromadresse globale
+Cependant, si votre application utilise la même adresse 
+
+"de" pour tous ses e-mails, il peut devenir fastidieux 
+
+d'appeler la fromméthode dans chaque classe mailable 
+
+que vous générez. Au lieu de cela, vous pouvez spécifier 
+
+une adresse "de" globale dans votre config/mail.php 
+
+fichier de configuration. Cette adresse sera utilisée 
+
+si aucune autre adresse "de" n'est spécifiée dans la 
+
+classe mailable :
+
+'from' => ['address' => 'example@example.com', 'name' => 'App Name'],
+
+De plus, vous pouvez définir une adresse globale "reply_to" 
+
+dans votre config/mail.phpfichier de configuration :
+
+'reply_to' => ['address' => 'example@example.com', 'name' => 'App Name'],
+
+Configuration de la vue
+Dans une méthode de classe mailable build, vous pouvez 
+
+utiliser la viewméthode pour spécifier quel modèle doit 
+
+être utilisé lors du rendu du contenu de l'e-mail. Étant 
+
+donné que chaque e-mail utilise généralement un modèle 
+
+Blade pour afficher son contenu, vous disposez de toute 
+
+la puissance et de la commodité du moteur de création de 
+
+modèles Blade lors de la création du code HTML de votre 
+
+e-mail :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped');
+}
+
+
+Vous souhaiterez peut-être créer un resources/views/emails
+
+répertoire pour héberger tous vos modèles d'e-mails ; 
+
+cependant, vous êtes libre de les placer où vous le 
+
+souhaitez dans votre resources/viewsrépertoire.
+
+
+E-mails en texte brut
+Si vous souhaitez définir une version en texte brut de 
+
+votre e-mail, vous pouvez utiliser la textméthode. Comme 
+
+la viewméthode, la textméthode accepte un nom de modèle 
+
+qui sera utilisé pour restituer le contenu de l'e-mail. 
+
+Vous êtes libre de définir à la fois une version HTML et 
+
+une version en texte brut de votre message :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped')
+                ->text('emails.orders.shipped_plain');
+}
+
+Afficher les données
+Via les propriétés publiques
+En règle générale, vous souhaiterez transmettre certaines 
+
+données à votre vue que vous pourrez utiliser lors du 
+
+rendu du code HTML de l'e-mail. Il existe deux manières 
+
+de rendre les données disponibles pour votre vue. Tout 
+
+d'abord, toute propriété publique définie sur votre classe 
+
+mailable sera automatiquement mise à la disposition de la vue. 
+
+Ainsi, par exemple, vous pouvez transmettre des données au 
+
+constructeur de votre classe mailable et définir ces données 
+
+sur des propriétés publiques définies sur la classe :
+
+<?php
+ 
+namespace App\Mail;
+ 
+use App\Models\Order;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+ 
+class OrderShipped extends Mailable
+{
+    use Queueable, SerializesModels;
+ 
+    /**
+     * The order instance.
+     *
+     * @var \App\Models\Order
+     */
+    public $order;
+ 
+    /**
+     * Create a new message instance.
+     *
+     * @param  \App\Models\Order  $order
+     * @return void
+     */
+    public function __construct(Order $order)
+    {
+        $this->order = $order;
+    }
+ 
+    /**
+     * Build the message.
+     *
+     * @return $this
+     */
+    public function build()
+    {
+        return $this->view('emails.orders.shipped');
+    }
+}
+
+Une fois que les données ont été définies sur une 
+
+propriété publique, elles seront automatiquement 
+
+disponibles dans votre vue, vous pouvez donc y accéder 
+
+comme vous accéderiez à n'importe quelle autre donnée 
+
+dans vos modèles Blade :
+
+<div>
+    Price: {{ $order->price }}
+</div>
+
+Via La withMéthode :
+Si vous souhaitez personnaliser le format des données 
+
+de votre e-mail avant qu'il ne soit envoyé au modèle, 
+
+vous pouvez transmettre manuellement vos données à la 
+
+vue via la withméthode. En règle générale, vous 
+
+transmettrez toujours des données via le constructeur 
+
+de la classe mailable ; cependant, vous devez définir 
+
+ces données sur protectedou privatepropriétés afin que 
+
+les données ne soient pas automatiquement mises à la 
+
+disposition du modèle. Ensuite, lors de l'appel de la 
+
+with méthode, passez un tableau de données que vous 
+
+souhaitez mettre à disposition du modèle :
+
+<?php
+ 
+namespace App\Mail;
+ 
+use App\Models\Order;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+ 
+class OrderShipped extends Mailable
+{
+    use Queueable, SerializesModels;
+ 
+    /**
+     * The order instance.
+     *
+     * @var \App\Models\Order
+     */
+    protected $order;
+ 
+    /**
+     * Create a new message instance.
+     *
+     * @param  \App\Models\Order  $order
+     * @return void
+     */
+    public function __construct(Order $order)
+    {
+        $this->order = $order;
+    }
+ 
+    /**
+     * Build the message.
+     *
+     * @return $this
+     */
+    public function build()
+    {
+        return $this->view('emails.orders.shipped')
+                    ->with([
+                        'orderName' => $this->order->name,
+                        'orderPrice' => $this->order->price,
+                    ]);
+    }
+}
+
+Une fois que les données ont été transmises à la with 
+
+méthode, elles seront automatiquement disponibles 
+
+dans votre vue, vous pouvez donc y accéder comme vous 
+
+accéderiez à n'importe quelle autre donnée dans vos 
+
+modèles Blade :
+
+<div>
+    Price: {{ $orderPrice }}
+</div>
+
+Pièces jointes
+Pour ajouter des pièces jointes à un e-mail, utilisez la 
+
+attachméthode de la méthode de la classe mailable build. 
+
+La attachméthode accepte le chemin complet du fichier comme 
+
+premier argument :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped')
+                ->attach('/path/to/file');
+}
+
+Lorsque vous joignez des fichiers à un message, vous 
+
+pouvez également spécifier le nom d'affichage et/ou le type 
+
+MIME en passant un arraycomme deuxième argument à la 
+
+attachméthode :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped')
+                ->attach('/path/to/file', [
+                    'as' => 'name.pdf',
+                    'mime' => 'application/pdf',
+                ]);
+}
+
+Joindre des fichiers à partir du disque
+Si vous avez stocké un fichier sur l'un de vos disques de système de 
+
+fichiers , vous pouvez le joindre à l'e-mail en utilisant la 
+
+attachFromStorageméthode :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+   return $this->view('emails.orders.shipped')
+               ->attachFromStorage('/path/to/file');
+}
+
+Si nécessaire, vous pouvez spécifier le nom de la pièce 
+
+jointe du fichier et des options supplémentaires en utilisant 
+
+les deuxième et troisième arguments de la attachFromStorageméthode :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+   return $this->view('emails.orders.shipped')
+               ->attachFromStorage('/path/to/file', 'name.pdf', [
+                   'mime' => 'application/pdf'
+               ]);
+}
+
+La attachFromStorageDiskméthode peut être utilisée si 
+
+vous devez spécifier un disque de stockage autre que 
+
+votre disque par défaut :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+   return $this->view('emails.orders.shipped')
+               ->attachFromStorageDisk('s3', '/path/to/file');
+}
+
+Pièces jointes de données brutes
+La attachDataméthode peut être utilisée pour joindre 
+
+une chaîne brute d'octets en tant que pièce jointe. 
+
+Par exemple, vous pouvez utiliser cette méthode si 
+
+vous avez généré un PDF en mémoire et souhaitez le 
+
+joindre à l'e-mail sans l'écrire sur le disque. La 
+
+attach Data méthode accepte les octets de données 
+
+brutes comme premier argument, le nom du fichier 
+
+comme deuxième argument et un tableau d'options 
+
+comme troisième argument :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped')
+                ->attachData($this->pdf, 'name.pdf', [
+                    'mime' => 'application/pdf',
+                ]);
+}
+
+Pièces jointes en ligne
+L'intégration d'images en ligne dans vos e-mails 
+
+est généralement fastidieuse. cependant, Laravel 
+
+fournit un moyen pratique de joindre des images à 
+
+vos e-mails. Pour intégrer une image en ligne, 
+
+utilisez la embedméthode sur la $messagevariable 
+
+dans votre modèle d'e-mail. Laravel rend automatiquement 
+
+la $messagevariable disponible pour tous vos modèles 
+
+d'e-mail, vous n'avez donc pas à vous soucier de la 
+
+transmettre manuellement :
+
+<body>
+    Here is an image:
+ 
+    <img src="{{ $message->embed($pathToImage) }}">
+</body>
+
+
+La $messagevariable n'est pas disponible dans les 
+
+modèles de message en texte brut, car les messages 
+
+en texte brut n'utilisent pas de pièces jointes en 
+
+ligne.
+
+
+Intégration de pièces jointes de données brutes
+Si vous avez déjà une chaîne de données d'image brute 
+
+que vous souhaitez intégrer dans un modèle d'e-mail, 
+
+vous pouvez appeler la embedDataméthode sur la $message
+
+variable. Lors de l'appel de la embedDataméthode, vous 
+
+devrez fournir un nom de fichier qui doit être attribué 
+
+à l'image intégrée :
+
+<body>
+    Here is an image from raw data:
+ 
+    <img src="{{ $message->embedData($data, 'example-image.jpg') }}">
+</body>
+
+Objets attachables
+Bien que joindre des fichiers aux messages via de 
+
+simples chemins de chaîne soit souvent suffisant, 
+
+dans de nombreux cas, les entités pouvant être jointes 
+
+au sein de votre application sont représentées par des 
+
+classes. Par exemple, si votre application joint une 
+
+photo à un message, votre application peut également 
+
+avoir un Photomodèle qui représente cette photo. Lorsque 
+
+c'est le cas, ne serait-il pas pratique de simplement 
+
+passer le Photomodèle à la attachméthode ? Les objets 
+
+attachables vous permettent de faire exactement cela.
+
+Pour commencer, implémentez 
+
+l' Illuminate\Contracts\Mail\Attachableinterface sur 
+
+l'objet qui pourra être attaché aux messages. Cette 
+
+interface impose à votre classe de définir une 
+
+toMailAttachmentméthode qui renvoie une 
+
+Illuminate\Mail\Attachmentinstance :
+
+<?php
+ 
+namespace App\Models;
+ 
+use Illuminate\Contracts\Mail\Attachable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Mail\Attachment;
+ 
+class Photo extends Model implements Attachable
+{
+    /**
+     * Get the attachable representation of the model.
+     *
+     * @return \Illuminate\Mail\Attachment
+     */
+    public function toMailAttachment()
+    {
+        return Attachment::fromPath('/path/to/file');
+    }
+}
+
+Une fois que vous avez défini votre objet pouvant 
+
+être attaché, vous pouvez simplement passer une 
+
+instance de cet objet à la attachméthode lors de 
+
+la création d'un message électronique :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('photos.resized')
+                ->attach($this->photo);
+}
+
+Bien sûr, les données des pièces jointes peuvent être 
+
+stockées sur un service de stockage de fichiers à 
+
+distance tel qu'Amazon S3. Ainsi, Laravel vous permet 
+
+également de générer des instances de pièces jointes à 
+
+partir de données stockées sur l'un des disques du 
+
+système de fichiers de votre application :
+
+// Create an attachment from a file on your default disk...
+return Attachment::fromStorage($this->path);
+ 
+// Create an attachment from a file on a specific disk...
+return Attachment::fromStorageDisk('backblaze', $this->path);
+
+De plus, vous pouvez créer des instances de pièces 
+
+jointes via les données que vous avez en mémoire. 
+
+Pour ce faire, fournissez une clôture à la fromDataméthode. 
+
+La fermeture doit renvoyer les données brutes qui représentent 
+
+la pièce jointe :
+
+return Attachment::fromData(fn () => $this->content);
+
+Laravel fournit également des méthodes supplémentaires que 
+
+vous pouvez utiliser pour personnaliser vos pièces jointes. 
+
+Par exemple, vous pouvez utiliser les méthodes aset withMimepour 
+
+personnaliser le nom du fichier et le type MIME :
+
+return Attachment::fromPath('/path/to/file')
+        ->as('Photo Name')
+        ->withMime('image/jpeg');
+
+Balises et métadonnées
+Certains fournisseurs de messagerie tiers tels que Mailgun 
+
+et Postmark prennent en charge les "tags" et les "métadonnées" 
+
+des messages, qui peuvent être utilisés pour regrouper et suivre 
+
+les e-mails envoyés par votre application. Vous pouvez ajouter 
+
+des balises et des métadonnées à un e-mail via les méthodes 
+
+taget :metadata
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->view('emails.orders.shipped')
+                ->tag('shipment')
+                ->metadata('order_id', $this->order->id);
+}
+
+Si votre application utilise le pilote Mailgun, vous pouvez 
+
+consulter la documentation de Mailgun pour plus d'informations 
+
+sur les balises et les métadonnées . De même, la documentation 
+
+Postmark peut également être consultée pour plus d'informations 
+
+sur leur prise en charge des balises et des métadonnées .
+
+Si votre application utilise Amazon SES pour envoyer des 
+
+e-mails, vous devez utiliser la metadataméthode pour 
+
+attacher des « balises » SES au message.
+
+Personnaliser le message Symfony
+La withSymfonyMessageméthode de la Mailableclasse de 
+
+base permet d'enregistrer une fermeture qui sera invoquée 
+
+avec l'instance Symfony Message avant d'envoyer le message. 
+
+Cela vous donne la possibilité de personnaliser en profondeur 
+
+le message avant qu'il ne soit diffusé :
+
+use Symfony\Component\Mime\Email;
+ 
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    $this->view('emails.orders.shipped');
+ 
+    $this->withSymfonyMessage(function (Email $message) {
+        $message->getHeaders()->addTextHeader(
+            'Custom-Header', 'Header Value'
+        );
+    });
+ 
+    return $this;
+}
+
+Envois de démarquage
+Les messages mailables Markdown vous permettent de tirer 
+
+parti des modèles et des composants prédéfinis des 
+
+notifications par e-mail dans vos mailables. Étant 
+
+donné que les messages sont écrits en Markdown, Laravel 
+
+est capable de rendre de beaux modèles HTML réactifs pour 
+
+les messages tout en générant automatiquement une 
+
+contrepartie en texte brut.
+
+Génération d'e-mails Markdown
+Pour générer un mailable avec un modèle Markdown 
+
+correspondant, vous pouvez utiliser l' --markdownoption 
+
+de la make:mailcommande Artisan :
+
+php artisan make:mail OrderShipped --markdown=emails.orders.shipped
+
+Ensuite, lors de la configuration du mailable dans sa 
+
+build méthode, appelez la mark down méthode au lieu de la 
+
+view méthode. La markdownméthode accepte le nom du modèle 
+
+Markdown et un tableau facultatif de données à mettre à la 
+
+disposition du modèle :
+
+/**
+ * Build the message.
+ *
+ * @return $this
+ */
+public function build()
+{
+    return $this->from('example@example.com')
+                ->markdown('emails.orders.shipped', [
+                    'url' => $this->orderUrl,
+                ]);
+}
+
+Rédaction de messages de démarquage
+Les mailables Markdown utilisent une combinaison de composants 
+
+Blade et de syntaxe Markdown qui vous permettent de créer 
+
+facilement des messages électroniques tout en tirant parti 
+
+des composants d'interface utilisateur de messagerie prédéfinis 
+
+de Laravel :
+
+@component('mail::message')
+# Order Shipped
+ 
+Your order has been shipped!
+ 
+@component('mail::button', ['url' => $url])
+View Order
+@endcomponent
+ 
+Thanks,<br>
+{{ config('app.name') }}
+@endcomponent
+
+
+N'utilisez pas d'indentation excessive lors de la rédaction 
+
+d'e-mails Markdown. Selon les normes Markdown, les analyseurs
+
+Markdown rendront le contenu indenté sous forme de blocs de code.
+
+
+Composant de bouton
+Le composant de bouton restitue un lien de bouton centré. 
+
+Le composant accepte deux arguments, un urlet un facultatif 
+
+color. Les couleurs prises en charge sont primary, successet 
+
+error. Vous pouvez ajouter autant de composants de bouton 
+
+à un message que vous le souhaitez :
+
+@component('mail::button', ['url' => $url, 'color' => 'success'])
+View Order
+@endcomponent
+
+Composant de panneau
+Le composant panel restitue le bloc de texte donné dans un 
+
+panneau dont la couleur d'arrière-plan est légèrement 
+
+différente de celle du reste du message. Cela vous permet 
+
+d'attirer l'attention sur un bloc de texte donné :
+
+@component('mail::panel')
+This is the panel content.
+@endcomponent
+
+Composant de tableau
+Le composant tableau permet de transformer un tableau 
+
+Markdown en tableau HTML. Le composant accepte la table 
+
+Markdown comme contenu. L'alignement des colonnes de 
+
+tableau est pris en charge à l'aide de la syntaxe 
+
+d'alignement de tableau Markdown par défaut :
+
+@component('mail::table')
+| Laravel       | Table         | Example  |
+| ------------- |:-------------:| --------:|
+| Col 2 is      | Centered      | $10      |
+| Col 3 is      | Right-Aligned | $20      |
+@endcomponent
+
+Personnalisation des composants
+Vous pouvez exporter tous les composants de messagerie 
+
+Markdown vers votre propre application pour la 
+
+personnalisation. Pour exporter les composants, utilisez 
+
+la vendor:publishcommande Artisan pour publier l'étiquette 
+
+laravel-mail d'inventaire :
+
+php artisan vendor:publish --tag=laravel-mail
+
+Cette commande publiera les composants de messagerie 
+
+Markdown dans le resources/views/vendor/mailrépertoire. 
+
+Le mail répertoire contiendra un htmlet un textrépertoire, 
+
+chacun contenant leurs représentations respectives de 
+
+chaque composant disponible. Vous êtes libre de 
+
+personnaliser ces composants comme bon vous semble.
+
+Personnalisation du CSS
+Après avoir exporté les composants, le répertoire
+
+resources/views/vendor/mail/html/themes contiendra un 
+
+default.cssfichier. Vous pouvez personnaliser le CSS 
+
+dans ce fichier et vos styles seront automatiquement 
+
+convertis en styles CSS intégrés dans les représentations 
+
+HTML de vos messages électroniques Markdown.
+
+Si vous souhaitez créer un thème entièrement nouveau 
+
+pour les composants Markdown de Laravel, vous pouvez 
+
+placer un fichier CSS dans le html/themesrépertoire. 
+
+Après avoir nommé et enregistré votre fichier CSS, 
+
+mettez à jour l' themeoption du config/mail.phpfichier 
+
+de configuration de votre application pour qu'elle 
+
+corresponde au nom de votre nouveau thème.
+
+Pour personnaliser le thème d'un mailable individuel, 
+
+vous pouvez définir la $themepropriété de la classe 
+
+mailable sur le nom du thème qui doit être utilisé 
+
+lors de l'envoi de ce mailable.
+
+Envoi de mail
+Pour envoyer un message, utilisez la tométhode sur la 
+
+Mail façade . La tométhode accepte une adresse e-mail, 
+
+une instance d'utilisateur ou une collection d'utilisateurs. 
+
+Si vous transmettez un objet ou une collection d'objets, le 
+
+mailer utilisera automatiquement leurs propriétés email 
+
+et name lors de la détermination des destinataires de 
+
+l'e-mail, assurez-vous donc que ces attributs sont 
+
+disponibles sur vos objets. Une fois que vous avez 
+
+spécifié vos destinataires, vous pouvez passer une 
+
+instance de votre classe mailable à la sendméthode :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Mail\OrderShipped;
+use App\Models\Order;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+ 
+class OrderShipmentController extends Controller
+{
+    /**
+     * Ship the given order.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $order = Order::findOrFail($request->order_id);
+ 
+        // Ship the order...
+ 
+        Mail::to($request->user())->send(new OrderShipped($order));
+    }
+}
+
+Vous n'êtes pas limité à spécifier simplement les 
+
+destinataires "à" lors de l'envoi d'un message. 
+
+Vous êtes libre de définir les destinataires "to", 
+
+"cc" et "bcc" en enchaînant leurs méthodes respectives :
+
+Mail::to($request->user())
+    ->cc($moreUsers)
+    ->bcc($evenMoreUsers)
+    ->send(new OrderShipped($order));
+
+Bouclage sur les destinataires
+Parfois, vous devrez peut-être envoyer un mailable à 
+
+une liste de destinataires en itérant sur un tableau 
+
+de destinataires / adresses e-mail. Cependant, étant 
+
+donné que la tométhode ajoute des adresses e-mail à la 
+
+liste des destinataires de l'envoi, chaque itération dans 
+
+la boucle enverra un autre e-mail à chaque destinataire 
+
+précédent. Par conséquent, vous devez toujours recréer 
+
+l'instance mailable pour chaque destinataire :
+
+foreach (['taylor@example.com', 'dries@example.com'] as $recipient) {
+    Mail::to($recipient)->send(new OrderShipped($order));
+}
+
+Envoi de courrier via un expéditeur spécifique
+Par défaut, Laravel enverra des e-mails en utilisant 
+
+le mailer configuré comme defaultmailer dans le fichier 
+
+de configuration de votre application mail. Cependant, 
+
+vous pouvez utiliser la mailerméthode pour envoyer un 
+
+message en utilisant une configuration de messagerie 
+
+spécifique :
+
+Mail::mailer('postmark')
+        ->to($request->user())
+        ->send(new OrderShipped($order));
+
+Mise en file d'attente du courrier
+Mettre un message en file d'attente
+Étant donné que l'envoi d'e-mails peut avoir un impact 
+
+négatif sur le temps de réponse de votre application, 
+
+de nombreux développeurs choisissent de mettre les 
+
+e-mails en file d'attente pour un envoi en arrière-plan. 
+
+Laravel facilite cela en utilisant son API de file 
+
+d'attente unifiée intégrée . Pour mettre un message 
+
+en file d'attente, utilisez la queueméthode sur la 
+
+Mailfaçade après avoir spécifié les destinataires 
+
+du message :
+
+Mail::to($request->user())
+    ->cc($moreUsers)
+    ->bcc($evenMoreUsers)
+    ->queue(new OrderShipped($order));
+
+Cette méthode se chargera automatiquement de pousser 
+
+un travail dans la file d'attente afin que le message 
+
+soit envoyé en arrière-plan. Vous devrez configurer vos 
+
+files d'attente avant d'utiliser cette fonctionnalité.
+
+Mise en file d'attente des messages retardée
+Si vous souhaitez retarder la livraison d'un message 
+
+électronique en file d'attente, vous pouvez utiliser 
+
+la laterméthode. Comme premier argument, la laterméthode 
+
+accepte une DateTimeinstance indiquant quand le message 
+
+doit être envoyé :
+
+Mail::to($request->user())
+    ->cc($moreUsers)
+    ->bcc($evenMoreUsers)
+    ->later(now()->addMinutes(10), new OrderShipped($order));
+
+Pousser vers des files d'attente spécifiques
+Étant donné que toutes les classes mailables générées 
+
+à l'aide de la make:mailcommande utilisent le 
+
+Illuminate\Bus\Queueabletrait, vous pouvez appeler les 
+
+méthodes onQueueet onConnectionsur n'importe quelle 
+
+instance de classe mailable, ce qui vous permet de 
+
+spécifier la connexion et le nom de la file d'attente 
+
+pour le message :
+
+$message = (new OrderShipped($order))
+                ->onConnection('sqs')
+                ->onQueue('emails');
+ 
+Mail::to($request->user())
+    ->cc($moreUsers)
+    ->bcc($evenMoreUsers)
+    ->queue($message);
+
+Mise en file d'attente par défaut
+Si vous avez des classes mailables que vous souhaitez 
+
+toujours mettre en file d'attente, vous pouvez implémenter 
+
+le ShouldQueuecontrat sur la classe. Maintenant, même si 
+
+vous appelez la sendméthode lors de l'envoi, le mailable 
+
+sera toujours mis en file d'attente puisqu'il implémente 
+
+le contrat :
+
+use Illuminate\Contracts\Queue\ShouldQueue;
+ 
+class OrderShipped extends Mailable implements ShouldQueue
+{
+    //
+}
+
+Mailables en file d'attente et transactions de base de données
+Lorsque les e-mails en file d'attente sont distribués 
+
+dans des transactions de base de données, ils peuvent 
+
+être traités par la file d'attente avant que la transaction 
+
+de base de données ne soit validée. Lorsque cela se produit, 
+
+les mises à jour que vous avez apportées aux modèles ou 
+
+aux enregistrements de base de données lors de la 
+
+transaction de base de données peuvent ne pas encore 
+
+être reflétées dans la base de données. De plus, tous 
+
+les modèles ou enregistrements de base de données créés 
+
+dans la transaction peuvent ne pas exister dans la base 
+
+de données. Si votre envoi dépend de ces modèles, des 
+
+erreurs inattendues peuvent se produire lors du traitement 
+
+de la tâche qui envoie l'envoi en file d'attente.
+
+Si l' after_commitoption de configuration de votre connexion 
+
+à la file d'attente est définie sur false, vous pouvez 
+
+toujours indiquer qu'un mailable particulier en file 
+
+d'attente doit être envoyé après que toutes les transactions 
+
+de base de données ouvertes ont été validées en appelant 
+
+la afterCommitméthode lors de l'envoi du message 
+
+électronique :
+
+Mail::to($request->user())->send(
+    (new OrderShipped($order))->afterCommit()
+);
+
+Alternativement, vous pouvez appeler la afterCommitméthode 
+
+depuis le constructeur de votre mailable :
+
+<?php
+ 
+namespace App\Mail;
+ 
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+ 
+class OrderShipped extends Mailable implements ShouldQueue
+{
+    use Queueable, SerializesModels;
+ 
+    /**
+     * Create a new message instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->afterCommit();
+    }
+}
+
+
+Pour en savoir plus sur la façon de contourner ces 
+
+problèmes, veuillez consulter la documentation relative 
+
+aux travaux en file d'attente et aux transactions de 
+
+base de données .
+
+
+Rendu des e-mails
+Parfois, vous souhaiterez peut-être capturer le contenu 
+
+HTML d'un envoi sans l'envoyer. Pour ce faire, vous 
+
+pouvez appeler la renderméthode du mailable. Cette 
+
+méthode renverra le contenu HTML évalué de l'envoi 
+
+sous forme de chaîne :
+
+use App\Mail\InvoicePaid;
+use App\Models\Invoice;
+ 
+$invoice = Invoice::find(1);
+ 
+return (new InvoicePaid($invoice))->render();
+
+Aperçu des e-mails dans le navigateur
+Lors de la conception d'un modèle d'envoi, il est 
+
+pratique de prévisualiser rapidement l'envoi rendu 
+
+dans votre navigateur comme un modèle Blade typique. 
+
+Pour cette raison, Laravel vous permet de retourner 
+
+tout courrier directement à partir d'une fermeture de 
+
+route ou d'un contrôleur. Lorsqu'un mailable est renvoyé, 
+
+il sera rendu et affiché dans le navigateur, vous 
+
+permettant de prévisualiser rapidement sa conception 
+
+sans avoir besoin de l'envoyer à une adresse e-mail 
+
+réelle :
+
+Route::get('/mailable', function () {
+    $invoice = App\Models\Invoice::find(1);
+ 
+    return new App\Mail\InvoicePaid($invoice);
+});
+
+
+Les pièces jointes en ligne ne seront pas rendues 
+
+lorsqu'un mailable est prévisualisé dans votre navigateur. 
+
+Pour prévisualiser ces mailables, vous devez les envoyer 
+
+à une application de test de messagerie telle que MailHog 
+
+ou HELO .
+
+
+Localisation des e-mails
+Laravel vous permet d'envoyer des mailables dans des 
+
+paramètres régionaux autres que les paramètres régionaux 
+
+actuels de la demande, et se souviendra même de ces 
+
+paramètres régionaux si le courrier est mis en file d'attente.
+
+Pour ce faire, la Mailfaçade propose une locale méthode 
+
+pour définir la langue souhaitée. L'application passera 
+
+à cette locale lorsque le modèle de mailable est en cours 
+
+d'évaluation, puis reviendra à la locale précédente une 
+
+fois l'évaluation terminée :
+
+Mail::to($request->user())->locale('es')->send(
+    new OrderShipped($order)
+);
+
+Paramètres régionaux préférés de l'utilisateur
+Parfois, les applications stockent les paramètres 
+
+régionaux préférés de chaque utilisateur. En implémentant 
+
+le HasLocalePreferencecontrat sur un ou plusieurs de vos 
+
+modèles, vous pouvez demander à Laravel d'utiliser ces 
+
+paramètres régionaux stockés lors de l'envoi de courrier :
+
+use Illuminate\Contracts\Translation\HasLocalePreference;
+ 
+class User extends Model implements HasLocalePreference
+{
+    /**
+     * Get the user's preferred locale.
+     *
+     * @return string
+     */
+    public function preferredLocale()
+    {
+        return $this->locale;
+    }
+}
+
+Une fois que vous avez implémenté l'interface, Laravel 
+
+utilisera automatiquement les paramètres régionaux 
+
+préférés lors de l'envoi de mailables et de notifications 
+
+au modèle. Par conséquent, il n'est pas nécessaire 
+
+d'appeler la localeméthode lors de l'utilisation de 
+
+cette interface :
+
+Mail::to($request->user())->send(new OrderShipped($order));
+
+Tester les e-mails
+Laravel fournit plusieurs méthodes pratiques pour 
+
+tester que vos mailables contiennent le contenu que 
+
+vous attendez. Ces méthodes sont : assertSeeInHtml, 
+
+assertDontSeeInHtml, assertSeeInOrderInHtml, 
+
+assertSeeInText, assertDontSeeInText, et 
+
+assertSeeInOrderInText.
+
+Comme vous pouvez vous y attendre, les assertions 
+
+"HTML" affirment que la version HTML de votre mailable 
+
+contient une chaîne donnée, tandis que les assertions 
+
+"text" affirment que la version en texte brut de votre 
+
+mailable contient une chaîne donnée :
+
+use App\Mail\InvoicePaid;
+use App\Models\User;
+ 
+public function test_mailable_content()
+{
+    $user = User::factory()->create();
+ 
+    $mailable = new InvoicePaid($user);
+ 
+    $mailable->assertSeeInHtml($user->email);
+    $mailable->assertSeeInHtml('Invoice Paid');
+    $mailable->assertSeeInOrderInHtml(['Invoice Paid', 'Thanks']);
+ 
+    $mailable->assertSeeInText($user->email);
+    $mailable->assertSeeInOrderInText(['Invoice Paid', 'Thanks']);
+}
+
+Test de l'envoi par e-mail
+Nous vous suggérons de tester le contenu de vos mailables 
+
+séparément de vos tests qui affirment qu'un mailable donné 
+
+a été "envoyé" à un utilisateur spécifique. Pour savoir 
+
+comment tester l'envoi des mailables, consultez notre 
+
+documentation sur le Mail fake .
+
+Courrier & Développement local
+Lorsque vous développez une application qui envoie 
+
+des e-mails, vous ne souhaitez probablement pas 
+
+envoyer des e-mails à des adresses e-mail actives. 
+
+Laravel propose plusieurs façons de "désactiver" 
+
+l'envoi effectif d'e-mails lors du développement local.
+
+Pilote de journal
+Au lieu d'envoyer vos e-mails, le logpilote de 
+
+messagerie écrira tous les e-mails dans vos fichiers 
+
+journaux pour inspection. En règle générale, ce pilote 
+
+ne serait utilisé que lors du développement local. Pour 
+
+plus d'informations sur la configuration de votre 
+
+application par environnement, consultez la 
+
+documentation de configuration .
+
+HELO / Mailtrap / MailHog
+Alternativement, vous pouvez utiliser un service 
+
+comme HELO ou Mailtrap et le smtppilote pour envoyer 
+
+vos messages électroniques à une boîte aux lettres 
+
+"factice" où vous pouvez les afficher dans un véritable 
+
+client de messagerie. Cette approche a l'avantage de 
+
+vous permettre d'inspecter réellement les e-mails 
+
+finaux dans la visionneuse de messages de Mailtrap.
+
+Si vous utilisez Laravel Sail , vous pouvez 
+
+prévisualiser vos messages en utilisant MailHog . 
+
+Lorsque Sail est en cours d'exécution, vous pouvez 
+
+accéder à l'interface MailHog à : http://localhost:8025.
+
+Utilisation d'une toadresse globale
+Enfin, vous pouvez spécifier une adresse "à" globale 
+
+en invoquant la alwaysTométhode offerte par la 
+
+Mailfaçade. En règle générale, cette méthode doit 
+
+être appelée à partir de la bootméthode de l'un des 
+
+fournisseurs de services de votre application :
+
+use Illuminate\Support\Facades\Mail;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    if ($this->app->environment('local')) {
+        Mail::alwaysTo('taylor@example.com');
+    }
+}
+
+Événements
+Laravel déclenche deux événements pendant le processus 
+
+d'envoi de messages électroniques. L'événement 
+
+MessageSending est déclenché avant l'envoi d'un message, 
+
+tandis que l' MessageSentévénement est déclenché après 
+
+l'envoi d'un message. N'oubliez pas que ces événements 
+
+sont déclenchés lorsque le courrier est envoyé , pas 
+
+lorsqu'il est mis en file d'attente. Vous pouvez 
+
+enregistrer des auditeurs d'événements pour cet 
+
+événement auprès de votre 
+
+App\Providers\EventServiceProviderfournisseur de 
+
+services :
+
+/**
+ * The event listener mappings for the application.
+ *
+ * @var array
+ */
+protected $listen = [
+    'Illuminate\Mail\Events\MessageSending' => [
+        'App\Listeners\LogSendingMessage',
+    ],
+    'Illuminate\Mail\Events\MessageSent' => [
+        'App\Listeners\LogSentMessage',
+    ],
+];
+
+Transports personnalisés
+Laravel comprend une variété de transports de 
+
+courrier; cependant, vous souhaiterez peut-être 
+
+écrire vos propres transports pour envoyer des 
+
+e-mails via d'autres services que Laravel ne 
+
+prend pas en charge par défaut. Pour commencer, 
+
+définissez une classe qui étend la 
+
+Symfony\Component\Mailer\Transport\AbstractTransportclasse. 
+
+Ensuite, implémentez les méthodes doSendet __toString() sur 
+
+votre transport :
+
+use MailchimpTransactional\ApiClient;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
+use Symfony\Component\Mime\MessageConverter;
+ 
+class MailchimpTransport extends AbstractTransport
+{
+    /**
+     * The Mailchimp API client.
+     *
+     * @var \MailchimpTransactional\ApiClient
+     */
+    protected $client;
+ 
+    /**
+     * Create a new Mailchimp transport instance.
+     *
+     * @param  \MailchimpTransactional\ApiClient  $client
+     * @return void
+     */
+    public function __construct(ApiClient $client)
+    {
+        $this->client = $client;
+    }
+ 
+    /**
+     * {@inheritDoc}
+     */
+    protected function doSend(SentMessage $message): void
+    {
+        $email = MessageConverter::toEmail($message->getOriginalMessage());
+ 
+        $this->client->messages->send(['message' => [
+            'from_email' => $email->getFrom(),
+            'to' => collect($email->getTo())->map(function ($email) {
+                return ['email' => $email->getAddress(), 'type' => 'to'];
+            })->all(),
+            'subject' => $email->getSubject(),
+            'text' => $email->getTextBody(),
+        ]]);
+    }
+ 
+    /**
+     * Get the string representation of the transport.
+     *
+     * @return string
+     */
+    public function __toString(): string
+    {
+        return 'mailchimp';
+    }
+}
+
+Une fois que vous avez défini votre transport 
+
+personnalisé, vous pouvez l'enregistrer via la 
+
+extend méthode fournie par la Mailfaçade. En 
+
+règle générale, cela doit être fait dans le 
+
+cadre de la bootméthode du AppServiceProviderfournisseur 
+
+de services de votre application. Un $configargument 
+
+sera passé à la fermeture fournie à la extendméthode. 
+
+Cet argument contiendra le tableau de configuration 
+
+défini pour le mailer dans le config/mail.phpfichier 
+
+de configuration de l'application :
+
+use App\Mail\MailchimpTransport;
+use Illuminate\Support\Facades\Mail;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Mail::extend('mailchimp', function (array $config = []) {
+        return new MailchimpTransport(/* ... */);
+    })
+}
+
+Une fois que votre transport personnalisé a été 
+
+défini et enregistré, vous pouvez créer une 
+
+définition de messagerie dans le config/mail.phpfichier 
+
+de configuration de votre application qui utilise le 
+
+nouveau transport :
+
+'mailchimp' => [
+    'transport' => 'mailchimp',
+    // ...
+],
+
+Transports Symfony supplémentaires
+Laravel inclut la prise en charge de certains 
+
+transports de courrier existants maintenus par 
+
+Symfony, tels que Mailgun et Postmark. Cependant, 
+
+vous souhaiterez peut-être étendre Laravel avec la 
+
+prise en charge de transports supplémentaires 
+
+maintenus par Symfony. Vous pouvez le faire en 
+
+exigeant le mailer Symfony nécessaire via Composer 
+
+et en enregistrant le transport avec Laravel. Par 
+
+exemple, vous pouvez installer et enregistrer le 
+
+mailer Symfony "Sendinblue":
+
+composer require symfony/sendinblue-mailer
+
+Une fois le package de messagerie Sendinblue installé, 
+
+vous pouvez ajouter une entrée pour vos identifiants 
+
+API Sendinblue dans le servicesfichier de configuration 
+
+de votre application :
+
+'sendinblue' => [
+    'key' => 'your-api-key',
+],
+
+Enfin, vous pouvez utiliser la méthode de la Mailfaçade 
+
+extendpour enregistrer le transport auprès de Laravel. 
+
+En règle générale, cela doit être fait dans le cadre de 
+
+la bootméthode d'un fournisseur de services :
+
+use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Bridge\Sendinblue\Transport\SendinblueTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
+ 
+/**
+ * Bootstrap any application services.
+ *
+ * @return void
+ */
+public function boot()
+{
+    Mail::extend('sendinblue', function () {
+        return (new SendinblueTransportFactory)->create(
+            new Dsn(
+                'sendinblue+api',
+                'default',
+                config('services.sendinblue.key')
+            )
+        );
+    });
+}
+

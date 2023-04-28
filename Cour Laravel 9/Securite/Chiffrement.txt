@@ -1,0 +1,50 @@
+Chiffrement
+Introduction
+Configuration
+Utilisation du chiffreur
+Introduction
+Les services de chiffrement de Laravel fournissent une interface simple et pratique pour chiffrer et déchiffrer du texte via OpenSSL en utilisant le chiffrement AES-256 et AES-128. Toutes les valeurs chiffrées de Laravel sont signées à l'aide d'un code d'authentification de message (MAC) afin que leur valeur sous-jacente ne puisse pas être modifiée ou altérée une fois chiffrée.
+
+Configuration
+Avant d'utiliser le chiffreur de Laravel, vous devez définir l' keyoption de configuration dans votre config/app.phpfichier de configuration. Cette valeur de configuration est pilotée par la APP_KEYvariable d'environnement. Vous devez utiliser la php artisan key:generatecommande pour générer la valeur de cette variable car la key:generatecommande utilisera le générateur sécurisé d'octets aléatoires de PHP pour créer une clé cryptographiquement sécurisée pour votre application. Typiquement, la valeur de la APP_KEYvariable d'environnement sera générée pour vous lors de l'installation de Laravel .
+
+Utilisation du chiffreur
+Crypter une valeur
+Vous pouvez chiffrer une valeur en utilisant la encryptStringméthode fournie par la Cryptfaçade. Toutes les valeurs chiffrées sont chiffrées à l'aide d'OpenSSL et du chiffrement AES-256-CBC. De plus, toutes les valeurs cryptées sont signées avec un code d'authentification de message (MAC). Le code d'authentification de message intégré empêchera le déchiffrement de toutes les valeurs qui ont été falsifiées par des utilisateurs malveillants :
+
+<?php
+ 
+namespace App\Http\Controllers;
+ 
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
+ 
+class DigitalOceanTokenController extends Controller
+{
+    /**
+     * Store a DigitalOcean API token for the user.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function storeSecret(Request $request)
+    {
+        $request->user()->fill([
+            'token' => Crypt::encryptString($request->token),
+        ])->save();
+    }
+}
+
+Déchiffrer une valeur
+Vous pouvez déchiffrer les valeurs en utilisant la decryptStringméthode fournie par la Cryptfaçade. Si la valeur ne peut pas être correctement déchiffrée, par exemple lorsque le code d'authentification du message n'est pas valide, un message Illuminate\Contracts\Encryption\DecryptExceptionsera émis :
+
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
+ 
+try {
+    $decrypted = Crypt::decryptString($encryptedValue);
+} catch (DecryptException $e) {
+    //
+}

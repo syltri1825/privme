@@ -1,0 +1,184 @@
+Éloquent : Collections
+Introduction
+Méthodes disponibles
+Collections personnalisées
+Introduction
+Toutes les méthodes Eloquent qui renvoient plus d'un résultat de modèle renverront des instances de la 
+
+Illuminate\Database\Eloquent\Collectionclasse, y compris les résultats récupérés via la getméthode ou 
+
+accessibles via une relation. L'objet de collection Eloquent étend la collection de base de Laravel , 
+
+il hérite donc naturellement de dizaines de méthodes utilisées pour travailler de manière fluide avec le tableau 
+
+sous-jacent de modèles Eloquent. Assurez-vous de consulter la documentation de la collection Laravel pour tout 
+savoir sur ces méthodes utiles !
+
+Toutes les collections servent également d'itérateurs, vous permettant de les parcourir comme s'il s'agissait 
+
+de simples tableaux PHP :
+
+use App\Models\User;
+ 
+$users = User::where('active', 1)->get();
+ 
+foreach ($users as $user) {
+    echo $user->name;
+}
+
+Cependant, comme mentionné précédemment, les collections sont beaucoup plus puissantes que les tableaux et exposent une variété d'opérations de mappage/réduction qui peuvent être enchaînées à l'aide d'une interface intuitive. Par exemple, nous pouvons supprimer tous les modèles inactifs, puis collecter le prénom de chaque utilisateur restant :
+
+$names = User::all()->reject(function ($user) {
+    return $user->active === false;
+})->map(function ($user) {
+    return $user->name;
+});
+
+Conversion de collection éloquente
+Alors que la plupart des méthodes de collection Eloquent renvoient une nouvelle instance d'une collection Eloquent, les méthodes collapse, flatten, flip, keys, plucket ziprenvoient une instance de collection de base . De même, si une mapopération renvoie une collection qui ne contient aucun modèle Eloquent, elle sera convertie en une instance de collection de base.
+
+Méthodes disponibles
+Toutes les collections Eloquent étendent l'objet de base de la collection Laravel ; par conséquent, ils héritent de toutes les méthodes puissantes fournies par la classe de collection de base.
+
+En outre, la Illuminate\Database\Eloquent\Collectionclasse fournit un sur-ensemble de méthodes pour vous aider à gérer vos collections de modèles. La plupart des méthodes renvoient des Illuminate\Database\Eloquent\Collectioninstances ; cependant, certaines méthodes, comme modelKeys, renvoient une Illuminate\Support\Collectioninstance.
+
+ajouter
+contient
+différence
+à l'exception
+trouver
+Frais
+couper
+charger
+charge manquante
+modelKeys
+rendre visible
+mourir caché
+seulement
+toQuery
+unique
+
+append($attributes)
+La appendméthode peut être utilisée pour indiquer qu'un attribut doit être ajouté pour chaque modèle de la collection. Cette méthode accepte un tableau d'attributs ou un seul attribut :
+
+$users->append('team');
+ 
+$users->append(['team', 'is_admin']);
+
+contains($key, $operator = null, $value = null)
+Le containsprocédé peut être utilisé pour déterminer si une instance de modèle donnée est contenue par la collection. Cette méthode accepte une clé primaire ou une instance de modèle :
+
+$users->contains(1);
+ 
+$users->contains(User::find(1));
+
+diff($items)
+La diffméthode renvoie tous les modèles qui ne sont pas présents dans la collection donnée :
+
+use App\Models\User;
+ 
+$users = $users->diff(User::whereIn('id', [1, 2, 3])->get());
+
+except($keys)
+La exceptméthode renvoie tous les modèles qui n'ont pas les clés primaires données :
+
+$users = $users->except([1, 2, 3]);
+
+find($key)
+La findméthode renvoie le modèle dont la clé primaire correspond à la clé donnée. Si $keyest une instance de modèle, findtentera de renvoyer un modèle correspondant à la clé primaire. Si $keyest un tableau de clés, findrenverra tous les modèles qui ont une clé primaire dans le tableau donné :
+
+$users = User::all();
+ 
+$user = $users->find(1);
+
+fresh($with = [])
+La freshméthode récupère une nouvelle instance de chaque modèle de la collection à partir de la base de données. De plus, toutes les relations spécifiées seront chargées avec impatience :
+
+$users = $users->fresh();
+ 
+$users = $users->fresh('comments');
+
+intersect($items)
+La intersectméthode renvoie tous les modèles qui sont également présents dans la collection donnée :
+
+use App\Models\User;
+ 
+$users = $users->intersect(User::whereIn('id', [1, 2, 3])->get());
+
+load($relations)
+La loadméthode charge avec impatience les relations données pour tous les modèles de la collection :
+
+$users->load(['comments', 'posts']);
+ 
+$users->load('comments.author');
+
+loadMissing($relations)
+La loadMissingméthode charge avec impatience les relations données pour tous les modèles de la collection si les relations ne sont pas déjà chargées :
+
+$users->loadMissing(['comments', 'posts']);
+ 
+$users->loadMissing('comments.author');
+
+modelKeys()
+La modelKeysméthode renvoie les clés primaires pour tous les modèles de la collection :
+
+$users->modelKeys();
+ 
+// [1, 2, 3, 4, 5]
+
+makeVisible($attributes)
+La makeVisibleméthode rend visibles les attributs qui sont généralement "masqués" sur chaque modèle de la collection :
+
+$users = $users->makeVisible(['address', 'phone_number']);
+
+makeHidden($attributes)
+La makeHiddenméthode masque les attributs qui sont généralement "visibles" sur chaque modèle de la collection :
+
+$users = $users->makeHidden(['address', 'phone_number']);
+
+only($keys)
+La onlyméthode renvoie tous les modèles qui ont les clés primaires données :
+
+$users = $users->only([1, 2, 3]);
+
+toQuery()
+La toQueryméthode renvoie une instance du générateur de requêtes Eloquent contenant une whereIncontrainte sur les clés primaires du modèle de collection :
+
+use App\Models\User;
+ 
+$users = User::where('status', 'VIP')->get();
+ 
+$users->toQuery()->update([
+    'status' => 'Administrator',
+]);
+
+unique($key = null, $strict = false)
+La uniqueméthode renvoie tous les modèles uniques de la collection. Tous les modèles du même type avec la même clé primaire qu'un autre modèle de la collection sont supprimés :
+
+$users = $users->unique();
+
+Collections personnalisées
+Si vous souhaitez utiliser un Collectionobjet personnalisé lors de l'interaction avec un modèle donné, vous pouvez définir une newCollectionméthode sur votre modèle :
+
+<?php
+ 
+namespace App\Models;
+ 
+use App\Support\UserCollection;
+use Illuminate\Database\Eloquent\Model;
+ 
+class User extends Model
+{
+    /**
+     * Create a new Eloquent Collection instance.
+     *
+     * @param  array  $models
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function newCollection(array $models = [])
+    {
+        return new UserCollection($models);
+    }
+}
+
+Une fois que vous avez défini une newCollectionméthode, vous recevrez une instance de votre collection personnalisée chaque fois qu'Eloquent renverrait normalement une Illuminate\Database\Eloquent\Collectioninstance. Si vous souhaitez utiliser une collection personnalisée pour chaque modèle de votre application, vous devez définir la newCollectionméthode sur une classe de modèle de base étendue par tous les modèles de votre application.
